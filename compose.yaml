@@ -1,0 +1,13 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: framepost
+    volumes:
+      - framepost-mongodb:/data/db
+
+volumes:
+  framepost-mongodb:

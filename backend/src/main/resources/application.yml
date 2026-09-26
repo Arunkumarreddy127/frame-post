@@ -1,0 +1,32 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: framepost-backend
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/framepost}
+      database: ${MONGODB_DATABASE:framepost}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+framepost:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  auth:
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
+    session-hours: ${AUTH_SESSION_HOURS:24}
+  storage:
+    r2:
+      account-id: ${R2_ACCOUNT_ID:replace-me}
+      access-key-id: ${R2_ACCESS_KEY_ID:replace-me}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:replace-me}
+      bucket-name: ${R2_BUCKET_NAME:framepost-assets}
+      public-base-url: ${R2_PUBLIC_BASE_URL:}

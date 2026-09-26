@@ -1,0 +1,18 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend
+backend/target/
+backend/.mvn/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store

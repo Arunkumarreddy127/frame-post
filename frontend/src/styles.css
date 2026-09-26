@@ -1,0 +1,154 @@
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #18211f;
+  background: #f1f0e9;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: 8vh 8vw;
+  background:
+    radial-gradient(circle at 80% 15%, #d8e4d2 0, transparent 38%), #f1f0e9;
+}
+
+.auth-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 390px);
+  align-items: center;
+  gap: 8vw;
+}
+
+.home-shell {
+  display: grid;
+  place-items: center;
+}
+
+.home-panel {
+  width: min(100%, 760px);
+}
+
+.auth-panel {
+  display: grid;
+  gap: 1.25rem;
+  padding: 2rem;
+  border: 1px solid #c9d1c7;
+  background: rgba(255, 255, 251, 0.72);
+  box-shadow: 12px 12px 0 #cbd8c6;
+}
+
+.mode-switcher {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #c9d1c7;
+}
+
+.mode-button {
+  padding: 0.65rem 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #6b746d;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.mode-button.active {
+  border-color: #18211f;
+  color: #18211f;
+}
+
+label {
+  display: grid;
+  gap: 0.45rem;
+  color: #4f5c53;
+  font: 700 0.75rem/1.2 monospace;
+  text-transform: uppercase;
+}
+
+input {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #aeb9ac;
+  border-radius: 0;
+  background: #fffefa;
+  color: #18211f;
+  font:
+    1rem Georgia,
+    "Times New Roman",
+    serif;
+}
+
+button {
+  font: inherit;
+}
+
+.primary-button,
+.secondary-button {
+  width: fit-content;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid #18211f;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: #18211f;
+  color: #f1f0e9;
+}
+
+.secondary-button {
+  margin-top: 2rem;
+  background: transparent;
+  color: #18211f;
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.error {
+  margin: 0;
+  color: #a33f2f;
+  font-size: 0.95rem;
+}
+
+.eyebrow {
+  margin: 0 0 1rem;
+  color: #6b746d;
+  font: 700 0.75rem/1.2 monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+h1 {
+  max-width: 8ch;
+  margin: 0;
+  font-size: clamp(4rem, 12vw, 9rem);
+  line-height: 0.85;
+  letter-spacing: 0;
+}
+.status {
+  max-width: 32rem;
+  margin-top: 2rem;
+  font-size: 1.25rem;
+}
+
+@media (max-width: 720px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+  h1 {
+    font-size: clamp(3.5rem, 18vw, 6rem);
+  }
+}
