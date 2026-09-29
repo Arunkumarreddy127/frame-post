@@ -1,8 +1,14 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { API_BASE_URL } from "../api";
 
 type SidebarProps = {
   backTo?: string;
-  pages?: Array<{ id: string; name: string }>;
+};
+
+type SidebarPage = {
+  id: string;
+  name: string;
 };
 
 const navigation = [
@@ -12,7 +18,25 @@ const navigation = [
   { label: "Library", to: "/library", end: true },
 ];
 
-export function Sidebar({ backTo = "/home", pages = [] }: SidebarProps) {
+export function Sidebar({ backTo = "/home" }: SidebarProps) {
+  const [pages, setPages] = useState<SidebarPage[]>([]);
+
+  useEffect(() => {
+    async function loadPages() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/pages`, {
+          credentials: "include",
+        });
+        if (!response.ok) return;
+        setPages(await response.json());
+      } catch {
+        setPages([]);
+      }
+    }
+
+    void loadPages();
+  }, []);
+
   return (
     <aside className="app-sidebar">
       <nav className="sidebar-nav" aria-label="Main navigation">

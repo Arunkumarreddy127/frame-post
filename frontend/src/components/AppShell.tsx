@@ -8,7 +8,6 @@ type AppShellProps = {
   onLogout: () => Promise<void>;
   pageTitle: string;
   backTo?: string;
-  pages?: Array<{ id: string; name: string }>;
 };
 
 export function AppShell({
@@ -17,7 +16,6 @@ export function AppShell({
   onLogout,
   pageTitle,
   backTo = "/home",
-  pages = [],
 }: AppShellProps) {
   return (
     <div className="shell app-shell">
@@ -27,7 +25,7 @@ export function AppShell({
         onLogout={onLogout}
       />
       <div className="app-body">
-        <Sidebar backTo={backTo} pages={pages} />
+        <Sidebar backTo={backTo} />
         <main className="app-main">{children}</main>
       </div>
     </div>

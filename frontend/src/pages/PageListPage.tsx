@@ -57,12 +57,7 @@ export function PageListPage({ user, onLogout }: ShellRouteProps) {
   }
 
   return (
-    <AppShell
-      user={user}
-      onLogout={onLogout}
-      pageTitle="DREAMVERSE"
-      pages={pages}
-    >
+    <AppShell user={user} onLogout={onLogout} pageTitle="DREAMVERSE">
       <div className="page-list-header">
         <div>
           <p className="eyebrow">Pages</p>
