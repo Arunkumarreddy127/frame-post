@@ -4,6 +4,9 @@ import type { ShellRouteProps } from "../types";
 type PlaceholderPageProps = ShellRouteProps & {
   title: string;
   description: string;
+  sidebar?: "global" | "page";
+  pageId?: string;
+  backTo?: string;
 };
 
 export function PlaceholderPage({
@@ -11,9 +14,19 @@ export function PlaceholderPage({
   onLogout,
   title,
   description,
+  sidebar = "global",
+  pageId,
+  backTo,
 }: PlaceholderPageProps) {
   return (
-    <AppShell user={user} onLogout={onLogout} pageTitle={title}>
+    <AppShell
+      user={user}
+      onLogout={onLogout}
+      pageTitle={title}
+      sidebar={sidebar}
+      pageId={pageId}
+      backTo={backTo}
+    >
       <section className="panel placeholder-panel">
         <p className="eyebrow">Framepost workspace</p>
         <h2>{title}</h2>

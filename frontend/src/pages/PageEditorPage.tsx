@@ -77,7 +77,14 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
   }
 
   return (
-    <AppShell user={user} onLogout={onLogout} pageTitle={pageTitle}>
+    <AppShell
+      user={user}
+      onLogout={onLogout}
+      pageTitle={pageTitle}
+      sidebar={mode === "edit" ? "page" : "global"}
+      pageId={pageId}
+      backTo="/pages"
+    >
       <div className="page-header-row">
         <Link to="/pages" className="nav-link">
           ← Back to pages

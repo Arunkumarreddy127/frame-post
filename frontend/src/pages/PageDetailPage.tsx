@@ -37,7 +37,14 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
 
   if (loading) {
     return (
-      <AppShell user={user} onLogout={onLogout} pageTitle="Loading...">
+      <AppShell
+        user={user}
+        onLogout={onLogout}
+        pageTitle="Loading..."
+        sidebar="page"
+        pageId={pageId}
+        backTo="/pages"
+      >
         <p className="status">Loading page...</p>
       </AppShell>
     );
@@ -45,7 +52,14 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
 
   if (error || !page) {
     return (
-      <AppShell user={user} onLogout={onLogout} pageTitle="Page not found">
+      <AppShell
+        user={user}
+        onLogout={onLogout}
+        pageTitle="Page not found"
+        sidebar="page"
+        pageId={pageId}
+        backTo="/pages"
+      >
         <div className="panel error-panel">
           <p className="error">{error || "Page not found."}</p>
           <Link to="/pages" className="primary-button">
@@ -57,7 +71,14 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
   }
 
   return (
-    <AppShell user={user} onLogout={onLogout} pageTitle={page.name}>
+    <AppShell
+      user={user}
+      onLogout={onLogout}
+      pageTitle={page.name}
+      sidebar="page"
+      pageId={pageId}
+      backTo="/pages"
+    >
       <div className="page-header-row">
         <Link to="/pages" className="nav-link">
           ← Back to pages

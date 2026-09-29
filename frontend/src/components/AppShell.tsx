@@ -1,4 +1,5 @@
 import { Header } from "./Header";
+import { PageSidebar } from "./PageSidebar";
 import { Sidebar } from "./Sidebar";
 import type { User } from "../types";
 
@@ -8,6 +9,8 @@ type AppShellProps = {
   onLogout: () => Promise<void>;
   pageTitle: string;
   backTo?: string;
+  sidebar?: "global" | "page";
+  pageId?: string;
 };
 
 export function AppShell({
@@ -16,6 +19,8 @@ export function AppShell({
   onLogout,
   pageTitle,
   backTo = "/home",
+  sidebar = "global",
+  pageId,
 }: AppShellProps) {
   return (
     <div className="shell app-shell">
@@ -25,7 +30,11 @@ export function AppShell({
         onLogout={onLogout}
       />
       <div className="app-body">
-        <Sidebar backTo={backTo} />
+        {sidebar === "page" ? (
+          <PageSidebar pageId={pageId} backTo={backTo} />
+        ) : (
+          <Sidebar backTo={backTo} />
+        )}
         <main className="app-main">{children}</main>
       </div>
     </div>

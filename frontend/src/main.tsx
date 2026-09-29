@@ -11,6 +11,7 @@ import {
   PageDetailPage,
   PageEditorPage,
   PageListPage,
+  PagePlaceholderPage,
 } from "./pages";
 import type { User } from "./types";
 import "./styles.css";
@@ -117,6 +118,14 @@ function App() {
                 user={user as User}
                 onLogout={logout}
               />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pages/:pageId/:tool"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <PagePlaceholderPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />

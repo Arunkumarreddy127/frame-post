@@ -1,32 +1,39 @@
 import { NavLink } from "react-router-dom";
 
 type PageSidebarProps = {
+  pageId?: string;
   backTo?: string;
-  pages?: Array<{ id: string; name: string }>;
 };
 
 const navigation = [
-  { label: "Overview", to: "/pages", end: true },
-  { label: "Chat", to: "/chat", end: true },
-  { label: "Create", to: "/create", end: true },
-  { label: "Library", to: "/library", end: true },
+  { label: "Chat", suffix: "chat" },
+  { label: "Create", suffix: "create" },
+  { label: "Library", suffix: "library" },
 ];
 
-export function PageSidebar({
-  backTo = "/home",
-  pages = [],
-}: PageSidebarProps) {
+export function PageSidebar({ pageId, backTo = "/pages" }: PageSidebarProps) {
+  const pagePath = pageId ? `/pages/${pageId}` : "/pages";
+
   return (
     <aside className="app-sidebar">
-      <NavLink to={backTo} className="sidebar-back" aria-label="Back to home">
-        ←
+      <NavLink to={backTo} className="sidebar-back" aria-label="Back to Pages">
+        {"<- Back to Pages"}
       </NavLink>
       <nav className="sidebar-nav" aria-label="Main navigation">
+        <NavLink
+          to={pagePath}
+          end
+          className={({ isActive }) =>
+            isActive ? "sidebar-link active" : "sidebar-link"
+          }
+        >
+          Overview
+        </NavLink>
         {navigation.map((item) => (
           <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
+            key={item.suffix}
+            to={`${pagePath}/${item.suffix}`}
+            end
             className={({ isActive }) =>
               isActive ? "sidebar-link active" : "sidebar-link"
             }
@@ -35,23 +42,6 @@ export function PageSidebar({
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-section">
-        <span className="sidebar-section-label">Pages</span>
-        {pages.map((page) => (
-          <NavLink
-            key={page.id}
-            to={`/pages/${page.id}`}
-            className={({ isActive }) =>
-              isActive ? "sidebar-page-link active" : "sidebar-page-link"
-            }
-          >
-            {page.name}
-          </NavLink>
-        ))}
-        <NavLink to="/pages/new" className="sidebar-page-link">
-          + New Page
-        </NavLink>
-      </div>
     </aside>
   );
 }

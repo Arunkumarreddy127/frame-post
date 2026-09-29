@@ -129,10 +129,13 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  width: 2rem;
-  height: 2rem;
-  color: #48544d;
-  font-size: 1.4rem;
+  width: fit-content;
+  min-height: 2.8rem;
+  padding: 0.7rem 1.1rem;
+  border: 1px solid #18211f;
+  background: transparent;
+  color: #18211f;
+  font: inherit;
 }
 
 .sidebar-nav,
@@ -465,7 +468,7 @@ h1 {
   }
 
   .sidebar-back {
-    height: 1.5rem;
+    min-height: 2.8rem;
   }
 
   .sidebar-nav {
