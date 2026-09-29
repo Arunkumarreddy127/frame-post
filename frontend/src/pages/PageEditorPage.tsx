@@ -85,11 +85,7 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
       pageId={pageId}
       backTo="/pages"
     >
-      <div className="page-header-row">
-        <Link to="/pages" className="nav-link">
-          ← Back to pages
-        </Link>
-      </div>
+      <div className="page-header-row"></div>
       <section className="panel form-panel">
         <h2>{mode === "edit" ? "Edit page" : "Create page"}</h2>
         {loading ? (
