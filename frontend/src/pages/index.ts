@@ -1,3 +1,4 @@
+export { ChatPage } from "./ChatPage";
 export { HomePage } from "./HomePage";
 export { PageDetailPage } from "./PageDetailPage";
 export { PageEditorPage } from "./PageEditorPage";

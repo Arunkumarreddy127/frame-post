@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom";
+import { ChatPage } from "./ChatPage";
 import { PlaceholderPage } from "../components/PlaceholderPage";
 import type { ShellRouteProps } from "../types";
 
@@ -28,6 +29,10 @@ export function PagePlaceholderPage({ user, onLogout }: ShellRouteProps) {
 
   if (!pageId || !pageTool) {
     return null;
+  }
+
+  if (tool === "chat") {
+    return <ChatPage user={user} onLogout={onLogout} pageId={pageId} />;
   }
 
   return (

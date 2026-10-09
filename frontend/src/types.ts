@@ -19,3 +19,29 @@ export type ShellRouteProps = {
   user: User;
   onLogout: () => Promise<void>;
 };
+
+export type ChatRole = "user" | "assistant";
+export type ChatMessageStatus = "completed" | "failed";
+
+export type ChatMessage = {
+  id: string;
+  role: ChatRole;
+  content: string;
+  model: string | null;
+  status: ChatMessageStatus;
+  createdAt: string;
+};
+
+export type ChatConversationSummary = {
+  id: string;
+  title: string;
+  model: string;
+  pageId: string | null;
+  pageName: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ChatConversation = ChatConversationSummary & {
+  messages: ChatMessage[];
+};

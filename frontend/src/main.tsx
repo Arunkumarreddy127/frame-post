@@ -7,6 +7,7 @@ import { PlaceholderPage } from "./components/PlaceholderPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import {
+  ChatPage,
   HomePage,
   PageDetailPage,
   PageEditorPage,
@@ -133,12 +134,7 @@ function App() {
           path="/chat"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <PlaceholderPage
-                user={user as User}
-                onLogout={logout}
-                title="Chat"
-                description="Chat is ready for a future workspace experience."
-              />
+              <ChatPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />

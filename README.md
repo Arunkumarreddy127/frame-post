@@ -9,11 +9,13 @@ Full-stack foundation with basic username authentication and a simple homepage.
 - Data: MongoDB
 - Object storage: Cloudflare R2 through the S3-compatible AWS SDK
 
-This workspace intentionally contains no Instagram or publishing features. Authentication is limited to username/password registration, login, logout, and the authenticated homepage greeting.
+This workspace intentionally contains no Instagram or publishing features. It includes username/password authentication, user-owned pages, and private ChatGPT-style conversations in global or page-specific workspaces.
 
 ## Configuration
 
 Copy `.env.example` to `.env` and replace the R2 placeholders when needed. The default local values use MongoDB database `framepost` and R2 bucket `framepost-assets`.
+
+To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The UI allows `gpt-5-mini` and `gpt-5` by default; adjust the server-side `OPENAI_ALLOWED_MODELS` allowlist only when those models are available to the configured key.
 
 ## Run locally
 
@@ -30,7 +32,9 @@ npm run dev
 
 The frontend runs at `http://localhost:5173`. The backend actuator health endpoint is available at `http://localhost:8080/actuator/health`.
 
-Register or log in from the frontend. User records and server-managed sessions are stored in MongoDB. The session cookie is HttpOnly; set `AUTH_COOKIE_SECURE=true` when serving the backend over HTTPS.
+Register or log in from the frontend. User records, server-managed sessions, page records, conversations, and chat messages are stored in MongoDB. The session cookie is HttpOnly; set `AUTH_COOKIE_SECURE=true` when serving the backend over HTTPS.
+
+`/chat` keeps conversations in the user workspace. `/pages/:pageId/chat` keeps separate conversations for that owned page and sends its name, description, and bio as OpenAI context. Assistant responses stream into the browser, while the backend persists completed replies and retains user messages when a provider request fails.
 
 ## Validate
 
