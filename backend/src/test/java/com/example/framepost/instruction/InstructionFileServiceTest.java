@@ -1,11 +1,13 @@
 package com.example.framepost.instruction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.page.PageService;
@@ -63,5 +65,55 @@ class InstructionFileServiceTest {
         when(files.findByIdInAndUserId(List.of("f1"), "user-id")).thenReturn(List.of(userFile));
 
         assertEquals(List.of("f1"), service.validateSelection(user, null, List.of("f1", "f1")));
+    }
+
+    @Test
+    void updateCanMovePageFileToAllChats() {
+        InstructionFile pageFile = new InstructionFile("f1", "user-id", "page-a", "Tone", "old", now, now);
+        when(files.findByIdAndUserId("f1", "user-id")).thenReturn(Optional.of(pageFile));
+        when(files.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InstructionFile updated = service.update(
+                user,
+                "f1",
+                new InstructionFileService.InstructionFileUpdateRequest("Tone", "new", "user", null)
+        );
+
+        assertNull(updated.pageId());
+        assertEquals("new", updated.content());
+    }
+
+    @Test
+    void updateCanMoveUserFileIntoCurrentPage() {
+        InstructionFile userFile = new InstructionFile("f1", "user-id", null, "Tone", "old", now, now);
+        when(files.findByIdAndUserId("f1", "user-id")).thenReturn(Optional.of(userFile));
+        when(files.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InstructionFile updated = service.update(
+                user,
+                "f1",
+                new InstructionFileService.InstructionFileUpdateRequest("Tone", "new", "page", "page-a")
+        );
+
+        assertEquals("page-a", updated.pageId());
+        Mockito.verify(pageService).get(user, "page-a");
+    }
+
+    @Test
+    void updateRejectsDuplicateNameInDestinationScope() {
+        InstructionFile pageFile = new InstructionFile("f1", "user-id", "page-a", "Tone", "old", now, now);
+        when(files.findByIdAndUserId("f1", "user-id")).thenReturn(Optional.of(pageFile));
+        when(files.existsByUserIdAndPageIdIsNullAndNameIgnoreCase("user-id", "Tone")).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(
+                ResponseStatusException.class,
+                () -> service.update(
+                        user,
+                        "f1",
+                        new InstructionFileService.InstructionFileUpdateRequest("Tone", "new", "user", null)
+                )
+        );
+
+        assertEquals(409, exception.getStatusCode().value());
     }
 }

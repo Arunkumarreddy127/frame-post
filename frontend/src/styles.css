@@ -1149,10 +1149,42 @@ h2 {
 
 .instruction-files {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.75rem;
   padding: 0.75rem 1rem;
   border-top: 1px solid #d0d7de;
   background: #f6f8fa;
+}
+
+.instruction-files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.instruction-files-header h3 {
+  margin: 0;
+  color: #24292f;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.instruction-files-header p {
+  margin: 0.15rem 0 0;
+  color: #656d76;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.instruction-files-count {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  background: #fff;
+  color: #57606a;
+  font-size: 0.68rem;
+  white-space: nowrap;
 }
 
 .instruction-file-list {
@@ -1164,40 +1196,74 @@ h2 {
 
 .instruction-file {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.2rem 0.5rem;
+  padding: 0.35rem 0.5rem;
   border: 1px solid #d0d7de;
-  border-radius: 6px;
+  border-radius: 0.45rem;
   background: #fff;
   font-size: 0.85rem;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.instruction-file:hover {
+  border-color: #8c959f;
 }
 
 .instruction-file.selected {
   border-color: #0969da;
   background: #ddf4ff;
+  box-shadow: inset 0 0 0 1px rgb(9 105 218 / 12%);
 }
 
 .instruction-file label {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 0.3rem;
   cursor: pointer;
 }
 
+.instruction-file label > span:first-of-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instruction-file input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: #0969da;
+  flex: 0 0 auto;
+}
+
 .instruction-file-scope {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: #f6f8fa;
   color: #57606a;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .instruction-file-edit {
-  padding: 0;
+  flex: 0 0 auto;
+  padding: 0.15rem 0.3rem;
   border: 0;
+  border-radius: 0.25rem;
   background: none;
   color: #0969da;
   font-size: 0.8rem;
-  cursor: pointer;
+}
+
+.instruction-file-edit:hover:not(:disabled) {
+  background: #ddf4ff;
+  text-decoration: underline;
 }
 
 .instruction-editor {
@@ -1207,6 +1273,12 @@ h2 {
   border: 1px solid #d0d7de;
   border-radius: 0.35rem;
   background: #fafbfc;
+}
+
+.instruction-editor input,
+.instruction-editor textarea,
+.instruction-editor select {
+  min-width: 0;
 }
 
 .instruction-editor input,
@@ -1228,22 +1300,75 @@ h2 {
   gap: 0.5rem;
 }
 
+.instruction-editor-actions select {
+  width: auto;
+  max-width: 100%;
+  margin-right: auto;
+}
+
+.chat-sidebar .instruction-files-chat {
+  flex: 0 0 auto;
+  max-height: 42%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.8rem;
+  border-top: 1px solid #d0d7de;
+  background: #fff;
+}
+
+.chat-sidebar .instruction-file-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.chat-sidebar .instruction-file {
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.4rem 0.45rem;
+  font-size: 0.78rem;
+}
+
+.chat-sidebar .instruction-file label {
+  flex: 1;
+}
+
+.chat-sidebar .instruction-files-chat > .instruction-file-list > .secondary-button {
+  justify-content: center;
+  width: 100%;
+  min-height: 2rem;
+  border-style: dashed;
+  color: #0969da;
+}
+
 .instruction-proposal-diff {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
 }
 
+.instruction-proposal-diff > div,
+.instruction-proposal-content {
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid #d8dee4;
+  border-radius: 0.4rem;
+  background: #f6f8fa;
+}
+
 .instruction-proposal-diff pre {
   margin: 0.25rem 0 0;
   max-height: 14rem;
   overflow: auto;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
   font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .instruction-proposal-content {
-  margin: 0.5rem 0 0 0;
+  margin: 0.5rem 0 0;
 }
 
 .instruction-proposal-content pre {
@@ -1252,41 +1377,45 @@ h2 {
   overflow: auto;
   white-space: pre-wrap;
   font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .page-instructions-panel {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
+  border-top: 3px solid #0969da;
 }
 
 .page-instructions-panel h3 {
-  margin-bottom: 0.5rem;
+  margin: 0;
 }
 
 .page-instructions-panel > p {
-  margin-bottom: 1rem;
+  margin: -0.5rem 0 0;
   color: #57606a;
   font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 .page-instructions-panel .instruction-files {
-  padding: 0;
-  border: none;
-  background: none;
+  padding: 1rem;
+  border: 1px solid #d8dee4;
+  border-radius: 0.5rem;
+  background: #f6f8fa;
 }
 
 .page-instructions-panel .instruction-file-list {
   flex-direction: column;
   align-items: stretch;
-  gap: 0.5rem;
+  gap: 0.55rem;
 }
 
 .page-instructions-panel .instruction-file {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.5rem;
-  border: 1px solid #d0d7de;
-  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  border-color: #d8dee4;
+  border-radius: 0.45rem;
   background: #fff;
 }
 
@@ -1298,4 +1427,29 @@ h2 {
 .page-instructions-panel .instruction-file-edit {
   flex-shrink: 0;
   margin-left: 0.5rem;
+}
+
+.page-instructions-panel .instruction-editor {
+  background: #fff;
+}
+
+.page-instructions-panel .instruction-files-overview > .instruction-file-list > .secondary-button {
+  justify-content: center;
+  min-height: 2.4rem;
+  border-style: dashed;
+  color: #0969da;
+}
+
+@media (max-width: 720px) {
+  .chat-sidebar .instruction-files-chat {
+    max-height: none;
+  }
+
+  .page-instructions-panel .instruction-file {
+    align-items: flex-start;
+  }
+
+  .instruction-proposal-diff {
+    grid-template-columns: 1fr;
+  }
 }

@@ -10,6 +10,7 @@ import type { InstructionFile } from "../types";
 
 type InstructionFilesProps = {
   pageId?: string;
+  variant?: "chat" | "overview";
   selectedIds: string[];
   disabled?: boolean;
   refreshKey?: number;
@@ -26,6 +27,7 @@ type Editor = {
 
 export function InstructionFiles({
   pageId,
+  variant = "chat",
   selectedIds,
   disabled = false,
   refreshKey = 0,
@@ -75,9 +77,18 @@ export function InstructionFiles({
     try {
       const input = { name: editor.name, content: editor.content };
       if (editor.id) {
-        const updated = await updateInstructionFile(editor.id, input);
+        const updated = await updateInstructionFile(editor.id, {
+          ...input,
+          scope: editor.scope,
+          pageId: editor.scope === "page" ? pageId : null,
+        });
         setFiles((current) =>
-          (current ?? []).map((file) => (file.id === updated.id ? updated : file)),
+          (current ?? [])
+            .map((file) => (file.id === updated.id ? updated : file))
+            .sort((a, b) => {
+              const scopeOrder = (a.pageId === null ? 0 : 1) - (b.pageId === null ? 0 : 1);
+              return scopeOrder || a.name.localeCompare(b.name);
+            }),
         );
       } else {
         const created = await createInstructionFile(
@@ -115,7 +126,16 @@ export function InstructionFiles({
   }
 
   return (
-    <div className="instruction-files">
+    <div className={`instruction-files instruction-files-${variant}`}>
+      {variant === "chat" && (
+        <div className="instruction-files-header">
+          <div>
+            <h3>Instruction files</h3>
+            <p>Select files to guide replies</p>
+          </div>
+          <span className="instruction-files-count">{selectedIds.length} selected</span>
+        </div>
+      )}
       <div className="instruction-file-list" role="group" aria-label="Instruction files">
         {(files ?? []).map((file) => (
           <span
@@ -186,7 +206,7 @@ export function InstructionFiles({
             onChange={(event) => setEditor({ ...editor, content: event.target.value })}
           />
           <div className="instruction-editor-actions">
-            {!editor.id && pageId && (
+            {pageId && (
               <select
                 value={editor.scope}
                 aria-label="Instruction file scope"

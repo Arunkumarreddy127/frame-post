@@ -37,7 +37,12 @@ export async function createInstructionFile(
 
 export async function updateInstructionFile(
   id: string,
-  input: { name: string; content: string },
+  input: {
+    name: string;
+    content: string;
+    scope?: "user" | "page";
+    pageId?: string | null;
+  },
 ) {
   return await request<InstructionFile>(`/api/instructions/${id}`, {
     method: "PUT",

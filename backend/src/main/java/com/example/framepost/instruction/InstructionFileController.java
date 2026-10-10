@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import com.example.framepost.auth.AuthService;
 import com.example.framepost.auth.User;
 import com.example.framepost.instruction.InstructionFileService.InstructionFileRequest;
+import com.example.framepost.instruction.InstructionFileService.InstructionFileUpdateRequest;
 import com.example.framepost.instruction.InstructionFileService.InstructionFileResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -67,7 +68,7 @@ public class InstructionFileController {
     @PutMapping("/instructions/{id}")
     public InstructionFileResponse update(
             @PathVariable String id,
-            @RequestBody InstructionFileRequest body,
+            @RequestBody InstructionFileUpdateRequest body,
             HttpServletRequest request
     ) {
         return InstructionFileResponse.from(instructionService.update(currentUser(request), id, body));

@@ -300,6 +300,13 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     }
   }
 
+  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = draft.trim();
@@ -582,6 +589,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               id="chat-message"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
               placeholder="Pitch your idea"
               rows={2}
               maxLength={8000}

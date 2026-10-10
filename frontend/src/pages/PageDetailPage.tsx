@@ -115,6 +115,7 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
         </p>
         <InstructionFiles
           pageId={pageId}
+          variant="overview"
           selectedIds={[]}
           disabled={false}
           refreshKey={filesRefreshKey}

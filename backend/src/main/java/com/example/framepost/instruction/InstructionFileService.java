@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,17 +50,31 @@ public class InstructionFileService {
         return files.save(new InstructionFile(null, user.id(), pageId, name, content, now, now));
     }
 
-    public InstructionFile update(User user, String id, InstructionFileRequest request) {
+    public InstructionFile update(User user, String id, InstructionFileUpdateRequest request) {
         InstructionFile existing = get(user, id);
         String name = validateName(request.name());
         String content = validateContent(request.content());
-        if (!name.equalsIgnoreCase(existing.name())) {
-            ensureNameAvailable(user, existing.pageId(), name);
+        String pageId = existing.pageId();
+        if (request.scope() != null) {
+            if ("user".equals(request.scope())) {
+                pageId = null;
+            } else if ("page".equals(request.scope())) {
+                if (request.pageId() == null || request.pageId().isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Page is required for page scope");
+                }
+                pageService.get(user, request.pageId());
+                pageId = request.pageId();
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid instruction file scope");
+            }
+        }
+        if (!name.equalsIgnoreCase(existing.name()) || !Objects.equals(pageId, existing.pageId())) {
+            ensureNameAvailable(user, pageId, name);
         }
         return files.save(new InstructionFile(
                 existing.id(),
                 existing.userId(),
-                existing.pageId(),
+                pageId,
                 name,
                 content,
                 existing.createdAt(),
@@ -154,6 +169,9 @@ public class InstructionFileService {
     }
 
     public record InstructionFileRequest(String name, String content) {
+    }
+
+    public record InstructionFileUpdateRequest(String name, String content, String scope, String pageId) {
     }
 
     public record InstructionFileResponse(
