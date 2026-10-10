@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowUp, ChevronDown, Pencil, Plus } from "lucide-react";
 import {
   type ChatModel,
   createConversation,
@@ -307,21 +308,22 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               onClick={() => void startConversation()}
               disabled={sending || !model}
             >
-              <span className="chat-new-icon" aria-hidden="true">
-                +
-              </span>
+              <Plus className="chat-new-icon" size={17} strokeWidth={2} aria-hidden="true" />
               <span>New chat</span>
             </button>
           </div>
           {!isPageChat && (
-            <button
-              className={showAllChats ? "chat-history-filter active" : "chat-history-filter"}
-              type="button"
-              disabled={sending}
-              onClick={() => void toggleAllChats()}
+            <label
+              className="secondary-button small-button chat-all-chats-toggle"
             >
-              {showAllChats ? "Global chats" : "All chats"}
-            </button>
+              <input
+                type="checkbox"
+                checked={showAllChats}
+                disabled={sending}
+                onChange={() => void toggleAllChats()}
+              />
+              <span>All chats</span>
+            </label>
           )}
           {loading ? (
             <p className="chat-history-status">Loading chats...</p>
@@ -344,7 +346,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                 >
                   <span>{item.title}</span>
                   {showAllChats && (
-                    <span className="chat-history-scope">
+                    <span className={`chat-history-scope ${scopeColorClass(item.pageId)}`}>
                       {item.pageName ?? "Global chat"}
                     </span>
                   )}
@@ -380,7 +382,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                       aria-label="Edit conversation title"
                       title="Edit conversation title"
                     >
-                      ✎
+                      <Pencil size={15} strokeWidth={2} aria-hidden="true" />
                     </button>
                   )}
                 </>
@@ -451,17 +453,25 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
             <div className="chat-composer-toolbar">
               <label className="chat-model-control">
                 <span className="sr-only">Model</span>
-                <select
-                  value={model}
-                  disabled={sending || chatModels.length === 0}
-                  onChange={(event) => setModel(event.target.value)}
-                >
-                  {chatModels.map((chatModel) => (
-                    <option key={chatModel} value={chatModel}>
-                      {chatModel}
-                    </option>
-                  ))}
-                </select>
+                <span className="chat-model-select">
+                  <select
+                    value={model}
+                    disabled={sending || chatModels.length === 0}
+                    onChange={(event) => setModel(event.target.value)}
+                  >
+                    {chatModels.map((chatModel) => (
+                      <option key={chatModel} value={chatModel}>
+                        {chatModel}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    className="chat-model-chevron"
+                    size={14}
+                    strokeWidth={2}
+                    aria-hidden="true"
+                  />
+                </span>
               </label>
               <button
                 className="chat-composer-submit"
@@ -469,7 +479,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                 aria-label={sending ? "Responding" : "Send message"}
                 disabled={sending || !draft.trim()}
               >
-                ↑
+                <ArrowUp size={19} strokeWidth={2} aria-hidden="true" />
               </button>
             </div>
           </form>
@@ -481,4 +491,14 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
 
 function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function scopeColorClass(pageId: string | null) {
+  if (!pageId) return "scope-color-global";
+
+  let hash = 0;
+  for (const character of pageId) {
+    hash = (hash * 31 + character.charCodeAt(0)) % 6;
+  }
+  return `scope-color-${hash}`;
 }

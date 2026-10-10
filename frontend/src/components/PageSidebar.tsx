@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 type PageSidebarProps = {
   pageId?: string;
@@ -17,9 +18,7 @@ export function PageSidebar({ pageId, backTo = "/pages" }: PageSidebarProps) {
   return (
     <aside className="app-sidebar">
       <NavLink to={backTo} className="sidebar-back" aria-label="Back to Pages">
-        <span className="sidebar-back-icon" aria-hidden="true">
-          ←
-        </span>
+        <ArrowLeft className="sidebar-back-icon" size={18} strokeWidth={1.8} aria-hidden="true" />
         <span>Back to Pages</span>
       </NavLink>
       <nav className="sidebar-nav" aria-label="Main navigation">
