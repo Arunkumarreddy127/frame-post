@@ -48,6 +48,12 @@ public class ChatController {
         return chatService.listAll(currentUser(request));
     }
 
+    @GetMapping("/chat/models")
+    public List<String> listModels(HttpServletRequest request) {
+        currentUser(request);
+        return chatService.availableModels();
+    }
+
     @PostMapping("/chats")
     @ResponseStatus(HttpStatus.CREATED)
     public ChatConversationResponse createGlobal(

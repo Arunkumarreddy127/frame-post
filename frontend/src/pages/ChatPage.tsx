@@ -1,11 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  CHAT_MODELS,
   type ChatModel,
   createConversation,
   deleteConversation,
   getConversation,
+  listChatModels,
   listAllConversations,
   listConversations,
   streamMessage,
@@ -22,12 +22,11 @@ type ChatPageProps = ShellRouteProps & {
   pageId?: string;
 };
 
-const initialModel: ChatModel = "gpt-5-mini";
-
 export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
+  const [chatModels, setChatModels] = useState<ChatModel[]>([]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [conversation, setConversation] = useState<ChatConversation | null>(null);
-  const [model, setModel] = useState<ChatModel>(initialModel);
+  const [model, setModel] = useState<ChatModel>("");
   const [draft, setDraft] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,8 +49,13 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       setError("");
       setShowAllChats(false);
       try {
-        const loaded = await listConversations(pageId);
+        const [availableModels, loaded] = await Promise.all([
+          listChatModels(),
+          listConversations(pageId),
+        ]);
         if (!active) return;
+        setChatModels(availableModels);
+        setModel(availableModels[0] ?? "");
         setConversations(loaded);
         const selectedConversation =
           loaded.find((item) => item.id === requestedConversationId) ?? loaded[0];
@@ -114,6 +118,10 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
 
   async function startConversation() {
     setError("");
+    if (!model) {
+      setError("No chat models are available");
+      return;
+    }
     try {
       const created = await createConversation(model, pageId);
       setConversations((current) => [created, ...current]);
@@ -143,7 +151,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content || sending || !model) return;
 
     setSending(true);
     setError("");
@@ -218,7 +226,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               className="secondary-button small-button"
               type="button"
               onClick={() => void startConversation()}
-              disabled={sending}
+              disabled={sending || !model}
             >
               New chat
             </button>
@@ -275,10 +283,10 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                 Model
                 <select
                   value={model}
-                  disabled={sending}
-                  onChange={(event) => setModel(event.target.value as ChatModel)}
+                  disabled={sending || chatModels.length === 0}
+                  onChange={(event) => setModel(event.target.value)}
                 >
-                  {CHAT_MODELS.map((chatModel) => (
+                  {chatModels.map((chatModel) => (
                     <option key={chatModel} value={chatModel}>
                       {chatModel}
                     </option>

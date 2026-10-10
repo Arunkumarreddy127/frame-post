@@ -1,9 +1,7 @@
 import { API_BASE_URL } from "./api";
 import type { ChatConversation, ChatConversationSummary } from "./types";
 
-export const CHAT_MODELS = ["gpt-5-mini", "gpt-5"] as const;
-
-export type ChatModel = (typeof CHAT_MODELS)[number];
+export type ChatModel = string;
 
 export type ChatStreamEvent =
   | { type: "delta"; text: string }
@@ -32,6 +30,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function listConversations(pageId?: string) {
   return request<ChatConversationSummary[]>(chatPath(pageId));
+}
+
+export function listChatModels() {
+  return request<string[]>("/api/chat/models");
 }
 
 export function listAllConversations() {

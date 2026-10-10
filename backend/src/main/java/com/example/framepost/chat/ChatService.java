@@ -63,6 +63,10 @@ public class ChatService {
                 .toList();
     }
 
+    public List<String> availableModels() {
+        return openAiProperties.allowedModels();
+    }
+
     public ChatConversationResponse create(User user, String pageId, CreateConversationRequest request) {
         validateScope(user, pageId);
         String model = validateModel(request.model());
