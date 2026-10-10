@@ -20,11 +20,12 @@ export function PagePlaceholderPage({ user, onLogout }: ShellRouteProps) {
     pageId: string;
     tool: PageTool;
   }>();
-  const pageTool = pageTools[tool];
 
-  if (!pageId || !pageTool) {
+  if (!pageId || (tool !== "create" && tool !== "library")) {
     return null;
   }
+
+  const pageTool = pageTools[tool];
 
   return (
     <PlaceholderPage
