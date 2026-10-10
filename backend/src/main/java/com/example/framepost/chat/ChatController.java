@@ -11,10 +11,12 @@ import com.example.framepost.chat.ChatService.ChatConversationResponse;
 import com.example.framepost.chat.ChatService.ChatConversationSummary;
 import com.example.framepost.chat.ChatService.CreateConversationRequest;
 import com.example.framepost.chat.ChatService.SendMessageRequest;
+import com.example.framepost.chat.ChatService.UpdateConversationTitleRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -71,6 +73,15 @@ public class ChatController {
         return chatService.get(currentUser(request), null, conversationId);
     }
 
+    @PatchMapping("/chats/{conversationId}")
+    public ChatConversationResponse updateGlobalTitle(
+            @PathVariable String conversationId,
+            @RequestBody UpdateConversationTitleRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.updateTitle(currentUser(servletRequest), null, conversationId, request);
+    }
+
     @DeleteMapping("/chats/{conversationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteGlobal(@PathVariable String conversationId, HttpServletRequest request) {
@@ -111,6 +122,16 @@ public class ChatController {
             HttpServletRequest request
     ) {
         return chatService.get(currentUser(request), pageId, conversationId);
+    }
+
+    @PatchMapping("/pages/{pageId}/chats/{conversationId}")
+    public ChatConversationResponse updateForPageTitle(
+            @PathVariable String pageId,
+            @PathVariable String conversationId,
+            @RequestBody UpdateConversationTitleRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.updateTitle(currentUser(servletRequest), pageId, conversationId, request);
     }
 
     @DeleteMapping("/pages/{pageId}/chats/{conversationId}")

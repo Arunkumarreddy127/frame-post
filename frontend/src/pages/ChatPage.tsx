@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   type ChatModel,
@@ -9,6 +9,7 @@ import {
   listAllConversations,
   listConversations,
   streamMessage,
+  updateConversationTitle,
 } from "../chatApi";
 import { AppShell } from "../components/AppShell";
 import type {
@@ -29,6 +30,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [conversation, setConversation] = useState<ChatConversation | null>(null);
   const [model, setModel] = useState<ChatModel>("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [savingTitle, setSavingTitle] = useState(false);
   const [draft, setDraft] = useState("");
   const [streamingText, setStreamingText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -47,6 +51,8 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     async function loadInitialConversations() {
       setLoading(true);
       setConversation(null);
+      setEditingTitle(false);
+      setTitleDraft("");
       setConversations([]);
       setError("");
       setShowAllChats(false);
@@ -87,6 +93,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       const loaded = await getConversation(conversationId, activePageId);
       if (!active) return;
       setConversation(loaded);
+      setEditingTitle(false);
       setModel(
         availableModels.includes(loaded.model)
           ? loaded.model
@@ -136,6 +143,8 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       const created = await createConversation(model, activePageId);
       setConversations((current) => [created, ...current]);
       setConversation(created);
+      setEditingTitle(false);
+      setTitleDraft("");
       setStreamingText("");
     } catch (requestError) {
       setError(messageFrom(requestError, "Unable to create a conversation"));
@@ -149,12 +158,73 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       const remaining = conversations.filter((item) => item.id !== conversation.id);
       setConversations(remaining);
       setConversation(null);
+      setEditingTitle(false);
+      setTitleDraft("");
       setStreamingText("");
       if (remaining[0]) {
         await loadConversation(remaining[0].id);
       }
     } catch (requestError) {
       setError(messageFrom(requestError, "Unable to delete conversation"));
+    }
+  }
+
+  function beginTitleEdit() {
+    if (!conversation || sending || savingTitle) return;
+    setTitleDraft(conversation.title);
+    setEditingTitle(true);
+  }
+
+  function cancelTitleEdit() {
+    if (savingTitle) return;
+    setEditingTitle(false);
+    setTitleDraft("");
+  }
+
+  async function saveTitle() {
+    if (!conversation || savingTitle) return;
+    const title = titleDraft.trim();
+    if (!title) {
+      setError("Conversation title is required");
+      return;
+    }
+    if (title === conversation.title) {
+      cancelTitleEdit();
+      return;
+    }
+
+    setSavingTitle(true);
+    setError("");
+    try {
+      const updated = await updateConversationTitle(
+        conversation.id,
+        title,
+        activePageId,
+      );
+      setConversation(updated);
+      setConversations((current) =>
+        current.map((item) =>
+          item.id === updated.id
+            ? { ...item, title: updated.title, updatedAt: updated.updatedAt }
+            : item,
+        ),
+      );
+      setEditingTitle(false);
+      setTitleDraft("");
+    } catch (requestError) {
+      setError(messageFrom(requestError, "Unable to update conversation title"));
+    } finally {
+      setSavingTitle(false);
+    }
+  }
+
+  function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void saveTitle();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      cancelTitleEdit();
     }
   }
 
@@ -285,11 +355,36 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         </aside>
         <div className="chat-workspace">
           <div className="chat-toolbar">
-            <div>
-              <p className="eyebrow">
-                {isPageChat ? "Page workspace" : "Private workspace"}
-              </p>
-              <h2>{conversation?.title ?? "New chat"}</h2>
+            <div className="chat-title">
+              {editingTitle ? (
+                <input
+                  className="chat-title-input"
+                  value={titleDraft}
+                  maxLength={120}
+                  autoFocus
+                  disabled={savingTitle}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onBlur={() => void saveTitle()}
+                  onKeyDown={handleTitleKeyDown}
+                  aria-label="Conversation title"
+                />
+              ) : (
+                <>
+                  <h2>{conversation?.title ?? "New chat"}</h2>
+                  {conversation && (
+                    <button
+                      className="chat-title-edit"
+                      type="button"
+                      onClick={beginTitleEdit}
+                      disabled={sending || savingTitle}
+                      aria-label="Edit conversation title"
+                      title="Edit conversation title"
+                    >
+                      ✎
+                    </button>
+                  )}
+                </>
+              )}
             </div>
             <div className="chat-toolbar-actions">
               {conversation && (

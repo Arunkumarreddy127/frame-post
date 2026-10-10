@@ -44,6 +44,18 @@ export function getConversation(conversationId: string, pageId?: string) {
   return request<ChatConversation>(`${chatPath(pageId)}/${conversationId}`);
 }
 
+export function updateConversationTitle(
+  conversationId: string,
+  title: string,
+  pageId?: string,
+) {
+  return request<ChatConversation>(`${chatPath(pageId)}/${conversationId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+}
+
 export function createConversation(model: ChatModel, pageId?: string) {
   return request<ChatConversation>(chatPath(pageId), {
     method: "POST",

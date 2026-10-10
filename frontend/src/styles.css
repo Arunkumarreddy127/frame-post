@@ -686,7 +686,52 @@ textarea {
 }
 
 .chat-toolbar h2 {
+  margin: 0;
   font-size: 1rem;
+}
+
+.chat-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.chat-title h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-title-input {
+  width: min(32rem, 60vw);
+  min-width: 12rem;
+  padding: 0.2rem 0.35rem;
+  border-color: #1f6feb;
+  border-radius: 0.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.chat-title-edit {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: #57606a;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.chat-title-edit:hover:not(:disabled) {
+  background: #f6f8fa;
+  color: #1f6feb;
 }
 
 .chat-toolbar-actions {

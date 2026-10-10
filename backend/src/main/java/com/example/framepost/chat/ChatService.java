@@ -93,6 +93,31 @@ public class ChatService {
         );
     }
 
+    public ChatConversationResponse updateTitle(
+            User user,
+            String pageId,
+            String conversationId,
+            UpdateConversationTitleRequest request
+    ) {
+        validateScope(user, pageId);
+        ChatConversation conversation = findConversation(user, pageId, conversationId);
+        String title = validateTitle(request.title());
+        ChatConversation updated = conversations.save(new ChatConversation(
+                conversation.id(),
+                conversation.userId(),
+                conversation.pageId(),
+                title,
+                conversation.model(),
+                conversation.createdAt(),
+                Instant.now()
+        ));
+        return ChatConversationResponse.from(
+                updated,
+                pageName(updated),
+                messages.findByConversationIdOrderByCreatedAtAsc(updated.id())
+        );
+    }
+
     public void delete(User user, String pageId, String conversationId) {
         validateScope(user, pageId);
         ChatConversation conversation = findConversation(user, pageId, conversationId);
@@ -263,6 +288,20 @@ public class ChatService {
         return trimmed;
     }
 
+    private String validateTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Conversation title is required");
+        }
+        String trimmed = title.trim();
+        if (trimmed.length() > 120) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Conversation title must be at most 120 characters"
+            );
+        }
+        return trimmed;
+    }
+
     private String developerInstructions(Page page) {
         if (page == null) {
             return "You are a helpful assistant in the user's private Framepost workspace.";
@@ -309,6 +348,9 @@ public class ChatService {
     }
 
     public record SendMessageRequest(String content, String model) {
+    }
+
+    public record UpdateConversationTitleRequest(String title) {
     }
 
     public record ChatConversationSummary(
