@@ -17,7 +17,10 @@ export function PageSidebar({ pageId, backTo = "/pages" }: PageSidebarProps) {
   return (
     <aside className="app-sidebar">
       <NavLink to={backTo} className="sidebar-back" aria-label="Back to Pages">
-        {"<- Back to Pages"}
+        <span className="sidebar-back-icon" aria-hidden="true">
+          ←
+        </span>
+        <span>Back to Pages</span>
       </NavLink>
       <nav className="sidebar-nav" aria-label="Main navigation">
         <NavLink

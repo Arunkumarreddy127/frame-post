@@ -62,7 +62,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         const selectedConversation =
           loaded.find((item) => item.id === requestedConversationId) ?? loaded[0];
         if (selectedConversation) {
-          await loadConversation(selectedConversation.id, active);
+          await loadConversation(selectedConversation.id, active, availableModels);
         }
       } catch (requestError) {
         if (active) setError(messageFrom(requestError, "Unable to load conversations"));
@@ -77,13 +77,21 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     };
   }, [activePageId, requestedConversationId]);
 
-  async function loadConversation(conversationId: string, active = true) {
+  async function loadConversation(
+    conversationId: string,
+    active = true,
+    availableModels = chatModels,
+  ) {
     setError("");
     try {
       const loaded = await getConversation(conversationId, activePageId);
       if (!active) return;
       setConversation(loaded);
-      setModel(loaded.model as ChatModel);
+      setModel(
+        availableModels.includes(loaded.model)
+          ? loaded.model
+          : availableModels[0] ?? "",
+      );
     } catch (requestError) {
       if (active) setError(messageFrom(requestError, "Unable to load conversation"));
     }
@@ -223,14 +231,16 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       <section className="chat-page">
         <aside className="chat-history" aria-label="Chat history">
           <div className="chat-history-header">
-            <span className="sidebar-section-label">Conversations</span>
             <button
               className="secondary-button small-button"
               type="button"
               onClick={() => void startConversation()}
               disabled={sending || !model}
             >
-              New chat
+              <span className="chat-new-icon" aria-hidden="true">
+                +
+              </span>
+              <span>New chat</span>
             </button>
           </div>
           {!isPageChat && (
@@ -249,6 +259,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
             <p className="chat-history-status">No chats yet.</p>
           ) : (
             <div className="chat-history-list">
+              <span className="sidebar-section-label">History</span>
               {conversations.map((item) => (
                 <button
                   key={item.id}
@@ -281,20 +292,6 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               <h2>{conversation?.title ?? "New chat"}</h2>
             </div>
             <div className="chat-toolbar-actions">
-              <label className="chat-model-label">
-                Model
-                <select
-                  value={model}
-                  disabled={sending || chatModels.length === 0}
-                  onChange={(event) => setModel(event.target.value)}
-                >
-                  {chatModels.map((chatModel) => (
-                    <option key={chatModel} value={chatModel}>
-                      {chatModel}
-                    </option>
-                  ))}
-                </select>
-              </label>
               {conversation && (
                 <button
                   className="secondary-button small-button danger-button"
@@ -350,19 +347,36 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               id="chat-message"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Message Framepost"
-              rows={3}
+              placeholder="Pitch your idea"
+              rows={2}
               maxLength={8000}
               disabled={sending}
               required
             />
-            <button
-              className="primary-button"
-              type="submit"
-              disabled={sending || !draft.trim()}
-            >
-              {sending ? "Responding..." : "Send"}
-            </button>
+            <div className="chat-composer-toolbar">
+              <label className="chat-model-control">
+                <span className="sr-only">Model</span>
+                <select
+                  value={model}
+                  disabled={sending || chatModels.length === 0}
+                  onChange={(event) => setModel(event.target.value)}
+                >
+                  {chatModels.map((chatModel) => (
+                    <option key={chatModel} value={chatModel}>
+                      {chatModel}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="chat-composer-submit"
+                type="submit"
+                aria-label={sending ? "Responding" : "Send message"}
+                disabled={sending || !draft.trim()}
+              >
+                ↑
+              </button>
+            </div>
           </form>
         </div>
       </section>
