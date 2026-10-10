@@ -8,14 +8,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.framepost.auth.User;
+import com.example.framepost.instruction.InstructionFileRepository;
 
 @Service
 public class PageService {
 
     private final PageRepository pageRepository;
 
-    public PageService(PageRepository pageRepository) {
+    private final InstructionFileRepository instructionFiles;
+
+    public PageService(PageRepository pageRepository, InstructionFileRepository instructionFiles) {
         this.pageRepository = pageRepository;
+        this.instructionFiles = instructionFiles;
     }
 
     public List<Page> list(User user) {
@@ -56,6 +60,7 @@ public class PageService {
 
     public void delete(User user, String id) {
         Page page = get(user, id);
+        instructionFiles.deleteByUserIdAndPageId(user.id(), id);
         pageRepository.delete(page);
     }
 

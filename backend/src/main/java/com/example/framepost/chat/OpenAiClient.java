@@ -25,6 +25,9 @@ public class OpenAiClient {
 
     private static final URI RESPONSES_URI = URI.create("https://api.openai.com/v1/responses");
 
+    static final String INSTRUCTION_UPDATE_TOOL = "propose_instruction_update";
+    static final String INSTRUCTION_CREATE_TOOL = "create_instruction_file";
+
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final OpenAiProperties properties;
@@ -41,7 +44,9 @@ public class OpenAiClient {
             String model,
             String developerInstructions,
             List<ChatMessage> messages,
-            Consumer<String> onDelta
+            boolean offerInstructionTool,
+            Consumer<String> onDelta,
+            Consumer<FunctionCall> onFunctionCall
     ) {
         if (properties.apiKey() == null || properties.apiKey().isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "OpenAI is not configured");
@@ -52,7 +57,7 @@ public class OpenAiClient {
                 .header("Authorization", "Bearer " + properties.apiKey())
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody(model, developerInstructions, messages)))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody(model, developerInstructions, messages, offerInstructionTool)))
                 .build();
 
         try {
@@ -65,7 +70,7 @@ public class OpenAiClient {
             }
 
             try (Stream<String> lines = response.body()) {
-                consumeEvents(lines, onDelta);
+                consumeEvents(lines, onDelta, onFunctionCall);
             }
         } catch (IOException exception) {
             throw new OpenAiRequestException("Unable to reach OpenAI", exception);
@@ -75,7 +80,12 @@ public class OpenAiClient {
         }
     }
 
-    private String requestBody(String model, String developerInstructions, List<ChatMessage> messages) {
+    private String requestBody(
+            String model,
+            String developerInstructions,
+            List<ChatMessage> messages,
+            boolean offerInstructionTool
+    ) {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("model", model);
         payload.put("stream", true);
@@ -89,6 +99,37 @@ public class OpenAiClient {
                     .put("content", message.content());
         }
 
+        if (offerInstructionTool) {
+            ArrayNode tools = payload.putArray("tools");
+            
+            // Tool 1: Update existing instruction file
+            ObjectNode updateTool = tools.addObject();
+            updateTool.put("type", "function");
+            updateTool.put("name", INSTRUCTION_UPDATE_TOOL);
+            updateTool.put("description", "Propose a replacement for the full content of one selected instruction file. "
+                    + "The user must approve it before it is saved.");
+            ObjectNode updateParams = updateTool.putObject("parameters");
+            updateParams.put("type", "object");
+            ObjectNode updateProps = updateParams.putObject("properties");
+            updateProps.putObject("file_id").put("type", "string").put("description", "The id of the instruction file");
+            updateProps.putObject("content").put("type", "string").put("description", "The complete new file content");
+            updateParams.putArray("required").add("file_id").add("content");
+            updateParams.put("additionalProperties", false);
+            
+            // Tool 2: Create new instruction file
+            ObjectNode createTool = tools.addObject();
+            createTool.put("type", "function");
+            createTool.put("name", INSTRUCTION_CREATE_TOOL);
+            createTool.put("description", "Create a new instruction file. The user must approve it before it is saved.");
+            ObjectNode createParams = createTool.putObject("parameters");
+            createParams.put("type", "object");
+            ObjectNode createProps = createParams.putObject("properties");
+            createProps.putObject("name").put("type", "string").put("description", "The name of the instruction file (1-100 characters)");
+            createProps.putObject("content").put("type", "string").put("description", "The complete file content (1-20000 characters)");
+            createParams.putArray("required").add("name").add("content");
+            createParams.put("additionalProperties", false);
+        }
+
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (IOException exception) {
@@ -96,13 +137,13 @@ public class OpenAiClient {
         }
     }
 
-    private void consumeEvents(Stream<String> lines, Consumer<String> onDelta) {
+    private void consumeEvents(Stream<String> lines, Consumer<String> onDelta, Consumer<FunctionCall> onFunctionCall) {
         StringBuilder data = new StringBuilder();
         Iterator<String> iterator = lines.iterator();
         while (iterator.hasNext()) {
             String line = iterator.next();
             if (line.isEmpty()) {
-                consumeEvent(data.toString(), onDelta);
+                consumeEvent(data.toString(), onDelta, onFunctionCall);
                 data.setLength(0);
             } else if (line.startsWith("data:")) {
                 if (!data.isEmpty()) {
@@ -111,10 +152,10 @@ public class OpenAiClient {
                 data.append(line.substring(5).trim());
             }
         }
-        consumeEvent(data.toString(), onDelta);
+        consumeEvent(data.toString(), onDelta, onFunctionCall);
     }
 
-    private void consumeEvent(String data, Consumer<String> onDelta) {
+    private void consumeEvent(String data, Consumer<String> onDelta, Consumer<FunctionCall> onFunctionCall) {
         if (data.isBlank() || "[DONE]".equals(data)) {
             return;
         }
@@ -124,6 +165,12 @@ public class OpenAiClient {
             String type = event.path("type").asText();
             if ("response.output_text.delta".equals(type)) {
                 onDelta.accept(event.path("delta").asText());
+            } else if ("response.output_item.done".equals(type)
+                    && "function_call".equals(event.path("item").path("type").asText())) {
+                onFunctionCall.accept(new FunctionCall(
+                        event.path("item").path("name").asText(),
+                        event.path("item").path("arguments").asText()
+                ));
             } else if ("error".equals(type) || "response.failed".equals(type)) {
                 throw new OpenAiRequestException(providerError(event));
             }
@@ -146,6 +193,9 @@ public class OpenAiClient {
             message = response.path("message").asText();
         }
         return message.isBlank() ? "OpenAI could not complete the request" : message;
+    }
+
+    public record FunctionCall(String name, String arguments) {
     }
 
     public static class OpenAiRequestException extends RuntimeException {

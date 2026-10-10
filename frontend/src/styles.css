@@ -568,13 +568,22 @@ textarea {
   background: #fff;
 }
 
+.chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-right: 1px solid #d0d7de;
+  background: #f6f8fa;
+}
+
 .chat-history {
   display: grid;
   align-content: start;
   gap: 0.75rem;
   padding: 1rem;
-  border-right: 1px solid #d0d7de;
-  background: #f6f8fa;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .chat-history-header,
@@ -1136,4 +1145,157 @@ h2 {
   .page-card-actions > * {
     flex: 1;
   }
+}
+
+.instruction-files {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #d0d7de;
+  background: #f6f8fa;
+}
+
+.instruction-file-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.instruction-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.85rem;
+}
+
+.instruction-file.selected {
+  border-color: #0969da;
+  background: #ddf4ff;
+}
+
+.instruction-file label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+
+.instruction-file-scope {
+  color: #57606a;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.instruction-file-edit {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #0969da;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.instruction-editor {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #d0d7de;
+  border-radius: 0.35rem;
+  background: #fafbfc;
+}
+
+.instruction-editor input,
+.instruction-editor textarea,
+.instruction-editor select {
+  font-size: 0.9rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.instruction-editor textarea {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  line-height: 1.5;
+}
+
+.instruction-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.instruction-proposal-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.instruction-proposal-diff pre {
+  margin: 0.25rem 0 0;
+  max-height: 14rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+}
+
+.instruction-proposal-content {
+  margin: 0.5rem 0 0 0;
+}
+
+.instruction-proposal-content pre {
+  margin: 0.25rem 0 0;
+  max-height: 14rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 0.8rem;
+}
+
+.page-instructions-panel {
+  margin-top: 2rem;
+}
+
+.page-instructions-panel h3 {
+  margin-bottom: 0.5rem;
+}
+
+.page-instructions-panel > p {
+  margin-bottom: 1rem;
+  color: #57606a;
+  font-size: 0.9rem;
+}
+
+.page-instructions-panel .instruction-files {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.page-instructions-panel .instruction-file-list {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.page-instructions-panel .instruction-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.page-instructions-panel .instruction-file label {
+  flex: 1;
+  margin: 0;
+}
+
+.page-instructions-panel .instruction-file-edit {
+  flex-shrink: 0;
+  margin-left: 0.5rem;
 }

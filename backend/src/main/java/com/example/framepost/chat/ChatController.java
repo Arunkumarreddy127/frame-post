@@ -1,6 +1,7 @@
 package com.example.framepost.chat;
 
 import java.util.List;
+import java.util.Map;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +13,7 @@ import com.example.framepost.chat.ChatService.ChatConversationSummary;
 import com.example.framepost.chat.ChatService.CreateConversationRequest;
 import com.example.framepost.chat.ChatService.SendMessageRequest;
 import com.example.framepost.chat.ChatService.UpdateConversationTitleRequest;
+import com.example.framepost.chat.ChatService.UpdateInstructionsRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -80,6 +83,54 @@ public class ChatController {
             HttpServletRequest servletRequest
     ) {
         return chatService.updateTitle(currentUser(servletRequest), null, conversationId, request);
+    }
+
+    @PutMapping("/chats/{conversationId}/instructions")
+    public ChatConversationResponse updateGlobalInstructions(
+            @PathVariable String conversationId,
+            @RequestBody UpdateInstructionsRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.updateInstructions(currentUser(servletRequest), null, conversationId, request);
+    }
+
+    @PutMapping("/pages/{pageId}/chats/{conversationId}/instructions")
+    public ChatConversationResponse updatePageInstructions(
+            @PathVariable String pageId,
+            @PathVariable String conversationId,
+            @RequestBody UpdateInstructionsRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.updateInstructions(currentUser(servletRequest), pageId, conversationId, request);
+    }
+
+    @PostMapping("/chats/instruction-proposals")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object applyGlobalCreationProposal(
+            @RequestBody Map<String, String> request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.applyCreationProposal(
+                currentUser(servletRequest),
+                null,
+                request.get("name"),
+                request.get("content")
+        );
+    }
+
+    @PostMapping("/pages/{pageId}/chats/instruction-proposals")
+    @ResponseStatus(HttpStatus.CREATED)
+    public Object applyPageCreationProposal(
+            @PathVariable String pageId,
+            @RequestBody Map<String, String> request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.applyCreationProposal(
+                currentUser(servletRequest),
+                pageId,
+                request.get("name"),
+                request.get("content")
+        );
     }
 
     @DeleteMapping("/chats/{conversationId}")

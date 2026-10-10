@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../api";
 import { AppShell } from "../components/AppShell";
+import { InstructionFiles } from "../components/InstructionFiles";
 import type { Page, ShellRouteProps } from "../types";
 
 export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
@@ -9,6 +10,7 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
   useEffect(() => {
     async function loadPage() {
@@ -104,6 +106,21 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
             <strong>{new Date(page.updatedAt).toLocaleString()}</strong>
           </div>
         </div>
+      </section>
+      <section className="panel page-instructions-panel">
+        <h3>Instruction Files</h3>
+        <p>
+          Create and manage instruction files for conversations in this page. These appear as
+          selectable items during chat and can be edited by the assistant.
+        </p>
+        <InstructionFiles
+          pageId={pageId}
+          selectedIds={[]}
+          disabled={false}
+          refreshKey={filesRefreshKey}
+          onSelectionChange={() => undefined}
+          onError={setError}
+        />
       </section>
     </AppShell>
   );

@@ -1,10 +1,15 @@
 import { API_BASE_URL } from "./api";
-import type { ChatConversation, ChatConversationSummary } from "./types";
+import type {
+  ChatConversation,
+  ChatConversationSummary,
+  InstructionFileProposal,
+} from "./types";
 
 export type ChatModel = string;
 
 export type ChatStreamEvent =
   | { type: "delta"; text: string }
+  | { type: "instruction_proposal"; proposal: InstructionFileProposal }
   | { type: "complete" }
   | { type: "error"; message: string };
 
@@ -61,6 +66,18 @@ export function createConversation(model: ChatModel, pageId?: string) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model }),
+  });
+}
+
+export function updateConversationInstructions(
+  conversationId: string,
+  instructionFileIds: string[],
+  pageId?: string,
+) {
+  return request<ChatConversation>(`${chatPath(pageId)}/${conversationId}/instructions`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instructionFileIds }),
   });
 }
 
@@ -130,7 +147,42 @@ export function parseSseFrame(frame: string): ChatStreamEvent | null {
   });
 
   if (!eventType || data.length === 0) return null;
-  const payload = JSON.parse(data.join("\n")) as { text?: string; message?: string };
+  const payload = JSON.parse(data.join("\n")) as Record<string, unknown>;
+  
+  // Check for update proposal
+  if (
+    eventType === "instruction_proposal" &&
+    typeof payload.fileId === "string" &&
+    typeof payload.fileName === "string" &&
+    typeof payload.currentContent === "string" &&
+    typeof payload.proposedContent === "string"
+  ) {
+    return {
+      type: "instruction_proposal",
+      proposal: {
+        fileId: payload.fileId,
+        fileName: payload.fileName,
+        currentContent: payload.currentContent,
+        proposedContent: payload.proposedContent,
+      },
+    } as const;
+  }
+  
+  // Check for creation proposal
+  if (
+    eventType === "instruction_proposal" &&
+    typeof payload.name === "string" &&
+    typeof payload.content === "string" &&
+    !("fileId" in payload)
+  ) {
+    return {
+      type: "instruction_proposal",
+      proposal: {
+        name: payload.name,
+        content: payload.content,
+      },
+    } as const;
+  }
   if (eventType === "delta" && typeof payload.text === "string") {
     return { type: "delta", text: payload.text };
   }

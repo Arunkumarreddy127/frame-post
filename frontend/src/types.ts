@@ -40,8 +40,33 @@ export type ChatConversationSummary = {
   pageName: string | null;
   createdAt: string;
   updatedAt: string;
+  instructionFileIds: string[];
 };
 
 export type ChatConversation = ChatConversationSummary & {
   messages: ChatMessage[];
 };
+
+export type InstructionFile = {
+  id: string;
+  pageId: string | null;
+  scope: "user" | "page";
+  name: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type InstructionProposal = {
+  fileId: string;
+  fileName: string;
+  currentContent: string;
+  proposedContent: string;
+};
+
+export type InstructionCreationProposal = {
+  name: string;
+  content: string;
+};
+
+export type InstructionFileProposal = InstructionProposal | InstructionCreationProposal;

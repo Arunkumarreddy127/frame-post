@@ -10,13 +10,20 @@ import {
   listAllConversations,
   listConversations,
   streamMessage,
+  updateConversationInstructions,
   updateConversationTitle,
 } from "../chatApi";
+import { API_BASE_URL } from "../api";
 import { AppShell } from "../components/AppShell";
+import { InstructionFiles } from "../components/InstructionFiles";
+import { updateInstructionFile } from "../instructionApi";
 import type {
   ChatConversation,
   ChatConversationSummary,
   ChatMessage,
+  InstructionFileProposal,
+  InstructionProposal,
+  InstructionCreationProposal,
   ShellRouteProps,
 } from "../types";
 
@@ -40,6 +47,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [showAllChats, setShowAllChats] = useState(false);
+  const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [proposals, setProposals] = useState<InstructionFileProposal[]>([]);
+  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const requestedConversationId = searchParams.get("conversation");
@@ -83,6 +93,67 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       active = false;
     };
   }, [activePageId, requestedConversationId]);
+
+  useEffect(() => {
+    setSelectedFileIds(conversation?.instructionFileIds ?? []);
+    setProposals([]);
+  }, [conversation?.id]);
+
+  async function changeSelection(ids: string[]) {
+    setSelectedFileIds(ids);
+    if (!conversation) return;
+    try {
+      const updated = await updateConversationInstructions(conversation.id, ids, activePageId);
+      setConversation((current) =>
+        current && current.id === updated.id
+          ? { ...current, instructionFileIds: updated.instructionFileIds }
+          : current,
+      );
+    } catch (requestError) {
+      setError(messageFrom(requestError, "Unable to update instruction files"));
+    }
+  }
+
+  async function withSelection(created: ChatConversation) {
+    if (selectedFileIds.length === 0) return created;
+    try {
+      return await updateConversationInstructions(created.id, selectedFileIds, activePageId);
+    } catch (requestError) {
+      setError(messageFrom(requestError, "Unable to update instruction files"));
+      return created;
+    }
+  }
+
+  async function applyProposal(proposal: InstructionFileProposal) {
+    try {
+      if ("fileId" in proposal) {
+        // Update existing file
+        await updateInstructionFile(proposal.fileId, {
+          name: proposal.fileName,
+          content: proposal.proposedContent,
+        });
+      } else {
+        // Create new file
+        const path = activePageId
+          ? `/api/pages/${activePageId}/chats/instruction-proposals`
+          : `/api/chats/instruction-proposals`;
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ name: proposal.name, content: proposal.content }),
+        });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.detail ?? body?.message ?? "Unable to create instruction file");
+        }
+      }
+      setProposals((current) => current.filter((item) => item !== proposal));
+      setFilesRefreshKey((current) => current + 1);
+    } catch (requestError) {
+      setError(messageFrom(requestError, "Unable to apply the instruction proposal"));
+    }
+  }
 
   async function loadConversation(
     conversationId: string,
@@ -141,7 +212,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       return;
     }
     try {
-      const created = await createConversation(model, activePageId);
+      const created = await withSelection(await createConversation(model, activePageId));
       setConversations((current) => [created, ...current]);
       setConversation(created);
       setEditingTitle(false);
@@ -241,7 +312,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
 
     try {
       if (!selectedConversation) {
-        const createdConversation = await createConversation(model, activePageId);
+        const createdConversation = await withSelection(
+          await createConversation(model, activePageId),
+        );
         selectedConversation = createdConversation;
         setConversations((current) => [createdConversation, ...current]);
         setConversation(createdConversation);
@@ -269,6 +342,8 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         (streamEvent) => {
           if (streamEvent.type === "delta") {
             setStreamingText((current) => current + streamEvent.text);
+          } else if (streamEvent.type === "instruction_proposal") {
+            setProposals((current) => [...current, streamEvent.proposal]);
           } else if (streamEvent.type === "error") {
             setError(streamEvent.message);
           }
@@ -300,60 +375,70 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       backTo={isPageChat ? "/pages" : undefined}
     >
       <section className="chat-page">
-        <aside className="chat-history" aria-label="Chat history">
-          <div className="chat-history-header">
-            <button
-              className="secondary-button small-button"
-              type="button"
-              onClick={() => void startConversation()}
-              disabled={sending || !model}
-            >
-              <Plus className="chat-new-icon" size={17} strokeWidth={2} aria-hidden="true" />
-              <span>New chat</span>
-            </button>
-          </div>
-          {!isPageChat && (
-            <label
-              className="secondary-button small-button chat-all-chats-toggle"
-            >
-              <input
-                type="checkbox"
-                checked={showAllChats}
-                disabled={sending}
-                onChange={() => void toggleAllChats()}
-              />
-              <span>All chats</span>
-            </label>
-          )}
-          {loading ? (
-            <p className="chat-history-status">Loading chats...</p>
-          ) : conversations.length === 0 ? (
-            <p className="chat-history-status">No chats yet.</p>
-          ) : (
-            <div className="chat-history-list">
-              <span className="sidebar-section-label">History</span>
-              {conversations.map((item) => (
-                <button
-                  key={item.id}
-                  className={
-                    item.id === conversation?.id
-                      ? "chat-history-item active"
-                      : "chat-history-item"
-                  }
-                  type="button"
-                  disabled={sending}
-                  onClick={() => void selectConversation(item)}
-                >
-                  <span>{item.title}</span>
-                  {showAllChats && (
-                    <span className={`chat-history-scope ${scopeColorClass(item.pageId)}`}>
-                      {item.pageName ?? "Global chat"}
-                    </span>
-                  )}
-                </button>
-              ))}
+        <aside className="chat-sidebar" aria-label="Chat history">
+          <div className="chat-history">
+            <div className="chat-history-header">
+              <button
+                className="secondary-button small-button"
+                type="button"
+                onClick={() => void startConversation()}
+                disabled={sending || !model}
+              >
+                <Plus className="chat-new-icon" size={17} strokeWidth={2} aria-hidden="true" />
+                <span>New chat</span>
+              </button>
             </div>
-          )}
+            {!isPageChat && (
+              <label
+                className="secondary-button small-button chat-all-chats-toggle"
+              >
+                <input
+                  type="checkbox"
+                  checked={showAllChats}
+                  disabled={sending}
+                  onChange={() => void toggleAllChats()}
+                />
+                <span>All chats</span>
+              </label>
+            )}
+            {loading ? (
+              <p className="chat-history-status">Loading chats...</p>
+            ) : conversations.length === 0 ? (
+              <p className="chat-history-status">No chats yet.</p>
+            ) : (
+              <div className="chat-history-list">
+                <span className="sidebar-section-label">History</span>
+                {conversations.map((item) => (
+                  <button
+                    key={item.id}
+                    className={
+                      item.id === conversation?.id
+                        ? "chat-history-item active"
+                        : "chat-history-item"
+                    }
+                    type="button"
+                    disabled={sending}
+                    onClick={() => void selectConversation(item)}
+                  >
+                    <span>{item.title}</span>
+                    {showAllChats && (
+                      <span className={`chat-history-scope ${scopeColorClass(item.pageId)}`}>
+                        {item.pageName ?? "Global chat"}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <InstructionFiles
+            pageId={activePageId}
+            selectedIds={selectedFileIds}
+            disabled={sending}
+            refreshKey={filesRefreshKey}
+            onSelectionChange={(ids) => void changeSelection(ids)}
+            onError={setError}
+          />
         </aside>
         <div className="chat-workspace">
           <div className="chat-toolbar">
@@ -422,6 +507,59 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                     )}
                   </article>
                 ))}
+                {proposals.map((proposal) => {
+                  const key =
+                    "fileId" in proposal
+                      ? `${proposal.fileId}-${proposal.proposedContent}`
+                      : `create-${proposal.name}`;
+                  const isUpdate = "fileId" in proposal;
+                  const title = isUpdate ? `Proposed update: ${proposal.fileName}` : `Proposed new file: ${proposal.name}`;
+
+                  return (
+                    <article
+                      className="chat-message assistant instruction-proposal"
+                      key={key}
+                    >
+                      <span className="chat-message-role">{title}</span>
+                      {isUpdate && (
+                        <div className="instruction-proposal-diff">
+                          <div>
+                            <strong>Current</strong>
+                            <pre>{proposal.currentContent}</pre>
+                          </div>
+                          <div>
+                            <strong>Proposed</strong>
+                            <pre>{proposal.proposedContent}</pre>
+                          </div>
+                        </div>
+                      )}
+                      {!isUpdate && (
+                        <div className="instruction-proposal-content">
+                          <strong>Content</strong>
+                          <pre>{proposal.content}</pre>
+                        </div>
+                      )}
+                      <div className="instruction-editor-actions">
+                        <button
+                          className="secondary-button small-button"
+                          type="button"
+                          onClick={() => void applyProposal(proposal)}
+                        >
+                          Apply
+                        </button>
+                        <button
+                          className="secondary-button small-button"
+                          type="button"
+                          onClick={() =>
+                            setProposals((current) => current.filter((item) => item !== proposal))
+                          }
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
                 {streamingText && (
                   <article className="chat-message assistant streaming">
                     <span className="chat-message-role">assistant</span>

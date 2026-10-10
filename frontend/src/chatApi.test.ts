@@ -17,4 +17,16 @@ describe("parseSseFrame", () => {
       parseSseFrame('event: error\ndata: {"message":"Rate limited"}'),
     ).toEqual({ type: "error", message: "Rate limited" });
   });
+
+  it("parses an instruction proposal", () => {
+    const proposal = {
+      fileId: "f1",
+      fileName: "Tone",
+      currentContent: "old",
+      proposedContent: "new",
+    };
+    expect(
+      parseSseFrame(`event: instruction_proposal\ndata: ${JSON.stringify(proposal)}`),
+    ).toEqual({ type: "instruction_proposal", proposal });
+  });
 });
