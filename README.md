@@ -15,7 +15,7 @@ This workspace intentionally contains no Instagram or publishing features. It in
 
 Copy `.env.example` to `.env` and replace the R2 placeholders when needed. The default local values use MongoDB database `framepost` and R2 bucket `framepost-assets`.
 
-To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The UI allows `gpt-5-mini` and `gpt-5` by default; adjust the server-side `OPENAI_ALLOWED_MODELS` allowlist only when those models are available to the configured key.
+To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The default `OPENAI_ALLOWED_MODELS` allowlist contains `gpt-6-luna`, `gpt-6.1-sol`, and `gpt-6-astra`; adjust it only when different models are available to the configured key.
 
 ## Run locally
 

@@ -33,7 +33,7 @@ class ChatServiceTest {
             messages,
             pageService,
             pages,
-            new OpenAiProperties("test-key", List.of("gpt-5-mini", "gpt-5"), 120),
+            new OpenAiProperties("test-key", List.of("gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"), 120),
             openAiClient
     );
     private final User user = new User("user-id", "framepost", "hash", Instant.now());
@@ -56,14 +56,14 @@ class ChatServiceTest {
         ChatService.ChatConversationResponse response = service.create(
                 user,
                 null,
-                new ChatService.CreateConversationRequest("gpt-5-mini")
+                new ChatService.CreateConversationRequest("gpt-6-luna")
         );
 
         ArgumentCaptor<ChatConversation> capture = ArgumentCaptor.forClass(ChatConversation.class);
         verify(conversations).save(capture.capture());
         assertEquals("conversation-id", response.id());
         assertEquals("New chat", response.title());
-        assertEquals("gpt-5-mini", capture.getValue().model());
+        assertEquals("gpt-6-luna", capture.getValue().model());
         assertEquals(user.id(), capture.getValue().userId());
         assertEquals(null, capture.getValue().pageId());
     }
@@ -83,8 +83,8 @@ class ChatServiceTest {
     void listsGlobalAndPageConversationsForTheCurrentUser() {
         Instant now = Instant.now();
         when(conversations.findByUserIdOrderByUpdatedAtDesc(user.id())).thenReturn(List.of(
-                new ChatConversation("global-id", user.id(), null, "Global", "gpt-5-mini", now, now),
-                new ChatConversation("page-id", user.id(), "page-id", "Page", "gpt-5", now, now)
+                new ChatConversation("global-id", user.id(), null, "Global", "gpt-6-luna", now, now),
+                new ChatConversation("page-id", user.id(), "page-id", "Page", "gpt-6.1-sol", now, now)
         ));
         when(pages.findByIdAndUserId("page-id", user.id())).thenReturn(Optional.of(new Page(
                 "page-id",
