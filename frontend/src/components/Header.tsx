@@ -10,9 +10,11 @@ type HeaderProps = {
 export function Header({ username, pageTitle, onLogout }: HeaderProps) {
   return (
     <header className="app-header">
-      <LinkBrand />
-      <div className="app-header-title">{pageTitle}</div>
-      <UserInfo username={username} onLogout={onLogout} />
+      <div className="app-header-inner">
+        <LinkBrand />
+        <div className="app-header-title">{pageTitle}</div>
+        <UserInfo username={username} onLogout={onLogout} />
+      </div>
     </header>
   );
 }

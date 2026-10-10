@@ -63,15 +63,21 @@ a:hover {
   position: sticky;
   top: 0;
   z-index: 20;
-  display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr) minmax(11rem, 1fr);
-  align-items: center;
   min-height: 3.5rem;
-  padding: 0 1.5rem;
-  gap: 1rem;
   border-bottom: 1px solid #d0d7de;
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+}
+
+.app-header-inner {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr) minmax(11rem, 1fr);
+  align-items: center;
+  width: min(100%, 76rem);
+  min-height: inherit;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  gap: 1rem;
 }
 
 .brand-mark {
@@ -813,7 +819,7 @@ h2 {
 }
 
 @media (max-width: 720px) {
-  .app-header {
+  .app-header-inner {
     grid-template-columns: 1fr auto;
     padding: 0.6rem 1rem;
   }
