@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   type ChatModel,
   createConversation,
@@ -23,6 +23,8 @@ type ChatPageProps = ShellRouteProps & {
 };
 
 export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
+  const { pageId: routePageId } = useParams<{ pageId?: string }>();
+  const activePageId = pageId ?? routePageId;
   const [chatModels, setChatModels] = useState<ChatModel[]>([]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [conversation, setConversation] = useState<ChatConversation | null>(null);
@@ -37,7 +39,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const [searchParams] = useSearchParams();
   const requestedConversationId = searchParams.get("conversation");
 
-  const isPageChat = Boolean(pageId);
+  const isPageChat = Boolean(activePageId);
 
   useEffect(() => {
     let active = true;
@@ -51,7 +53,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       try {
         const [availableModels, loaded] = await Promise.all([
           listChatModels(),
-          listConversations(pageId),
+          listConversations(activePageId),
         ]);
         if (!active) return;
         setChatModels(availableModels);
@@ -73,12 +75,12 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     return () => {
       active = false;
     };
-  }, [pageId, requestedConversationId]);
+  }, [activePageId, requestedConversationId]);
 
   async function loadConversation(conversationId: string, active = true) {
     setError("");
     try {
-      const loaded = await getConversation(conversationId, pageId);
+      const loaded = await getConversation(conversationId, activePageId);
       if (!active) return;
       setConversation(loaded);
       setModel(loaded.model as ChatModel);
@@ -90,7 +92,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   async function refreshConversations() {
     const loaded = showAllChats
       ? await listAllConversations()
-      : await listConversations(pageId);
+      : await listConversations(activePageId);
     setConversations(loaded);
   }
 
@@ -123,7 +125,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       return;
     }
     try {
-      const created = await createConversation(model, pageId);
+      const created = await createConversation(model, activePageId);
       setConversations((current) => [created, ...current]);
       setConversation(created);
       setStreamingText("");
@@ -135,7 +137,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   async function removeConversation() {
     if (!conversation || sending) return;
     try {
-      await deleteConversation(conversation.id, pageId);
+      await deleteConversation(conversation.id, activePageId);
       const remaining = conversations.filter((item) => item.id !== conversation.id);
       setConversations(remaining);
       setConversation(null);
@@ -160,7 +162,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
 
     try {
       if (!selectedConversation) {
-        const createdConversation = await createConversation(model, pageId);
+        const createdConversation = await createConversation(model, activePageId);
         selectedConversation = createdConversation;
         setConversations((current) => [createdConversation, ...current]);
         setConversation(createdConversation);
@@ -192,7 +194,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
             setError(streamEvent.message);
           }
         },
-        pageId,
+        activePageId,
       );
       await Promise.all([loadConversation(selectedConversation.id), refreshConversations()]);
     } catch (requestError) {
@@ -215,7 +217,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       onLogout={onLogout}
       pageTitle="Chat"
       sidebar={isPageChat ? "page" : "global"}
-      pageId={pageId}
+      pageId={activePageId}
       backTo={isPageChat ? "/pages" : undefined}
     >
       <section className="chat-page">

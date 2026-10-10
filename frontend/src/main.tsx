@@ -123,6 +123,14 @@ function App() {
           }
         />
         <Route
+          path="/pages/:pageId/chat"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <ChatPage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/pages/:pageId/:tool"
           element={
             <ProtectedRoute user={user} loading={loading}>

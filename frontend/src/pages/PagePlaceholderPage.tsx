@@ -1,15 +1,10 @@
 import { useParams } from "react-router-dom";
-import { ChatPage } from "./ChatPage";
 import { PlaceholderPage } from "../components/PlaceholderPage";
 import type { ShellRouteProps } from "../types";
 
-type PageTool = "chat" | "create" | "library";
+type PageTool = "create" | "library";
 
 const pageTools: Record<PageTool, { title: string; description: string }> = {
-  chat: {
-    title: "Chat",
-    description: "Chat is ready for this page workspace.",
-  },
   create: {
     title: "Create",
     description: "Create tools will appear here for this page.",
@@ -21,7 +16,7 @@ const pageTools: Record<PageTool, { title: string; description: string }> = {
 };
 
 export function PagePlaceholderPage({ user, onLogout }: ShellRouteProps) {
-  const { pageId, tool = "chat" } = useParams<{
+  const { pageId, tool } = useParams<{
     pageId: string;
     tool: PageTool;
   }>();
@@ -29,10 +24,6 @@ export function PagePlaceholderPage({ user, onLogout }: ShellRouteProps) {
 
   if (!pageId || !pageTool) {
     return null;
-  }
-
-  if (tool === "chat") {
-    return <ChatPage user={user} onLogout={onLogout} pageId={pageId} />;
   }
 
   return (
