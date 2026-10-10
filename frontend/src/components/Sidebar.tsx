@@ -1,14 +1,7 @@
-import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { API_BASE_URL } from "../api";
 
 type SidebarProps = {
   backTo?: string;
-};
-
-type SidebarPage = {
-  id: string;
-  name: string;
 };
 
 const navigation = [
@@ -16,27 +9,10 @@ const navigation = [
   { label: "Chat", to: "/chat", end: true },
   { label: "Create", to: "/create", end: true },
   { label: "Library", to: "/library", end: true },
+  { label: "Pages", to: "/pages", end: true },
 ];
 
 export function Sidebar({ backTo = "/home" }: SidebarProps) {
-  const [pages, setPages] = useState<SidebarPage[]>([]);
-
-  useEffect(() => {
-    async function loadPages() {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/pages`, {
-          credentials: "include",
-        });
-        if (!response.ok) return;
-        setPages(await response.json());
-      } catch {
-        setPages([]);
-      }
-    }
-
-    void loadPages();
-  }, []);
-
   return (
     <aside className="app-sidebar">
       <nav className="sidebar-nav" aria-label="Main navigation">
@@ -53,23 +29,6 @@ export function Sidebar({ backTo = "/home" }: SidebarProps) {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-section">
-        <span className="sidebar-section-label">Pages</span>
-        {pages.map((page) => (
-          <NavLink
-            key={page.id}
-            to={`/pages/${page.id}`}
-            className={({ isActive }) =>
-              isActive ? "sidebar-page-link active" : "sidebar-page-link"
-            }
-          >
-            {page.name}
-          </NavLink>
-        ))}
-        <NavLink to="/pages/new" className="sidebar-page-link">
-          + New Page
-        </NavLink>
-      </div>
     </aside>
   );
 }
