@@ -111,7 +111,7 @@ class ChatServiceTest {
     }
 
     @Test
-    void appendsSelectedInstructionFilesAfterPageMetadata() {
+    void catalogsSelectedInstructionFilesWithoutAppendingTheirContent() {
         Instant now = Instant.now();
         Page page = new Page("page-id", user.id(), "Dreamverse", "Description", "Bio", now, now);
         InstructionFile file = new InstructionFile(
@@ -121,10 +121,11 @@ class ChatServiceTest {
         String text = service.developerInstructions(page, List.of(file));
 
         assertTrue(text.contains("Name: Dreamverse"));
-        assertTrue(text.contains("<instruction_file id=\"file-id\" name=\"Tone\">"));
+        assertTrue(text.contains("<instruction_file id=\"file-id\" name=\"Tone\" />"));
+        assertTrue(text.contains("read_selected_instruction_file"));
         assertTrue(text.contains("propose_instruction_update"));
-        assertEquals(1, text.split("</instruction_file>", -1).length - 1);
-        assertTrue(text.indexOf("</page>") < text.indexOf("<instruction_file"));
+        assertTrue(!text.contains(file.content()));
+        assertTrue(text.indexOf("</page>") < text.indexOf("<selected_instruction_files>"));
     }
 
     @Test
@@ -132,5 +133,26 @@ class ChatServiceTest {
         String text = service.developerInstructions(null, List.of());
 
         assertEquals("You are a helpful assistant in the user's private Framepost workspace.\n", text);
+    }
+
+    @Test
+    void returnsContentOnlyForASelectedInstructionFile() {
+        Instant now = Instant.now();
+        InstructionFile selected = new InstructionFile(
+                "selected-id", user.id(), null, "Tone", "Be concise.", now, now
+        );
+
+        String allowed = service.readInstructionFile(
+                new OpenAiClient.ToolCall("call-id", OpenAiClient.INSTRUCTION_READ_TOOL, "{\"file_id\":\"selected-id\"}"),
+                List.of(selected)
+        );
+        String denied = service.readInstructionFile(
+                new OpenAiClient.ToolCall("call-id", OpenAiClient.INSTRUCTION_READ_TOOL, "{\"file_id\":\"other-id\"}"),
+                List.of(selected)
+        );
+
+        assertTrue(allowed.contains("\"content\":\"Be concise.\""));
+        assertTrue(denied.contains("\"error\""));
+        assertTrue(!denied.contains("Be concise."));
     }
 }
