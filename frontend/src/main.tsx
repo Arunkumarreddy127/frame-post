@@ -9,11 +9,13 @@ import { useAuth } from "./hooks/useAuth";
 import {
   ChatPage,
   CreatePage,
+  GptImageGenPage,
   HomePage,
   PageDetailPage,
   PageEditorPage,
   PageListPage,
   PagePlaceholderPage,
+  RhMinimaxH3FfImageToVideoPage,
 } from "./pages";
 import type { User } from "./types";
 import "./styles.css";
@@ -160,6 +162,22 @@ function App() {
           element={
             <ProtectedRoute user={user} loading={loading}>
               <CreatePage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gpt-image-gen"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <GptImageGenPage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rh-minimax-h3-ff-image-to-video"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <RhMinimaxH3FfImageToVideoPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />
