@@ -1,8 +1,9 @@
-import { ArrowLeft, ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ChevronDown, Download, Paperclip, Pencil, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import {
+  deleteImageGeneration,
   generateImages,
   listImageGenerations,
   listImageModels,
@@ -15,6 +16,29 @@ type GptImageGenPageProps = ShellRouteProps & {
 };
 
 const FALLBACK_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
+
+const PROMPT_PREVIEW_LENGTH = 120;
+
+function truncatePrompt(prompt: string) {
+  return prompt.length > PROMPT_PREVIEW_LENGTH ? `${prompt.slice(0, PROMPT_PREVIEW_LENGTH).trimEnd()}…` : prompt;
+}
+
+const POPOVER_WIDTH = 480;
+const POPOVER_GAP = 8;
+
+function popoverPosition(anchor: HTMLElement): React.CSSProperties {
+  const rect = anchor.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const width = Math.min(POPOVER_WIDTH, viewportWidth - POPOVER_GAP * 2);
+  const left = Math.min(Math.max(rect.left, POPOVER_GAP), viewportWidth - width - POPOVER_GAP);
+  const spaceBelow = viewportHeight - rect.bottom;
+  const spaceAbove = rect.top;
+  if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
+    return { top: rect.bottom + POPOVER_GAP, left, width, maxHeight: spaceBelow - POPOVER_GAP * 2 };
+  }
+  return { bottom: viewportHeight - rect.top + POPOVER_GAP, left, width, maxHeight: spaceAbove - POPOVER_GAP * 2 };
+}
 
 const SIZES = [
   { value: "auto", label: "Auto" },
@@ -50,7 +74,29 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<ImageGeneration[]>([]);
+  const [parent, setParent] = useState<{ generationId: string; resultKey: string; url: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const promptInput = useRef<HTMLTextAreaElement>(null);
+  const [promptPopover, setPromptPopover] = useState<{ text: string; anchor: HTMLElement } | null>(null);
+  const [, setLayoutTick] = useState(0);
+
+  useEffect(() => {
+    if (!promptPopover) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setPromptPopover(null);
+    }
+    function onLayoutChange() {
+      setLayoutTick((tick) => tick + 1);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onLayoutChange, true);
+    window.addEventListener("resize", onLayoutChange);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onLayoutChange, true);
+      window.removeEventListener("resize", onLayoutChange);
+    };
+  }, [promptPopover]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,16 +123,89 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
     if (fileInput.current) fileInput.current.value = "";
   }
 
+  async function startEdit(item: ImageGeneration, result: { key: string; url: string }) {
+    setError("");
+    setPrompt(item.prompt);
+    if (models.includes(item.model)) setModel(item.model);
+    setSize(item.size);
+    setQuality(item.quality);
+    setCount(item.imageCount);
+    setParent({ generationId: item.id, resultKey: result.key, url: result.url });
+    setAttachments([]);
+    promptInput.current?.focus();
+    promptInput.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    try {
+      const files = await Promise.all(
+        (item.inputs ?? []).map(async (input, index) => {
+          const response = await fetch(input.url);
+          if (!response.ok) throw new Error("Unable to load input image");
+          const blob = await response.blob();
+          const extension = blob.type.split("/")[1] ?? "png";
+          return new File([blob], `input-${index + 1}.${extension}`, { type: blob.type });
+        }),
+      );
+      setAttachments(files.slice(0, MAX_ATTACHMENTS));
+    } catch {
+      setError("Original input images could not be loaded; add them again if needed.");
+    }
+  }
+
+  async function downloadResult(item: ImageGeneration, result: { key: string; url: string }, index: number) {
+    setError("");
+    try {
+      const response = await fetch(result.url);
+      if (!response.ok) throw new Error("Unable to download the image");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `framepost-${item.id}-${index + 1}.${item.outputFormat || "png"}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to download the image");
+    }
+  }
+
+  async function removeGeneration(item: ImageGeneration) {
+    if (!window.confirm("Delete this generated image? This cannot be undone.")) return;
+    setError("");
+    try {
+      await deleteImageGeneration(item.id, activePageId);
+      setHistory((current) => current.filter((entry) => entry.id !== item.id));
+      setParent((current) => (current?.generationId === item.id ? null : current));
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to delete the image");
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prompt.trim() || generating) return;
+    const input = {
+      prompt,
+      model,
+      size,
+      quality,
+      count,
+      attachments,
+      parentGenerationId: parent?.generationId,
+      parentResultKey: parent?.resultKey,
+    };
+    setPrompt("");
+    setModel(models[0] ?? FALLBACK_MODELS[0]);
+    setSize("auto");
+    setQuality("auto");
+    setCount(1);
+    setAttachments([]);
+    setParent(null);
+    if (fileInput.current) fileInput.current.value = "";
     setGenerating(true);
     setError("");
     try {
-      const generation = await generateImages(
-        { prompt, model, size, quality, count, attachments },
-        activePageId,
-      );
+      const generation = await generateImages(input, activePageId);
       setHistory((current) => [generation, ...current]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to generate images");
@@ -114,7 +233,17 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
           <section className="image-gen-section">
             <h3>Prompt</h3>
             <div className="image-gen-prompt">
+              {parent && (
+                <div className="image-gen-parent">
+                  <img src={parent.url} alt="Original image" />
+                  <span>Editing from this image</span>
+                  <button type="button" aria-label="Cancel edit" onClick={() => setParent(null)}>
+                    <X size={12} aria-hidden="true" />
+                  </button>
+                </div>
+              )}
               <textarea
+                ref={promptInput}
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder="Describe what you want to see..."
@@ -230,23 +359,91 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
         <section className="image-gen-results">
           {history.map((item) => (
             <article className="panel image-gen-result" key={item.id}>
-              <p className="image-gen-result-prompt">{item.prompt}</p>
-              <p className="status">
-                {item.model} · {item.size} · {item.quality} · {item.imageCount}
-              </p>
               {item.status === "FAILED" ? (
                 <p className="error">{item.error ?? "Generation failed"}</p>
               ) : (
                 <div className="image-gen-grid">
-                  {item.results.map((result) => (
-                    <img key={result.key} src={result.url} alt={item.prompt} />
+                  {item.results.map((result, index) => (
+                    <div className="image-gen-tile" key={result.key}>
+                      <img src={result.url} alt={item.prompt} />
+                      <div className="image-gen-tile-actions">
+                        <button
+                          type="button"
+                          className="image-gen-icon-button"
+                          aria-label="Edit image"
+                          title="Edit"
+                          onClick={() => startEdit(item, result)}
+                        >
+                          <Pencil size={14} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="image-gen-icon-button"
+                          aria-label="Download image"
+                          title="Download"
+                          onClick={() => downloadResult(item, result, index)}
+                        >
+                          <Download size={14} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="image-gen-icon-button"
+                          aria-label="Delete image"
+                          title="Delete"
+                          onClick={() => removeGeneration(item)}
+                        >
+                          <Trash2 size={14} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
+              <div className="image-gen-meta">
+                <p className="status">
+                  {item.model} · {item.size} · {item.quality} · {item.imageCount}
+                  {item.parentGenerationId && " · Edited from a previous image"}
+                </p>
+                <button
+                  type="button"
+                  className="image-gen-result-prompt"
+                  title="View full prompt"
+                  onClick={(event) =>
+                    setPromptPopover({ text: item.prompt, anchor: event.currentTarget })
+                  }
+                >
+                  {truncatePrompt(item.prompt)}
+                </button>
+              </div>
             </article>
           ))}
         </section>
       </div>
+      {promptPopover && (
+        <div className="image-gen-popover-layer" onMouseDown={() => setPromptPopover(null)}>
+          <div
+            className="panel image-gen-popover"
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="image-gen-popover-title"
+            style={popoverPosition(promptPopover.anchor)}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="image-gen-popover-header">
+              <h3 id="image-gen-popover-title">Prompt</h3>
+              <button
+                type="button"
+                className="secondary-button"
+                aria-label="Close"
+                onClick={() => setPromptPopover(null)}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </header>
+            <p className="image-gen-popover-body">{promptPopover.text}</p>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

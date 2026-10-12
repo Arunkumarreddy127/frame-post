@@ -28,7 +28,9 @@ public record ImageGeneration(
         List<ImageResult> results,
         ImageGenerationStatus status,
         String error,
-        Instant createdAt
+        Instant createdAt,
+        @Indexed String parentGenerationId,
+        String parentResultKey
 ) {
 
     @PersistenceCreator

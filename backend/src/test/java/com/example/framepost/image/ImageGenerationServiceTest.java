@@ -52,6 +52,53 @@ class ImageGenerationServiceTest {
     }
 
     @Test
+    void tagsParentGenerationAndResult() {
+        var parent = new ImageGeneration("p1", "user-1", null, "old", "gpt-image-2.5-flare", "auto", "auto", 1,
+                "png", "auto", "auto", "none", List.of(), List.of(new ImageGeneration.ImageResult("k/1.png")),
+                ImageGenerationStatus.COMPLETED, null, Instant.now(), null, null);
+        when(repository.findByIdAndUserIdAndPageId("p1", "user-1", null)).thenReturn(java.util.Optional.of(parent));
+        when(client.generate(any(), any())).thenReturn(List.of(new byte[] {1}));
+        when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        var response = service.generate(user, null, "new", "gpt-image-2.5-flare", "auto", "auto", 1, null,
+                "p1", "k/1.png");
+
+        assertEquals("p1", response.parentGenerationId());
+        assertEquals("k/1.png", response.parentResultKey());
+    }
+
+    @Test
+    void deletesGenerationAndItsStoredImages() {
+        var generation = new ImageGeneration("g1", "user-1", null, "cat", "gpt-image-2.5-flare", "auto", "auto", 1,
+                "png", "auto", "auto", "none", List.of("in/1.png"), List.of(new ImageGeneration.ImageResult("out/1.png")),
+                ImageGenerationStatus.COMPLETED, null, Instant.now(), null, null);
+        when(repository.findByIdAndUserIdAndPageId("g1", "user-1", null)).thenReturn(java.util.Optional.of(generation));
+
+        service.delete(user, null, "g1");
+
+        verify(repository).delete(generation);
+        verify(storage).delete("out/1.png");
+        verify(storage).delete("in/1.png");
+    }
+
+    @Test
+    void deleteRejectsGenerationOwnedByAnotherUser() {
+        when(repository.findByIdAndUserIdAndPageId("g1", "user-1", null)).thenReturn(java.util.Optional.empty());
+        assertThrows(ResponseStatusException.class, () -> service.delete(user, null, "g1"));
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void rejectsUnknownParent() {
+        when(repository.findByIdAndUserIdAndPageId("p1", "user-1", null)).thenReturn(java.util.Optional.empty());
+        assertThrows(ResponseStatusException.class, () -> service.generate(
+                user, null, "x", "gpt-image-2.5-flare", "auto", "auto", 1, null, "p1", "k/1.png"));
+        assertThrows(ResponseStatusException.class, () -> service.generate(
+                user, null, "x", "gpt-image-2.5-flare", "auto", "auto", 1, null, "p1", null));
+        verifyNoInteractions(client, storage);
+    }
+
+    @Test
     void rejectsInvalidInputBeforeCallingOpenAi() {
         assertThrows(ResponseStatusException.class,
                 () -> service.generate(user, null, "x", "other-model", "auto", "auto", 1, null));

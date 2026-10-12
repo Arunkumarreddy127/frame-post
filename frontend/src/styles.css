@@ -1522,8 +1522,18 @@ h2 {
 }
 
 .image-gen-form,
-.image-gen-section,
-.image-gen-results,
+.image-gen-section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.image-gen-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
 .image-gen-result {
   display: grid;
   gap: 0.75rem;
@@ -1711,13 +1721,129 @@ h2 {
 
 .image-gen-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
   gap: 0.75rem;
 }
 
 .image-gen-grid img {
+  display: block;
   width: 100%;
-  border-radius: 0.35rem;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.5rem;
+}
+
+.image-gen-meta {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.image-gen-meta p {
+  margin: 0;
+}
+
+.image-gen-result-prompt {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.image-gen-result-prompt:hover,
+.image-gen-result-prompt:focus-visible {
+  text-decoration: underline;
+}
+
+.image-gen-popover-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.image-gen-popover {
+  position: fixed;
+  z-index: 1001;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-rows: auto minmax(0, 1fr);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.image-gen-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.image-gen-popover-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.image-gen-popover-body {
+  margin: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.image-gen-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.image-gen-tile-actions {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  display: flex;
+  gap: 0.35rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.image-gen-tile:hover .image-gen-tile-actions,
+.image-gen-tile:focus-within .image-gen-tile-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .image-gen-tile-actions {
+    opacity: 1;
+  }
+}
+
+.image-gen-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+
+.image-gen-icon-button:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.image-gen-parent {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.image-gen-parent img {
+  width: 2.5rem;
+  height: 2.5rem;
+  object-fit: cover;
+  border-radius: 0.3rem;
 }
 
 @media (max-width: 800px) {

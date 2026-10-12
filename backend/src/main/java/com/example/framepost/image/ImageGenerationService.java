@@ -92,7 +92,23 @@ public class ImageGenerationService {
             int count,
             List<MultipartFile> attachments
     ) {
+        return generate(user, pageId, prompt, model, size, quality, count, attachments, null, null);
+    }
+
+    public ImageGenerationResponse generate(
+            User user,
+            String pageId,
+            String prompt,
+            String model,
+            String size,
+            String quality,
+            int count,
+            List<MultipartFile> attachments,
+            String parentGenerationId,
+            String parentResultKey
+    ) {
         validateScope(user, pageId);
+        validateParent(user, pageId, parentGenerationId, parentResultKey);
         String cleanPrompt = prompt == null ? "" : prompt.trim();
         if (cleanPrompt.isEmpty() || cleanPrompt.length() > MAX_PROMPT_LENGTH) {
             throw badRequest("Enter a prompt of up to " + MAX_PROMPT_LENGTH + " characters");
@@ -143,7 +159,8 @@ public class ImageGenerationService {
         } catch (ImageRequestException exception) {
             log.warn("OpenAI image generation failed for model {}", model, exception);
             repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
-                    inputKeys, List.of(), ImageGenerationStatus.FAILED, exception.getMessage(), now));
+                    inputKeys, List.of(), ImageGenerationStatus.FAILED, exception.getMessage(), now,
+                    parentGenerationId, parentResultKey));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, exception.getMessage());
         } catch (RuntimeException exception) {
             storedKeys.forEach(this::deleteQuietly);
@@ -152,21 +169,34 @@ public class ImageGenerationService {
             }
             log.error("Storing generated images failed for generation {}", id, exception);
             repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
-                    List.of(), List.of(), ImageGenerationStatus.FAILED, "Unable to store the generated images", now));
+                    List.of(), List.of(), ImageGenerationStatus.FAILED, "Unable to store the generated images", now,
+                    parentGenerationId, parentResultKey));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to store the generated images");
         }
         ImageGeneration saved = repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
-                inputKeys, results, ImageGenerationStatus.COMPLETED, null, now));
+                inputKeys, results, ImageGenerationStatus.COMPLETED, null, now,
+                parentGenerationId, parentResultKey));
         return ImageGenerationResponse.from(saved, storage::publicUrl);
+    }
+
+    public void delete(User user, String pageId, String id) {
+        validateScope(user, pageId);
+        ImageGeneration generation = repository.findByIdAndUserIdAndPageId(id, user.id(), pageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Generation not found"));
+        repository.delete(generation);
+        generation.results().forEach(result -> deleteQuietly(result.key()));
+        generation.inputKeys().forEach(this::deleteQuietly);
     }
 
     private ImageGeneration record(
             String id, User user, String pageId, String prompt, String model, String size, String quality,
             int count, List<String> inputKeys, List<ImageResult> results,
-            ImageGenerationStatus status, String error, Instant createdAt
+            ImageGenerationStatus status, String error, Instant createdAt,
+            String parentGenerationId, String parentResultKey
     ) {
         return new ImageGeneration(id, user.id(), pageId, prompt, model, size, quality, count,
-                OUTPUT_FORMAT, BACKGROUND, MODERATION, PARTIAL_IMAGES, inputKeys, results, status, error, createdAt);
+                OUTPUT_FORMAT, BACKGROUND, MODERATION, PARTIAL_IMAGES, inputKeys, results, status, error, createdAt,
+                parentGenerationId, parentResultKey);
     }
 
     private List<InputImage> readAttachments(List<MultipartFile> files) {
@@ -201,6 +231,20 @@ public class ImageGenerationService {
         }
     }
 
+    private void validateParent(User user, String pageId, String parentId, String parentKey) {
+        if (parentId == null && parentKey == null) {
+            return;
+        }
+        if (parentId == null || parentKey == null) {
+            throw badRequest("Parent generation and result are both required");
+        }
+        ImageGeneration parent = repository.findByIdAndUserIdAndPageId(parentId, user.id(), pageId)
+                .orElseThrow(() -> badRequest("Parent generation not found"));
+        if (parent.results().stream().noneMatch(result -> result.key().equals(parentKey))) {
+            throw badRequest("Parent result not found");
+        }
+    }
+
     private void validateScope(User user, String pageId) {
         if (pageId != null) {
             pageService.get(user, pageId);
@@ -224,18 +268,25 @@ public class ImageGenerationService {
             String moderation,
             String partialImages,
             List<String> inputKeys,
+            List<ImageResultResponse> inputs,
             List<ImageResultResponse> results,
             ImageGenerationStatus status,
             String error,
-            Instant createdAt
+            Instant createdAt,
+            String parentGenerationId,
+            String parentResultKey
     ) {
         static ImageGenerationResponse from(ImageGeneration g, Function<String, String> publicUrl) {
             List<ImageResultResponse> results = g.results().stream()
                     .map(result -> new ImageResultResponse(result.key(), publicUrl.apply(result.key())))
                     .toList();
+            List<ImageResultResponse> inputs = g.inputKeys().stream()
+                    .map(key -> new ImageResultResponse(key, publicUrl.apply(key)))
+                    .toList();
             return new ImageGenerationResponse(g.id(), g.pageId(), g.prompt(), g.model(), g.size(), g.quality(),
                     g.imageCount(), g.outputFormat(), g.background(), g.moderation(), g.partialImages(),
-                    g.inputKeys(), results, g.status(), g.error(), g.createdAt());
+                    g.inputKeys(), inputs, results, g.status(), g.error(), g.createdAt(),
+                    g.parentGenerationId(), g.parentResultKey());
         }
     }
 

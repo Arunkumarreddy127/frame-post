@@ -10,6 +10,7 @@ import com.example.framepost.auth.User;
 import com.example.framepost.image.ImageGenerationService.ImageGenerationResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -73,9 +74,12 @@ public class ImageGenerationController {
             @RequestParam String quality,
             @RequestParam(defaultValue = "1") int count,
             @RequestParam(name = "attachments", required = false) List<MultipartFile> attachments,
+            @RequestParam(required = false) String parentGenerationId,
+            @RequestParam(required = false) String parentResultKey,
             HttpServletRequest request
     ) {
-        return service.generate(currentUser(request), null, prompt, model, size, quality, count, attachments);
+        return service.generate(currentUser(request), null, prompt, model, size, quality, count, attachments,
+                parentGenerationId, parentResultKey);
     }
 
     @PostMapping(value = "/pages/{pageId}/images/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -88,9 +92,28 @@ public class ImageGenerationController {
             @RequestParam String quality,
             @RequestParam(defaultValue = "1") int count,
             @RequestParam(name = "attachments", required = false) List<MultipartFile> attachments,
+            @RequestParam(required = false) String parentGenerationId,
+            @RequestParam(required = false) String parentResultKey,
             HttpServletRequest request
     ) {
-        return service.generate(currentUser(request), pageId, prompt, model, size, quality, count, attachments);
+        return service.generate(currentUser(request), pageId, prompt, model, size, quality, count, attachments,
+                parentGenerationId, parentResultKey);
+    }
+
+    @DeleteMapping("/images/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable String id, HttpServletRequest request) {
+        service.delete(currentUser(request), null, id);
+    }
+
+    @DeleteMapping("/pages/{pageId}/images/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteForPage(
+            @PathVariable String pageId,
+            @PathVariable String id,
+            HttpServletRequest request
+    ) {
+        service.delete(currentUser(request), pageId, id);
     }
 
     private User currentUser(HttpServletRequest request) {
