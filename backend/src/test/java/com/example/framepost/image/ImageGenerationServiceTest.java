@@ -52,6 +52,22 @@ class ImageGenerationServiceTest {
     }
 
     @Test
+    void sendsAttachmentsToOpenAiAsInputImages() {
+        when(client.generate(any(), any())).thenReturn(List.of(new byte[] {1}));
+        when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
+        var attachment = new org.springframework.mock.web.MockMultipartFile(
+                "attachments", "ref.png", "image/png", new byte[] {9, 9});
+
+        service.generate(user, null, "a cat", "gpt-image-2.5-flare", "auto", "auto", 1, List.of(attachment));
+
+        ArgumentCaptor<List<OpenAiImageClient.InputImage>> inputs = ArgumentCaptor.forClass(List.class);
+        verify(client).generate(any(), inputs.capture());
+        assertEquals(1, inputs.getValue().size());
+        assertEquals("image/png", inputs.getValue().get(0).contentType());
+        assertEquals(2, inputs.getValue().get(0).bytes().length);
+    }
+
+    @Test
     void tagsParentGenerationAndResult() {
         var parent = new ImageGeneration("p1", "user-1", null, "old", "gpt-image-2.5-flare", "auto", "auto", 1,
                 "png", "auto", "auto", "none", List.of(), List.of(new ImageGeneration.ImageResult("k/1.png")),

@@ -1567,8 +1567,8 @@ h2 {
 }
 
 .image-gen-prompt {
-  display: grid;
-  grid-template-rows: minmax(3.5rem, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: 0.45rem;
   min-height: 7.5rem;
   padding: 0.7rem 0.9rem 0.5rem;
@@ -1579,6 +1579,7 @@ h2 {
 }
 
 .image-gen-prompt textarea {
+  flex: 1 0 3.5rem;
   width: 100%;
   min-height: 0;
   padding: 0.25rem 0.35rem;
@@ -1699,7 +1700,7 @@ h2 {
   margin: 0;
   padding: 0;
   list-style: none;
-  order: 2;
+  padding-top: 0.35rem;
 }
 
 .image-gen-attachments li {

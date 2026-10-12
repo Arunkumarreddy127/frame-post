@@ -129,8 +129,9 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
 
   function addFiles(files: FileList | null) {
     if (!files) return;
-    setAttachments((current) => [...current, ...Array.from(files)].slice(0, MAX_ATTACHMENTS));
+    const selected = Array.from(files);
     if (fileInput.current) fileInput.current.value = "";
+    setAttachments((current) => [...current, ...selected].slice(0, MAX_ATTACHMENTS));
   }
 
   async function startEdit(item: ImageGeneration, result: { key: string; url: string }) {
@@ -252,6 +253,29 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                   </button>
                 </div>
               )}
+              {attachments.length > 0 && (
+                <ul className="image-gen-attachments">
+                  {attachments.map((file, index) => (
+                    <li key={`${file.name}-${index}`}>
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={file.name}
+                        title="Double-click to view"
+                        onDoubleClick={() => setFullView({ url: URL.createObjectURL(file), alt: file.name })}
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() =>
+                          setAttachments((current) => current.filter((_, i) => i !== index))
+                        }
+                      >
+                        <X size={12} aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <textarea
                 ref={promptInput}
                 value={prompt}
@@ -279,24 +303,6 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                 >
                   <Paperclip size={16} aria-hidden="true" />
                 </button>
-                {attachments.length > 0 && (
-                  <ul className="image-gen-attachments">
-                    {attachments.map((file, index) => (
-                      <li key={`${file.name}-${index}`}>
-                        <img src={URL.createObjectURL(file)} alt={file.name} />
-                        <button
-                          type="button"
-                          aria-label={`Remove ${file.name}`}
-                          onClick={() =>
-                            setAttachments((current) => current.filter((_, i) => i !== index))
-                          }
-                        >
-                          <X size={12} aria-hidden="true" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
                 <div style={{ flex: 1 }} />
                 <label className="image-gen-control">
                   <span className="image-gen-control-label">Model</span>
@@ -375,7 +381,12 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                 <div className="image-gen-grid">
                   {item.results.map((result, index) => (
                     <div className="image-gen-tile" key={result.key}>
-                      <img src={result.url} alt={item.prompt} />
+                      <img
+                        src={result.url}
+                        alt={item.prompt}
+                        title="Double-click to view"
+                        onDoubleClick={() => setFullView({ url: result.url, alt: item.prompt })}
+                      />
                       <div className="image-gen-tile-actions">
                         <button
                           type="button"
