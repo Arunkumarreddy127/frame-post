@@ -2,13 +2,9 @@ import { useParams } from "react-router-dom";
 import { PlaceholderPage } from "../components/PlaceholderPage";
 import type { ShellRouteProps } from "../types";
 
-type PageTool = "create" | "library";
+type PageTool = "library";
 
 const pageTools: Record<PageTool, { title: string; description: string }> = {
-  create: {
-    title: "Create",
-    description: "Create tools will appear here for this page.",
-  },
   library: {
     title: "Library",
     description: "Your library for this page will have a home here soon.",
@@ -21,7 +17,7 @@ export function PagePlaceholderPage({ user, onLogout }: ShellRouteProps) {
     tool: PageTool;
   }>();
 
-  if (!pageId || (tool !== "create" && tool !== "library")) {
+  if (!pageId || (tool !== "library")) {
     return null;
   }
 

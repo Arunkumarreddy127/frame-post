@@ -1380,6 +1380,19 @@ h2 {
   line-height: 1.5;
 }
 
+.create-sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.create-section {
+  border-top: 3px solid #0969da;
+}
+
+.create-section h3 {
+  margin: 0;
+}
+
 .page-instructions-panel {
   margin-top: 1.5rem;
   border-top: 3px solid #0969da;

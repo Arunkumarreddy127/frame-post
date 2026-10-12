@@ -8,6 +8,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import {
   ChatPage,
+  CreatePage,
   HomePage,
   PageDetailPage,
   PageEditorPage,
@@ -131,6 +132,14 @@ function App() {
           }
         />
         <Route
+          path="/pages/:pageId/create"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <CreatePage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/pages/:pageId/:tool"
           element={
             <ProtectedRoute user={user} loading={loading}>
@@ -150,12 +159,7 @@ function App() {
           path="/create"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <PlaceholderPage
-                user={user as User}
-                onLogout={logout}
-                title="Create"
-                description="Create tools will appear here as the workspace grows."
-              />
+              <CreatePage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />
