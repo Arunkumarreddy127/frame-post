@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUp, ChevronDown, Download, Paperclip, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ChevronDown, Download, Maximize2, Paperclip, Pencil, Trash2, X } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
@@ -79,6 +79,16 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
   const promptInput = useRef<HTMLTextAreaElement>(null);
   const [promptPopover, setPromptPopover] = useState<{ text: string; anchor: HTMLElement } | null>(null);
   const [, setLayoutTick] = useState(0);
+  const [fullView, setFullView] = useState<{ url: string; alt: string } | null>(null);
+
+  useEffect(() => {
+    if (!fullView) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setFullView(null);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [fullView]);
 
   useEffect(() => {
     if (!promptPopover) return;
@@ -370,6 +380,15 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                         <button
                           type="button"
                           className="image-gen-icon-button"
+                          aria-label="View full image"
+                          title="Full view"
+                          onClick={() => setFullView({ url: result.url, alt: item.prompt })}
+                        >
+                          <Maximize2 size={14} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="image-gen-icon-button"
                           aria-label="Edit image"
                           title="Edit"
                           onClick={() => startEdit(item, result)}
@@ -402,8 +421,10 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
               <div className="image-gen-meta">
                 <p className="status">
                   {item.model} · {item.size} · {item.quality} · {item.imageCount}
-                  {item.parentGenerationId && " · Edited from a previous image"}
                 </p>
+                {item.parentGenerationId && (
+                  <p className="status">Edited from a previous image</p>
+                )}
                 <button
                   type="button"
                   className="image-gen-result-prompt"
@@ -419,6 +440,29 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
           ))}
         </section>
       </div>
+      {fullView && (
+        <div
+          className="image-gen-fullview-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Full image view"
+          onMouseDown={() => setFullView(null)}
+        >
+          <button
+            type="button"
+            className="secondary-button image-gen-fullview-close"
+            aria-label="Close"
+            onClick={() => setFullView(null)}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+          <img
+            src={fullView.url}
+            alt={fullView.alt}
+            onMouseDown={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
       {promptPopover && (
         <div className="image-gen-popover-layer" onMouseDown={() => setPromptPopover(null)}>
           <div
