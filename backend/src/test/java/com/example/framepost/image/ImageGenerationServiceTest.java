@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -36,7 +37,7 @@ class ImageGenerationServiceTest {
     @Test
     void storesResultsInR2AndRecordsMetadata() {
         when(client.generate(any(), any())).thenReturn(List.of(new byte[] {1}, new byte[] {2}));
-        when(storage.store(any(), any(), anyLong(), eq("image/png"))).thenAnswer(i -> "https://cdn/" + i.getArgument(0));
+        doNothing().when(storage).store(any(), any(), anyLong(), eq("image/png"));
         when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         var response = service.generate(user, null, " a cat ", "gpt-image-2.5-flare", "1024x1024", "xhigh", 2, null);

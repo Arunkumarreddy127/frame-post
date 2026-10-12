@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.config.ImageProperties;
@@ -70,14 +71,14 @@ public class ImageGenerationService {
     public List<ImageGenerationResponse> list(User user, String pageId) {
         validateScope(user, pageId);
         return repository.findByUserIdAndPageIdOrderByCreatedAtDesc(user.id(), pageId).stream()
-                .map(ImageGenerationResponse::from)
+                .map(generation -> ImageGenerationResponse.from(generation, storage::publicUrl))
                 .toList();
     }
 
     public ImageGenerationResponse get(User user, String pageId, String id) {
         validateScope(user, pageId);
         return repository.findByIdAndUserIdAndPageId(id, user.id(), pageId)
-                .map(ImageGenerationResponse::from)
+                .map(generation -> ImageGenerationResponse.from(generation, storage::publicUrl))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Generation not found"));
     }
 
@@ -135,9 +136,9 @@ public class ImageGenerationService {
             }
             for (int index = 0; index < generated.size(); index++) {
                 String key = keyPrefix + (index + 1) + "." + OUTPUT_FORMAT;
-                String url = store(key, generated.get(index), "image/" + OUTPUT_FORMAT);
+                store(key, generated.get(index), "image/" + OUTPUT_FORMAT);
                 storedKeys.add(key);
-                results.add(new ImageResult(key, url));
+                results.add(new ImageResult(key));
             }
         } catch (ImageRequestException exception) {
             log.warn("OpenAI image generation failed for model {}", model, exception);
@@ -156,7 +157,7 @@ public class ImageGenerationService {
         }
         ImageGeneration saved = repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                 inputKeys, results, ImageGenerationStatus.COMPLETED, null, now));
-        return ImageGenerationResponse.from(saved);
+        return ImageGenerationResponse.from(saved, storage::publicUrl);
     }
 
     private ImageGeneration record(
@@ -188,8 +189,8 @@ public class ImageGenerationService {
         return inputs;
     }
 
-    private String store(String key, byte[] bytes, String contentType) {
-        return storage.store(key, new ByteArrayInputStream(bytes), bytes.length, contentType);
+    private void store(String key, byte[] bytes, String contentType) {
+        storage.store(key, new ByteArrayInputStream(bytes), bytes.length, contentType);
     }
 
     private void deleteQuietly(String key) {
@@ -223,15 +224,21 @@ public class ImageGenerationService {
             String moderation,
             String partialImages,
             List<String> inputKeys,
-            List<ImageResult> results,
+            List<ImageResultResponse> results,
             ImageGenerationStatus status,
             String error,
             Instant createdAt
     ) {
-        static ImageGenerationResponse from(ImageGeneration g) {
+        static ImageGenerationResponse from(ImageGeneration g, Function<String, String> publicUrl) {
+            List<ImageResultResponse> results = g.results().stream()
+                    .map(result -> new ImageResultResponse(result.key(), publicUrl.apply(result.key())))
+                    .toList();
             return new ImageGenerationResponse(g.id(), g.pageId(), g.prompt(), g.model(), g.size(), g.quality(),
                     g.imageCount(), g.outputFormat(), g.background(), g.moderation(), g.partialImages(),
-                    g.inputKeys(), g.results(), g.status(), g.error(), g.createdAt());
+                    g.inputKeys(), results, g.status(), g.error(), g.createdAt());
         }
+    }
+
+    public record ImageResultResponse(String key, String url) {
     }
 }

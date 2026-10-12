@@ -23,7 +23,7 @@ public class R2StorageService implements StorageService {
     }
 
     @Override
-    public String store(String key, InputStream content, long contentLength, String contentType) {
+    public void store(String key, InputStream content, long contentLength, String contentType) {
         client.putObject(
                 PutObjectRequest.builder()
                         .bucket(properties.bucketName())
@@ -31,7 +31,6 @@ public class R2StorageService implements StorageService {
                         .contentType(contentType)
                         .build(),
                 RequestBody.fromInputStream(content, contentLength));
-        return publicUrl(key);
     }
 
     @Override
@@ -42,7 +41,8 @@ public class R2StorageService implements StorageService {
                 .build());
     }
 
-    private String publicUrl(String key) {
+    @Override
+    public String publicUrl(String key) {
         if (properties.publicBaseUrl() == null || properties.publicBaseUrl().isBlank()) {
             return key;
         }

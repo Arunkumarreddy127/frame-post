@@ -37,6 +37,6 @@ public record ImageGeneration(
         results = results == null ? List.of() : List.copyOf(results);
     }
 
-    public record ImageResult(String key, String url) {
+    public record ImageResult(String key) {
     }
 }
