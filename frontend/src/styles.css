@@ -1515,7 +1515,7 @@ h2 {
 
 .image-gen-layout {
   display: grid;
-  grid-template-columns: minmax(18rem, 26rem) 1fr;
+  grid-template-columns: 1fr;
   gap: 1.25rem;
   align-items: start;
   margin-top: 1rem;
@@ -1543,16 +1543,128 @@ h2 {
 
 .image-gen-prompt {
   display: grid;
-  gap: 0.5rem;
+  grid-template-rows: minmax(3.5rem, 1fr) auto;
+  gap: 0.45rem;
+  min-height: 7.5rem;
+  padding: 0.7rem 0.9rem 0.5rem;
+  border: 1px solid #d0d7de;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
 }
 
 .image-gen-prompt textarea {
-  resize: vertical;
+  width: 100%;
+  min-height: 0;
+  padding: 0.25rem 0.35rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #1f2328;
+  resize: none;
+}
+
+.image-gen-prompt textarea:focus {
+  border: 0;
+  outline: 0;
+}
+
+.image-gen-prompt textarea::placeholder {
+  color: #8b949e;
+  opacity: 1;
 }
 
 .image-gen-prompt-actions {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.image-gen-prompt-actions > div[style*="flex: 1"] {
+  order: 999;
+  flex-basis: 100%;
+}
+
+.image-gen-prompt-actions button[type="submit"] {
+  order: 1000;
+  margin-left: auto;
+}
+
+.image-gen-control {
+  display: flex;
+  align-items: center;
+  width: auto;
+  gap: 0.25rem;
+}
+
+.image-gen-control-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #424a53;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.image-gen-select-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.image-gen-select-wrapper:hover {
+  border-color: #c9d1d9;
+  background: #f6f8fa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.image-gen-select-icon {
+  position: absolute;
+  right: 0.25rem;
+  pointer-events: none;
+  color: #57606a;
+  flex-shrink: 0;
+}
+
+.image-gen-control select {
+  width: auto;
+  min-width: 3.5rem;
+  max-width: 9rem;
+  padding: 0 1.5rem 0 0.3rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #1f2328;
+  font-size: 0.8rem;
+  font-weight: 500;
+  appearance: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.image-gen-control select:hover:not(:disabled) {
+  background: transparent;
+}
+
+.image-gen-control select:focus {
+  background: transparent;
+}
+
+.image-gen-control select:disabled {
+  color: #c4cbd3;
+  cursor: not-allowed;
+}
+
+.image-gen-select-wrapper:has(select:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .image-gen-attachments {
@@ -1562,6 +1674,7 @@ h2 {
   margin: 0;
   padding: 0;
   list-style: none;
+  order: 2;
 }
 
 .image-gen-attachments li {
@@ -1588,6 +1701,7 @@ h2 {
   border-radius: 50%;
   background: #fff;
   cursor: pointer;
+  font-size: 0.75rem;
 }
 
 .image-gen-result-prompt {

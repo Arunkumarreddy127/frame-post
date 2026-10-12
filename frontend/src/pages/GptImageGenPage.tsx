@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUp, Paperclip, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
@@ -122,24 +122,6 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                 maxLength={32000}
                 aria-label="Prompt"
               />
-              {attachments.length > 0 && (
-                <ul className="image-gen-attachments">
-                  {attachments.map((file, index) => (
-                    <li key={`${file.name}-${index}`}>
-                      <img src={URL.createObjectURL(file)} alt={file.name} />
-                      <button
-                        type="button"
-                        aria-label={`Remove ${file.name}`}
-                        onClick={() =>
-                          setAttachments((current) => current.filter((_, i) => i !== index))
-                        }
-                      >
-                        <X size={12} aria-hidden="true" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
               <div className="image-gen-prompt-actions">
                 <input
                   ref={fileInput}
@@ -158,6 +140,77 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                 >
                   <Paperclip size={16} aria-hidden="true" />
                 </button>
+                {attachments.length > 0 && (
+                  <ul className="image-gen-attachments">
+                    {attachments.map((file, index) => (
+                      <li key={`${file.name}-${index}`}>
+                        <img src={URL.createObjectURL(file)} alt={file.name} />
+                        <button
+                          type="button"
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() =>
+                            setAttachments((current) => current.filter((_, i) => i !== index))
+                          }
+                        >
+                          <X size={12} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div style={{ flex: 1 }} />
+                <label className="image-gen-control">
+                  <span className="image-gen-control-label">Model</span>
+                  <div className="image-gen-select-wrapper">
+                    <select value={model} onChange={(event) => setModel(event.target.value)} disabled={generating}>
+                      {models.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                  </div>
+                </label>
+                <label className="image-gen-control">
+                  <span className="image-gen-control-label">Size</span>
+                  <div className="image-gen-select-wrapper">
+                    <select value={size} onChange={(event) => setSize(event.target.value)} disabled={generating}>
+                      {SIZES.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                  </div>
+                </label>
+                <label className="image-gen-control">
+                  <span className="image-gen-control-label">Quality</span>
+                  <div className="image-gen-select-wrapper">
+                    <select value={quality} onChange={(event) => setQuality(event.target.value)} disabled={generating}>
+                      {QUALITIES.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                  </div>
+                </label>
+                <label className="image-gen-control">
+                  <span className="image-gen-control-label">Count</span>
+                  <div className="image-gen-select-wrapper">
+                    <select value={count} onChange={(event) => setCount(Number(event.target.value))} disabled={generating}>
+                      {Array.from({ length: MAX_IMAGES }, (_, index) => index + 1).map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                  </div>
+                </label>
                 <button
                   type="submit"
                   className="primary-button"
@@ -170,53 +223,6 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
             </div>
           </section>
 
-          <section className="image-gen-section">
-            <h3>Model</h3>
-            <label className="image-gen-row">
-              Model
-              <select value={model} onChange={(event) => setModel(event.target.value)}>
-                {models.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
-
-          <section className="image-gen-section">
-            <h3>Image settings</h3>
-            <label className="image-gen-row">
-              Size &amp; orientation
-              <select value={size} onChange={(event) => setSize(event.target.value)}>
-                {SIZES.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="image-gen-row">
-              Quality
-              <select value={quality} onChange={(event) => setQuality(event.target.value)}>
-                {QUALITIES.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="image-gen-row">
-              Number of images
-              <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
-                {Array.from({ length: MAX_IMAGES }, (_, index) => index + 1).map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
           {error && <p className="error">{error}</p>}
           {generating && <p className="status">Generating images...</p>}
         </form>
