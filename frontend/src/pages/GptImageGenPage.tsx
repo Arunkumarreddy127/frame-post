@@ -208,16 +208,13 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
             </label>
             <label className="image-gen-row">
               Number of images
-              <span className="image-gen-count">
-                <input
-                  type="range"
-                  min={1}
-                  max={MAX_IMAGES}
-                  value={count}
-                  onChange={(event) => setCount(Number(event.target.value))}
-                />
-                <output>{count}</output>
-              </span>
+              <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
+                {Array.from({ length: MAX_IMAGES }, (_, index) => index + 1).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </label>
           </section>
           {error && <p className="error">{error}</p>}
