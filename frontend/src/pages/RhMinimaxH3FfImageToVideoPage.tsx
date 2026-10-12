@@ -1,13 +1,27 @@
+import { useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import type { ShellRouteProps } from "../types";
 
-export function RhMinimaxH3FfImageToVideoPage({ user, onLogout }: ShellRouteProps) {
+type RhMinimaxH3FfImageToVideoPageProps = ShellRouteProps & {
+  pageId?: string;
+};
+
+export function RhMinimaxH3FfImageToVideoPage({
+  user,
+  onLogout,
+  pageId,
+}: RhMinimaxH3FfImageToVideoPageProps) {
+  const { pageId: routePageId } = useParams<{ pageId?: string }>();
+  const activePageId = pageId ?? routePageId;
+
   return (
     <AppShell
       user={user}
       onLogout={onLogout}
       pageTitle="Minimax H3 - FF Image to Video"
-      backTo="/create"
+      sidebar={activePageId ? "page" : "global"}
+      pageId={activePageId}
+      backTo={activePageId ? `/pages/${activePageId}/create` : "/create"}
     >
       <section className="panel placeholder-panel">
         <p className="eyebrow">Framepost workspace</p>

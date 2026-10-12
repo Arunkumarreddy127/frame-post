@@ -142,6 +142,22 @@ function App() {
           }
         />
         <Route
+          path="/pages/:pageId/create/gpt-image-gen"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <GptImageGenPage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pages/:pageId/create/rh-minimax-h3-ff-image-to-video"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <RhMinimaxH3FfImageToVideoPage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/pages/:pageId/:tool"
           element={
             <ProtectedRoute user={user} loading={loading}>
@@ -166,7 +182,7 @@ function App() {
           }
         />
         <Route
-          path="/gpt-image-gen"
+          path="/create/gpt-image-gen"
           element={
             <ProtectedRoute user={user} loading={loading}>
               <GptImageGenPage user={user as User} onLogout={logout} />
@@ -174,7 +190,7 @@ function App() {
           }
         />
         <Route
-          path="/rh-minimax-h3-ff-image-to-video"
+          path="/create/rh-minimax-h3-ff-image-to-video"
           element={
             <ProtectedRoute user={user} loading={loading}>
               <RhMinimaxH3FfImageToVideoPage user={user as User} onLogout={logout} />

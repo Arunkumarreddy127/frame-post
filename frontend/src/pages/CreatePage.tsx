@@ -19,7 +19,7 @@ const sections: { heading: string; items: CreateItem[] }[] = [
       {
         label: "Image",
         description: "Generate images with GPT image models.",
-        to: "/gpt-image-gen",
+        to: "/create/gpt-image-gen",
       },
     ],
   },
@@ -29,7 +29,7 @@ const sections: { heading: string; items: CreateItem[] }[] = [
       {
         label: "Minimax H3 - FF Image to Video",
         description: "Turn a still image into a video with Minimax H3 (FF).",
-        to: "/rh-minimax-h3-ff-image-to-video",
+        to: "/create/rh-minimax-h3-ff-image-to-video",
       },
     ],
   },
@@ -55,7 +55,10 @@ export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
             <ul className="create-list">
               {section.items.map((item) => (
                 <li key={item.to}>
-                  <Link className="create-item" to={item.to}>
+                  <Link
+                    className="create-item"
+                    to={activePageId ? `/pages/${activePageId}${item.to}` : item.to}
+                  >
                     <span className="create-item-text">
                       <strong>{item.label}</strong>
                       <span>{item.description}</span>
