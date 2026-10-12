@@ -3,7 +3,6 @@ import { ArrowLeft } from "lucide-react";
 
 type PageSidebarProps = {
   pageId?: string;
-  backTo?: string;
 };
 
 const navigation = [
@@ -12,12 +11,12 @@ const navigation = [
   { label: "Library", suffix: "library" },
 ];
 
-export function PageSidebar({ pageId, backTo = "/pages" }: PageSidebarProps) {
+export function PageSidebar({ pageId }: PageSidebarProps) {
   const pagePath = pageId ? `/pages/${pageId}` : "/pages";
 
   return (
     <aside className="app-sidebar">
-      <NavLink to={backTo} className="sidebar-back" aria-label="Back to Pages">
+      <NavLink to="/pages" className="sidebar-back" aria-label="Back to Pages">
         <ArrowLeft className="sidebar-back-icon" size={18} strokeWidth={1.8} aria-hidden="true" />
         <span>Back to Pages</span>
       </NavLink>

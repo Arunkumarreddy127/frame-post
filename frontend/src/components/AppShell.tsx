@@ -31,7 +31,7 @@ export function AppShell({
       />
       <div className="app-body">
         {sidebar === "page" ? (
-          <PageSidebar pageId={pageId} backTo={backTo} />
+          <PageSidebar pageId={pageId} />
         ) : (
           <Sidebar backTo={backTo} />
         )}

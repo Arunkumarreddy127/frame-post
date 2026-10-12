@@ -1,4 +1,5 @@
-import { useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import type { ShellRouteProps } from "../types";
 
@@ -9,6 +10,7 @@ type GptImageGenPageProps = ShellRouteProps & {
 export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const activePageId = pageId ?? routePageId;
+  const createPath = activePageId ? `/pages/${activePageId}/create` : "/create";
 
   return (
     <AppShell
@@ -17,8 +19,12 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
       pageTitle="Image"
       sidebar={activePageId ? "page" : "global"}
       pageId={activePageId}
-      backTo={activePageId ? `/pages/${activePageId}/create` : "/create"}
+      backTo={createPath}
     >
+      <Link to={createPath} className="secondary-button">
+        <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+        Back to Create
+      </Link>
       <section className="panel placeholder-panel">
         <p className="eyebrow">Framepost workspace</p>
         <h2>Image</h2>
