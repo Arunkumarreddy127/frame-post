@@ -17,6 +17,8 @@ Copy `.env.example` to `.env` and replace the R2 placeholders when needed. The d
 
 To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The default `OPENAI_ALLOWED_MODELS` allowlist contains `gpt-6-luna`, `gpt-6.1-sol`, and `gpt-6-astra`; adjust it only when different models are available to the configured key.
 
+Image generation at `/create/gpt-image-gen` reuses `OPENAI_API_KEY` and the `OPENAI_IMAGE_ALLOWED_MODELS` allowlist (default `gpt-image-2.5-sunburst,gpt-image-2.5-flare`). Generated images and attachments are stored in R2 and metadata is kept in the `image_generations` MongoDB collection.
+
 ## Run locally
 
 ```bash

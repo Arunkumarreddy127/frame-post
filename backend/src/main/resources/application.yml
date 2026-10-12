@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: framepost-backend
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 90MB
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/framepost}
@@ -34,3 +38,6 @@ framepost:
     api-key: ${OPENAI_API_KEY:}
     allowed-models: ${OPENAI_ALLOWED_MODELS:gpt-6-luna,gpt-6.1-sol,gpt-6-astra}
     request-timeout-seconds: ${OPENAI_REQUEST_TIMEOUT_SECONDS:120}
+  image:
+    allowed-models: ${OPENAI_IMAGE_ALLOWED_MODELS:gpt-image-2.5-sunburst,gpt-image-2.5-flare}
+    request-timeout-seconds: ${OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS:300}
