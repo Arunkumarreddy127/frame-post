@@ -9,5 +9,7 @@ public interface ImageGenerationRepository extends MongoRepository<ImageGenerati
 
     List<ImageGeneration> findByUserIdAndPageIdOrderByCreatedAtDesc(String userId, String pageId);
 
+    List<ImageGeneration> findByUserIdOrderByCreatedAtDesc(String userId);
+
     Optional<ImageGeneration> findByIdAndUserIdAndPageId(String id, String userId, String pageId);
 }

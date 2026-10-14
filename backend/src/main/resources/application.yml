@@ -6,8 +6,8 @@ spring:
     name: framepost-backend
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 90MB
+      max-file-size: 100MB
+      max-request-size: 110MB
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/framepost}
@@ -41,3 +41,11 @@ framepost:
   image:
     allowed-models: ${OPENAI_IMAGE_ALLOWED_MODELS:gpt-image-2.5-sunburst,gpt-image-2.5-flare}
     request-timeout-seconds: ${OPENAI_IMAGE_REQUEST_TIMEOUT_SECONDS:300}
+  runninghub:
+    api-key: ${RUNNINGHUB_API_KEY:}
+    base-url: ${RUNNINGHUB_BASE_URL:https://www.runninghub.ai}
+    request-timeout-seconds: ${RUNNINGHUB_REQUEST_TIMEOUT_SECONDS:60}
+    poll-interval-seconds: ${RUNNINGHUB_POLL_INTERVAL_SECONDS:5}
+    max-wait-seconds: ${RUNNINGHUB_MAX_WAIT_SECONDS:1800}
+    webhook-base-url: ${RUNNINGHUB_WEBHOOK_BASE_URL:}
+    webhook-secret: ${RUNNINGHUB_WEBHOOK_SECRET:}

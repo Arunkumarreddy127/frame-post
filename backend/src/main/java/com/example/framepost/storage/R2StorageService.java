@@ -8,6 +8,7 @@ import com.example.framepost.config.R2Properties;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -31,6 +32,16 @@ public class R2StorageService implements StorageService {
                         .contentType(contentType)
                         .build(),
                 RequestBody.fromInputStream(content, contentLength));
+    }
+
+    @Override
+    public void copy(String sourceKey, String targetKey) {
+        client.copyObject(CopyObjectRequest.builder()
+                .sourceBucket(properties.bucketName())
+                .sourceKey(sourceKey)
+                .destinationBucket(properties.bucketName())
+                .destinationKey(targetKey)
+                .build());
     }
 
     @Override

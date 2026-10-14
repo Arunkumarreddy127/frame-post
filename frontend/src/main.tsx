@@ -1,9 +1,8 @@
 import { StrictMode } from "react";
 import { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { AuthPage } from "./components/AuthPage";
-import { PlaceholderPage } from "./components/PlaceholderPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import {
@@ -14,14 +13,26 @@ import {
   PageDetailPage,
   PageEditorPage,
   PageListPage,
-  PagePlaceholderPage,
-  RhMinimaxH3FfImageToVideoPage,
+  LibraryPage,
+  RunningHubWorkflowPage,
 } from "./pages";
 import type { User } from "./types";
 import "./styles.css";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
+const LEGACY_MINIMAX_KEY = "minimax-h3-ff-image-to-video";
+
+function PageLibraryRoute({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
+  const { pageId } = useParams<{ pageId: string }>();
+  return <LibraryPage user={user} onLogout={onLogout} pageId={pageId} />;
+}
+
+function LegacyMinimaxRedirect() {
+  const { pageId } = useParams<{ pageId?: string }>();
+  const base = pageId ? `/pages/${pageId}/create` : "/create";
+  return <Navigate to={`${base}/rh/${LEGACY_MINIMAX_KEY}`} replace />;
+}
 
 function App() {
   const { user, loading, setUser } = useAuth();
@@ -151,17 +162,24 @@ function App() {
         />
         <Route
           path="/pages/:pageId/create/rh-minimax-h3-ff-image-to-video"
+          element={<LegacyMinimaxRedirect />}
+        />
+        <Route
+          path="/pages/:pageId/create/rh/:workflowKey"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <RhMinimaxH3FfImageToVideoPage user={user as User} onLogout={logout} />
+              <RunningHubWorkflowPage
+                user={user as User}
+                onLogout={logout}
+              />
             </ProtectedRoute>
           }
         />
         <Route
-          path="/pages/:pageId/:tool"
+          path="/pages/:pageId/library"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <PagePlaceholderPage user={user as User} onLogout={logout} />
+              <PageLibraryRoute user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />
@@ -191,9 +209,16 @@ function App() {
         />
         <Route
           path="/create/rh-minimax-h3-ff-image-to-video"
+          element={<LegacyMinimaxRedirect />}
+        />
+        <Route
+          path="/create/rh/:workflowKey"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <RhMinimaxH3FfImageToVideoPage user={user as User} onLogout={logout} />
+              <RunningHubWorkflowPage
+                user={user as User}
+                onLogout={logout}
+              />
             </ProtectedRoute>
           }
         />
@@ -201,12 +226,7 @@ function App() {
           path="/library"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <PlaceholderPage
-                user={user as User}
-                onLogout={logout}
-                title="Library"
-                description="Your library will have a home here soon."
-              />
+              <LibraryPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />

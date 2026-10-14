@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +18,7 @@ import com.example.framepost.image.OpenAiImageClient.ImageRequest;
 import com.example.framepost.image.OpenAiImageClient.ImageRequestException;
 import com.example.framepost.image.OpenAiImageClient.InputImage;
 import com.example.framepost.page.PageService;
+import com.example.framepost.storage.StorageKeys;
 import com.example.framepost.storage.StorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,7 +136,9 @@ public class ImageGenerationService {
         List<InputImage> inputs = readAttachments(files);
 
         String id = UUID.randomUUID().toString();
-        String keyPrefix = "image-generations/" + user.id() + "/" + id + "/";
+        String inputPrefix = StorageKeys.inputPrefix(user, id);
+        String outputPrefix = StorageKeys.outputPrefix(user, id);
+        Set<String> inputNames = new HashSet<>();
         List<String> storedKeys = new ArrayList<>();
         List<String> inputKeys = new ArrayList<>();
         List<ImageResult> results = new ArrayList<>();
@@ -145,13 +149,15 @@ public class ImageGenerationService {
                     OUTPUT_FORMAT, BACKGROUND, MODERATION), inputs);
             for (int index = 0; index < inputs.size(); index++) {
                 InputImage input = inputs.get(index);
-                String key = keyPrefix + "inputs/" + (index + 1) + "." + ATTACHMENT_TYPES.get(input.contentType());
+                String name = StorageKeys.fileName(files.get(index).getOriginalFilename(),
+                        ATTACHMENT_TYPES.get(input.contentType()), "input-" + (index + 1), inputNames);
+                String key = inputPrefix + name;
                 store(key, input.bytes(), input.contentType());
                 storedKeys.add(key);
                 inputKeys.add(key);
             }
             for (int index = 0; index < generated.size(); index++) {
-                String key = keyPrefix + (index + 1) + "." + OUTPUT_FORMAT;
+                String key = outputPrefix + "output-" + (index + 1) + "." + OUTPUT_FORMAT;
                 store(key, generated.get(index), "image/" + OUTPUT_FORMAT);
                 storedKeys.add(key);
                 results.add(new ImageResult(key));

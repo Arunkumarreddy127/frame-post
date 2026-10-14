@@ -17,6 +17,26 @@ Copy `.env.example` to `.env` and replace the R2 placeholders when needed. The d
 
 To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The default `OPENAI_ALLOWED_MODELS` allowlist contains `gpt-6-luna`, `gpt-6.1-sol`, and `gpt-6-astra`; adjust it only when different models are available to the configured key.
 
+RunningHub workflows are defined in `backend/src/main/resources/runninghub/workflows/*.json`. Each file describes one workflow: its inputs, the RunningHub node and field each input is written to, any derived-value transforms, and the output type. The app loads and validates all definitions at startup and renders one page per workflow at `/create/rh/{workflowKey}` (or `/pages/{pageId}/create/rh/{workflowKey}`). The current workflows are `minimax-h3-ff-image-to-video` and `seedvr2-video-upscale`.
+
+Workflow IDs are never stored in the definitions. Each definition names the env var that holds its ID in `workflowIdEnv`. Set `RUNNINGHUB_API_KEY` plus one ID per workflow in `.env`:
+
+- `RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF`
+- `RUNNINGHUB_WORKFLOW_ID_SEEDVR2`
+
+The workflow must already be saved on RunningHub. A workflow whose ID is missing is listed as not configured and its page reports it. Node IDs and field names are no longer read from env vars. **Breaking change:** the old `RUNNINGHUB_*_NODE_ID` and `RUNNINGHUB_*_FIELD_NAME` variables are ignored. Remove them from `.env`.
+
+Input types are `image`, `video`, `text`, `textarea`, `select`, and `number`. Files are uploaded to RunningHub and the returned file name is written to the mapped node. Other values are written as strings. Transforms derive values: `secondsToFrames` (seconds × fps) and `aspectRatioDimensions` (width and height from the longest side and aspect ratio, snapped to multiples of 32). Server-side validation uses the definition: required, `maxLength`, select options, accepted content types, and `maxBytes`.
+
+To add a workflow, export it from RunningHub, copy the nodes' `nodeId` and `fieldName` values from its `*_api.json` export, and write a definition in the same format as the existing files. Then set its `workflowIdEnv` variable. No Java or frontend code changes are needed. Outputs are stored in R2 and kept in the `runninghub_generations` MongoDB collection. Old `video_generations` records are not read by the app. To copy them, run the one-off migration from `backend/` with the same `.env` values loaded. It only runs with its profile and exits when done. Add `--dry-run` to count without writing. It is safe to re-run.
+
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=migrate-video-generations -Dspring-boot.run.arguments=--dry-run
+mvn spring-boot:run -Dspring-boot.run.profiles=migrate-video-generations
+```
+
+Completion is driven by RunningHub webhooks when `RUNNINGHUB_WEBHOOK_BASE_URL` (for example `https://test1.oneappstore.in`) and `RUNNINGHUB_WEBHOOK_SECRET` are set. RunningHub is then given `{RUNNINGHUB_WEBHOOK_BASE_URL}/api/webhooks/runninghub/{RUNNINGHUB_WEBHOOK_SECRET}`. The handler reads the `taskId` from the callback, re-checks status, and finishes the generation. Status polling continues as a fallback. The browser gets updates over Server-Sent Events at `GET /api/pages/{pageId}/runninghub/{workflowKey}/generations/{id}/events`. The stream sends the current state on connect and closes after the final update. The public tunnel must route `/api/webhooks/*` to the backend. Keep the secret out of logs. The field names, the `video` upload type, the SeedVR2 resolution options, and the callback payload shape are not yet verified against a live RunningHub account.
+
 Image generation at `/create/gpt-image-gen` reuses `OPENAI_API_KEY` and the `OPENAI_IMAGE_ALLOWED_MODELS` allowlist (default `gpt-image-2.5-sunburst,gpt-image-2.5-flare`). Generated images and attachments are stored in R2 and metadata is kept in the `image_generations` MongoDB collection.
 
 ## Run locally

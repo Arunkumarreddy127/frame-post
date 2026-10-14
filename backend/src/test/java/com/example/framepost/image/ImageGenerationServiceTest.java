@@ -48,7 +48,7 @@ class ImageGenerationServiceTest {
         assertEquals("xhigh", saved.getValue().quality());
         assertEquals(2, saved.getValue().results().size());
         assertEquals(ImageGenerationStatus.COMPLETED, saved.getValue().status());
-        assertEquals("image-generations/user-1/" + response.id() + "/1.png", response.results().get(0).key());
+        assertEquals("outputs/name-user-1/" + response.id() + "/output-1.png", response.results().get(0).key());
     }
 
     @Test

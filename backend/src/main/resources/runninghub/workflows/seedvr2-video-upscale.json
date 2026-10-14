@@ -1,0 +1,34 @@
+{
+  "key": "seedvr2-video-upscale",
+  "label": "SeedVR2 - Video Upscale",
+  "description": "Upscale a video with SeedVR2.",
+  "group": "RH",
+  "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_SEEDVR2",
+  "inputs": [
+    {
+      "name": "video",
+      "type": "video",
+      "label": "Source video",
+      "required": true,
+      "accept": ["video/mp4", "video/quicktime", "video/webm"],
+      "maxBytes": 104857600
+    },
+    {
+      "name": "resolution",
+      "type": "select",
+      "label": "Target resolution (px)",
+      "default": "2160",
+      "options": ["1080", "1440", "2160"]
+    }
+  ],
+  "nodeMappings": [
+    { "input": "video", "nodeId": "21", "fieldName": "file" },
+    { "input": "resolution", "nodeId": "10", "fieldName": "resolution" }
+  ],
+  "transforms": [],
+  "output": {
+    "type": "video",
+    "contentType": "video/mp4",
+    "extensions": ["mp4"]
+  }
+}

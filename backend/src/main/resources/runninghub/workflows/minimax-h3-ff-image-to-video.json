@@ -1,0 +1,71 @@
+{
+  "key": "minimax-h3-ff-image-to-video",
+  "label": "Minimax H3 - FF Image to Video",
+  "description": "Turn a still image into a short video with Minimax H3 (first-frame).",
+  "group": "RH",
+  "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF",
+  "inputs": [
+    {
+      "name": "image",
+      "type": "image",
+      "label": "First-frame image",
+      "required": true,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "prompt",
+      "type": "textarea",
+      "label": "Prompt",
+      "required": true,
+      "maxLength": 2000
+    },
+    {
+      "name": "duration",
+      "type": "select",
+      "label": "Duration (seconds)",
+      "default": "8",
+      "options": ["3", "4", "5", "6", "7", "8", "10", "12", "15"]
+    },
+    {
+      "name": "longestSide",
+      "type": "select",
+      "label": "Longest side (px)",
+      "default": "1344",
+      "options": ["864", "1024", "1216", "1344", "1536"]
+    },
+    {
+      "name": "aspectRatio",
+      "type": "select",
+      "label": "Aspect ratio",
+      "default": "9:16",
+      "options": ["keep", "1:1", "16:9", "9:16", "2:3"]
+    }
+  ],
+  "nodeMappings": [
+    { "input": "image", "nodeId": "236", "fieldName": "image" },
+    { "input": "prompt", "nodeId": "222", "fieldName": "prompt" }
+  ],
+  "transforms": [
+    {
+      "type": "secondsToFrames",
+      "inputs": { "seconds": "duration" },
+      "params": { "fps": "24" },
+      "targets": { "frames": { "nodeId": "222", "fieldName": "length" } }
+    },
+    {
+      "type": "aspectRatioDimensions",
+      "inputs": { "longestSide": "longestSide", "aspectRatio": "aspectRatio", "image": "image" },
+      "params": { "step": "32" },
+      "targets": {
+        "width": { "nodeId": "222", "fieldName": "width" },
+        "height": { "nodeId": "222", "fieldName": "height" }
+      }
+    }
+  ],
+  "output": {
+    "type": "video",
+    "contentType": "video/mp4",
+    "extensions": ["mp4"]
+  }
+}
