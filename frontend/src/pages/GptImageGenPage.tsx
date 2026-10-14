@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowUp, ChevronDown, Download, Maximize2, Paperclip, Pencil
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { API_BASE_URL } from "../api";
 import {
   deleteImageGeneration,
   generateImages,
@@ -148,7 +149,9 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
     try {
       const files = await Promise.all(
         (item.inputs ?? []).map(async (input, index) => {
-          const response = await fetch(input.url);
+          const response = await fetch(`${API_BASE_URL}/api/images/download/${encodeURIComponent(input.key)}`, {
+            credentials: "include",
+          });
           if (!response.ok) throw new Error("Unable to load input image");
           const blob = await response.blob();
           const extension = blob.type.split("/")[1] ?? "png";
@@ -164,7 +167,9 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
   async function downloadResult(item: ImageGeneration, result: { key: string; url: string }, index: number) {
     setError("");
     try {
-      const response = await fetch(result.url);
+      const response = await fetch(`${API_BASE_URL}/api/images/download/${encodeURIComponent(result.key)}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Unable to download the image");
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);

@@ -54,11 +54,12 @@ class RunningHubClientTest {
                 new NodeInfo("236", "image", "api/frame.png"),
                 new NodeInfo("222", "width", "768"));
 
-        assertEquals("task-9", client.createTask("workflow-1", nodes, null));
+        assertEquals("task-9", client.createTask("workflow-1", nodes, null, null));
 
         assertEquals("/task/openapi/create", lastPath.get());
         assertTrue(lastBody.get().contains("\"workflowId\":\"workflow-1\""));
         assertFalse(lastBody.get().contains("webhookUrl"));
+        assertFalse(lastBody.get().contains("instanceType"));
         assertTrue(lastBody.get().contains(
                 "{\"nodeId\":\"236\",\"fieldName\":\"image\",\"fieldValue\":\"api/frame.png\"}"));
         assertTrue(lastBody.get().contains(
@@ -69,10 +70,19 @@ class RunningHubClientTest {
     void createTaskRegistersWebhookUrlWhenProvided() {
         response.set("{\"code\":0,\"msg\":\"success\",\"data\":{\"taskId\":\"task-9\"}}");
 
-        client().createTask("workflow-1", List.of(), "https://example.test/api/webhooks/runninghub/s");
+        client().createTask("workflow-1", List.of(), "https://example.test/api/webhooks/runninghub/s", null);
 
         assertTrue(lastBody.get().contains(
                 "\"webhookUrl\":\"https://example.test/api/webhooks/runninghub/s\""));
+    }
+
+    @Test
+    void createTaskIncludesInstanceTypeWhenProvided() {
+        response.set("{\"code\":0,\"msg\":\"success\",\"data\":{\"taskId\":\"task-9\"}}");
+
+        client().createTask("workflow-1", List.of(), null, "plus");
+
+        assertTrue(lastBody.get().contains("\"instanceType\":\"plus\""));
     }
 
     @Test
@@ -87,7 +97,7 @@ class RunningHubClientTest {
     @Test
     void blankWorkflowIdIsRejectedBeforeCallingRunningHub() {
         assertThrows(RunningHubException.class,
-                () -> client().createTask(" ", List.of(), null));
+                () -> client().createTask(" ", List.of(), null, null));
         assertEquals(null, lastPath.get());
     }
 

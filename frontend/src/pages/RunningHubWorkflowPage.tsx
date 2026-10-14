@@ -6,6 +6,7 @@ import { DynamicInputField, initialValueFor } from "../components/DynamicInputFi
 import type { ShellRouteProps } from "../types";
 import {
   RunningHubGeneration,
+  RunningHubInstanceType,
   RunningHubWorkflow,
   generateRunningHub,
   listRunningHubGenerations,
@@ -16,6 +17,12 @@ import {
 type RunningHubWorkflowPageProps = ShellRouteProps & {
   pageId?: string;
 };
+
+const INSTANCE_TYPES: { value: RunningHubInstanceType; label: string; description: string; rateCoins: number }[] = [
+  { value: "default", label: "Standard (24GB)", description: "0.2 coins/second", rateCoins: 0.2 },
+  { value: "plus", label: "Plus (48GB)", description: "0.4 coins/second", rateCoins: 0.4 },
+  { value: "ultra", label: "Ultra (84GB)", description: "Higher tier option", rateCoins: 0.6 },
+];
 
 export function RunningHubWorkflowPage({ user, onLogout, pageId }: RunningHubWorkflowPageProps) {
   const { pageId: routePageId, workflowKey = "" } = useParams<{ pageId?: string; workflowKey?: string }>();
@@ -28,6 +35,7 @@ export function RunningHubWorkflowPage({ user, onLogout, pageId }: RunningHubWor
   const [files, setFiles] = useState<Record<string, File | null>>({});
   const [generations, setGenerations] = useState<RunningHubGeneration[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [instanceType, setInstanceType] = useState<RunningHubInstanceType>("default");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +111,7 @@ export function RunningHubWorkflowPage({ user, onLogout, pageId }: RunningHubWor
       const created = await generateRunningHub(activePageId, workflow.key, {
         values: cleanValues,
         files: cleanFiles,
+        instanceType,
       });
       setGenerations((current) => [created, ...current]);
       setSelectedId(created.id);
@@ -163,6 +172,28 @@ export function RunningHubWorkflowPage({ user, onLogout, pageId }: RunningHubWor
                     onFileChange={(file) => setFiles((current) => ({ ...current, [input.name]: file }))}
                   />
                 ))}
+                
+                <div className="form-field">
+                  <label htmlFor="instance-type" className="form-label">
+                    GPU Tier <span className="required-badge">*</span>
+                  </label>
+                  <select
+                    id="instance-type"
+                    className="form-select"
+                    value={instanceType}
+                    onChange={(e) => setInstanceType(e.target.value as RunningHubInstanceType)}
+                  >
+                    {INSTANCE_TYPES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label} - {option.description}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="form-hint">
+                    Select the GPU tier. Higher tiers support larger models but cost more per second.
+                  </span>
+                </div>
+
                 {error ? <p className="status error">{error}</p> : null}
                 <div className="workflow-form-footer">
                   <span className="workflow-cost">Generation may take a few minutes</span>

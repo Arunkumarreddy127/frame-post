@@ -70,21 +70,21 @@ class RunningHubGenerationServiceTest {
     void completesGenerationByPollingAndStoresVideo() throws Exception {
         stubRepository();
         when(client.uploadFile(any(), any(), eq("frame.png"), eq("image/png"))).thenReturn("api/frame.png");
-        when(client.createTask(eq("workflow-1"), any(), any())).thenReturn("task-1");
+        when(client.createTask(eq("workflow-1"), any(), any(), any())).thenReturn("task-1");
         when(client.taskStatus("task-1")).thenReturn("RUNNING", "SUCCESS");
         when(client.outputUrl(eq("task-1"), any())).thenReturn(OUTPUT_URL);
         when(client.download(OUTPUT_URL)).thenReturn(new byte[] {7, 8});
 
         RunningHubGenerationService service = service();
         RunningHubGenerationService.GenerationResponse started = service.start(
-                user, null, MINIMAX, Map.of("prompt", "a drone shot"), Map.of("image", png()));
+                user, null, MINIMAX, Map.of("prompt", "a drone shot"), Map.of("image", png()), "plus");
 
         verify(client, timeout(2000)).createTask(eq("workflow-1"), argThat(nodes ->
                 nodes.contains(new NodeInfo("236", "image", "api/frame.png"))
                         && nodes.contains(new NodeInfo("222", "prompt", "a drone shot"))
                         && nodes.contains(new NodeInfo("222", "length", "192"))
                         && nodes.contains(new NodeInfo("222", "width", "768"))
-                        && nodes.contains(new NodeInfo("222", "height", "1344"))), any());
+                        && nodes.contains(new NodeInfo("222", "height", "1344"))), any(), eq("plus"));
         verify(storage, timeout(2000)).store(eq("outputs/name-user-1/" + started.id() + "/minimax-h3-ff-image-to-video-output.mp4"),
                 any(), eq(2L), eq("video/mp4"));
         verify(repository, timeout(2000)).save(argThat(saved ->
@@ -95,7 +95,7 @@ class RunningHubGenerationServiceTest {
     void webhookCompletesGenerationWithoutWaitingForPolling() throws Exception {
         stubRepository();
         rows.put("gen-3", new RunningHubGeneration("gen-3", user.id(), null, MINIMAX, Map.of(), Map.of(),
-                null, null, null, "task-3", RunningHubGenerationStatus.PROCESSING, null, Instant.now()));
+                null, null, null, "task-3", RunningHubGenerationStatus.PROCESSING, null, "default", Instant.now()));
         when(client.taskStatus("task-3")).thenReturn("SUCCESS");
         when(client.outputUrl(eq("task-3"), any())).thenReturn(OUTPUT_URL);
         when(client.download(OUTPUT_URL)).thenReturn(new byte[] {7, 8});
@@ -119,10 +119,10 @@ class RunningHubGenerationServiceTest {
     @Test
     void marksGenerationFailedWhenRunningHubFails() throws Exception {
         stubRepository();
-        when(client.createTask(eq("workflow-1"), any(), any()))
+        when(client.createTask(eq("workflow-1"), any(), any(), any()))
                 .thenThrow(new RunningHubException("RunningHub is down"));
 
-        service().start(user, null, MINIMAX, Map.of("prompt", "prompt"), Map.of("image", png()));
+        service().start(user, null, MINIMAX, Map.of("prompt", "prompt"), Map.of("image", png()), "default");
 
         verify(repository, timeout(2000)).save(argThat(saved ->
                 saved.status() == RunningHubGenerationStatus.FAILED && "RunningHub is down".equals(saved.error())));
@@ -133,8 +133,8 @@ class RunningHubGenerationServiceTest {
         RunningHubGenerationService service = service();
         MockMultipartFile gif = new MockMultipartFile("image", "frame.gif", "image/gif", new byte[] {1});
 
-        assertBadRequest(() -> service.start(user, null, MINIMAX, Map.of("prompt", "  "), Map.of("image", png())));
-        assertBadRequest(() -> service.start(user, null, MINIMAX, Map.of("prompt", "prompt"), Map.of("image", gif)));
+        assertBadRequest(() -> service.start(user, null, MINIMAX, Map.of("prompt", "  "), Map.of("image", png()), "default"));
+        assertBadRequest(() -> service.start(user, null, MINIMAX, Map.of("prompt", "prompt"), Map.of("image", gif), "default"));
     }
 
     @Test
@@ -142,13 +142,13 @@ class RunningHubGenerationServiceTest {
         RunningHubGenerationService service = service();
 
         assertBadRequest(() -> service.start(user, null, MINIMAX,
-                Map.of("prompt", "prompt", "duration", "9"), Map.of("image", png())));
+                Map.of("prompt", "prompt", "duration", "9"), Map.of("image", png()), "default"));
     }
 
     @Test
     void rejectsUnknownWorkflowKey() throws Exception {
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
-                () -> service().start(user, null, "no-such-workflow", Map.of(), Map.of()));
+                () -> service().start(user, null, "no-such-workflow", Map.of(), Map.of(), "default"));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
     }
@@ -160,7 +160,7 @@ class RunningHubGenerationServiceTest {
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> service(unconfigured, env).start(user, null, MINIMAX,
-                        Map.of("prompt", "prompt"), Map.of("image", png())));
+                        Map.of("prompt", "prompt"), Map.of("image", png()), "default"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, exception.getStatusCode());
     }
@@ -169,7 +169,7 @@ class RunningHubGenerationServiceTest {
     void reportsNotConfiguredWhenWorkflowIdEnvMissing() throws Exception {
         ResponseStatusException exception = assertThrows(ResponseStatusException.class,
                 () -> service(properties, new MockEnvironment()).start(user, null, MINIMAX,
-                        Map.of("prompt", "prompt"), Map.of("image", png())));
+                        Map.of("prompt", "prompt"), Map.of("image", png()), "default"));
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, exception.getStatusCode());
     }

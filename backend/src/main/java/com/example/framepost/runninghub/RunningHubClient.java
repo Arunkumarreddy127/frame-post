@@ -53,7 +53,7 @@ public class RunningHubClient {
         return fileName;
     }
 
-    public String createTask(String workflowId, List<NodeInfo> nodes, String webhookUrl) {
+    public String createTask(String workflowId, List<NodeInfo> nodes, String webhookUrl, String instanceType) {
         if (workflowId == null || workflowId.isBlank()) {
             throw new RunningHubException("RunningHub workflow ID is not configured");
         }
@@ -62,6 +62,9 @@ public class RunningHubClient {
         payload.put("workflowId", workflowId);
         if (webhookUrl != null && !webhookUrl.isBlank()) {
             payload.put("webhookUrl", webhookUrl);
+        }
+        if (instanceType != null && !instanceType.isBlank()) {
+            payload.put("instanceType", instanceType);
         }
         ArrayNode nodeInfoList = payload.putArray("nodeInfoList");
         for (NodeInfo node : nodes) {

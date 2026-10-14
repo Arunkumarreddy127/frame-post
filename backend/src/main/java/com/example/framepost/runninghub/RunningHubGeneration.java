@@ -10,7 +10,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 /**
  * One run of a RunningHub workflow. {@code inputs} holds text values and {@code inputFileKeys}
- * maps each file input name to its stored object key.
+ * maps each file input name to its stored object key. {@code instanceType} tracks the selected
+ * GPU tier: "default" (24GB), "plus" (48GB), or "ultra" (84GB).
  */
 @Document("runninghub_generations")
 @CompoundIndex(name = "user_scope_created", def = "{'userId': 1, 'pageId': 1, 'workflowKey': 1, 'createdAt': -1}")
@@ -27,21 +28,22 @@ public record RunningHubGeneration(
         String runningHubTaskId,
         RunningHubGenerationStatus status,
         String error,
+        String instanceType,
         Instant createdAt
 ) {
 
     RunningHubGeneration withTaskId(String taskId) {
         return new RunningHubGeneration(id, userId, pageId, workflowKey, inputs, inputFileKeys, resultKey, resultType,
-                resultContentType, taskId, status, error, createdAt);
+                resultContentType, taskId, status, error, instanceType, createdAt);
     }
 
     RunningHubGeneration completed(String key, String type, String contentType) {
         return new RunningHubGeneration(id, userId, pageId, workflowKey, inputs, inputFileKeys, key, type, contentType,
-                runningHubTaskId, RunningHubGenerationStatus.COMPLETED, null, createdAt);
+                runningHubTaskId, RunningHubGenerationStatus.COMPLETED, null, instanceType, createdAt);
     }
 
     RunningHubGeneration failed(String message) {
         return new RunningHubGeneration(id, userId, pageId, workflowKey, inputs, inputFileKeys, resultKey, resultType,
-                resultContentType, runningHubTaskId, RunningHubGenerationStatus.FAILED, message, createdAt);
+                resultContentType, runningHubTaskId, RunningHubGenerationStatus.FAILED, message, instanceType, createdAt);
     }
 }

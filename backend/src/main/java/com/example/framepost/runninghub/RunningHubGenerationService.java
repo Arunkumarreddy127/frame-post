@@ -124,13 +124,21 @@ public class RunningHubGenerationService {
      * and runs the workflow in the background.
      */
     public GenerationResponse start(User user, String pageId, String workflowKey,
-            Map<String, String> textValues, Map<String, MultipartFile> files) {
+            Map<String, String> textValues, Map<String, MultipartFile> files, String instanceType) {
         validateScope(user, pageId);
         WorkflowDefinition definition = definition(workflowKey);
         String workflowId = registry.workflowId(definition).orElseThrow(() ->
                 new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "RunningHub workflow is not configured"));
         if (isBlank(properties.apiKey())) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "RunningHub is not configured");
+        }
+        
+        // Validate and default instanceType
+        if (isBlank(instanceType)) {
+            instanceType = "default";
+        }
+        if (!Set.of("default", "plus", "ultra").contains(instanceType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid instanceType: " + instanceType);
         }
 
         Map<String, String> values = new LinkedHashMap<>();
@@ -179,7 +187,7 @@ public class RunningHubGenerationService {
         }
 
         RunningHubGeneration generation = new RunningHubGeneration(id, user.id(), pageId, workflowKey, values, inputKeys,
-                null, null, null, null, RunningHubGenerationStatus.PROCESSING, null, Instant.now());
+                null, null, null, null, RunningHubGenerationStatus.PROCESSING, null, instanceType, Instant.now());
         repository.save(generation);
         executor.execute(() -> process(generation, definition, workflowId, nodes, uploads));
         return GenerationResponse.from(generation, storage::publicUrl);
@@ -229,7 +237,7 @@ public class RunningHubGenerationService {
                 }
                 allNodes.add(new NodeInfo(mapping.nodeId(), mapping.fieldName(), uploaded.get(mapping.input())));
             }
-            String taskId = client.createTask(workflowId, allNodes, webhookUrl());
+            String taskId = client.createTask(workflowId, allNodes, webhookUrl(), initial.instanceType());
             repository.findById(id).ifPresent(generation -> repository.save(generation.withTaskId(taskId)));
             awaitTask(id, definition, taskId);
         } catch (RuntimeException exception) {

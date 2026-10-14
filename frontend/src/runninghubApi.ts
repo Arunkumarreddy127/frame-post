@@ -4,6 +4,8 @@ export type RunningHubGenerationStatus = "PROCESSING" | "COMPLETED" | "FAILED";
 
 export type RunningHubInputType = "image" | "video" | "text" | "textarea" | "select" | "number";
 
+export type RunningHubInstanceType = "default" | "plus" | "ultra";
+
 export type RunningHubInput = {
   name: string;
   type: RunningHubInputType;
@@ -89,15 +91,18 @@ export function subscribeToRunningHubGeneration(
 export type GenerateRunningHubInput = {
   values: Record<string, string>;
   files: Record<string, File>;
+  instanceType: RunningHubInstanceType;
 };
 
 /**
  * Sends one multipart part per input, named after the input in the workflow definition.
+ * Also includes instanceType as a text part.
  */
 export function generateRunningHub(pageId: string, workflowKey: string, input: GenerateRunningHubInput) {
   const formData = new FormData();
   Object.entries(input.values).forEach(([name, value]) => formData.append(name, value));
   Object.entries(input.files).forEach(([name, file]) => formData.append(name, file));
+  formData.append("instanceType", input.instanceType);
   return request<RunningHubGeneration>(generationsPath(pageId, workflowKey), {
     method: "POST",
     body: formData,

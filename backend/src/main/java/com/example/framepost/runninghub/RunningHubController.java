@@ -101,7 +101,8 @@ public class RunningHubController {
                 textValues.put(name, values[0]);
             }
         });
-        return service.start(currentUser(request), pageId, workflowKey, textValues, new HashMap<>(request.getFileMap()));
+        String instanceType = textValues.remove("instanceType");
+        return service.start(currentUser(request), pageId, workflowKey, textValues, new HashMap<>(request.getFileMap()), instanceType);
     }
 
     @PostMapping("/webhooks/runninghub/{secret}")

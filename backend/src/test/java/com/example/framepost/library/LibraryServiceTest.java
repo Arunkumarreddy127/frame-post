@@ -76,6 +76,6 @@ class LibraryServiceTest {
         return new RunningHubGeneration("g2", "u1", "p1", "minimax", Map.of(),
                 Map.of("image", "inputs/jane-u1/g2/frame.png"),
                 "outputs/jane-u1/g2/minimax-output.mp4", "video", "video/mp4", "task-2",
-                RunningHubGenerationStatus.COMPLETED, null, createdAt);
+                RunningHubGenerationStatus.COMPLETED, null, "default", createdAt);
     }
 }
