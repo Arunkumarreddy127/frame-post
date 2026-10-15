@@ -4,20 +4,15 @@ import java.time.Instant;
 import java.util.Map;
 
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 /**
  * One run of a RunningHub workflow. {@code inputs} holds text values and {@code inputFileKeys}
  * maps each file input name to its stored object key. {@code instanceType} tracks the selected
  * GPU tier: "default" (24GB), "plus" (48GB), or "ultra" (84GB).
  */
-@Document("runninghub_generations")
-@CompoundIndex(name = "user_scope_created", def = "{'userId': 1, 'pageId': 1, 'workflowKey': 1, 'createdAt': -1}")
 public record RunningHubGeneration(
         @Id String id,
-        @Indexed String userId,
+    String userId,
         String pageId,
         String workflowKey,
         Map<String, String> inputs,

@@ -8,11 +8,9 @@ import java.util.Locale;
 import java.util.Map;
 
 import com.example.framepost.auth.User;
-import com.example.framepost.image.ImageGeneration;
-import com.example.framepost.image.ImageGenerationRepository;
+import com.example.framepost.generation.ContentGeneration;
+import com.example.framepost.generation.ContentGenerationRepository;
 import com.example.framepost.page.PageService;
-import com.example.framepost.runninghub.RunningHubGeneration;
-import com.example.framepost.runninghub.RunningHubGenerationRepository;
 import com.example.framepost.storage.StorageService;
 import org.springframework.stereotype.Service;
 
@@ -21,63 +19,46 @@ public class LibraryService {
 
     private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
-    private final ImageGenerationRepository imageRepository;
-    private final RunningHubGenerationRepository runningHubRepository;
+    private final ContentGenerationRepository repository;
     private final PageService pageService;
     private final StorageService storage;
 
     public LibraryService(
-            ImageGenerationRepository imageRepository,
-            RunningHubGenerationRepository runningHubRepository,
+            ContentGenerationRepository repository,
             PageService pageService,
             StorageService storage
     ) {
-        this.imageRepository = imageRepository;
-        this.runningHubRepository = runningHubRepository;
+        this.repository = repository;
         this.pageService = pageService;
         this.storage = storage;
     }
 
     /** Every input and output the user has stored, across all pages and global scope. */
     public LibraryResponse all(User user) {
-        List<ImageGeneration> images = imageRepository.findByUserIdOrderByCreatedAtDesc(user.id());
-        List<RunningHubGeneration> runningHub = runningHubRepository.findByUserIdOrderByCreatedAtDesc(user.id());
-        return build(images, runningHub);
+        return build(repository.findByUserIdOrderByCreatedAtDesc(user.id()));
     }
 
     /** Inputs and outputs stored for one page only. */
     public LibraryResponse forPage(User user, String pageId) {
         pageService.get(user, pageId);
-        List<ImageGeneration> images = imageRepository.findByUserIdAndPageIdOrderByCreatedAtDesc(user.id(), pageId);
-        List<RunningHubGeneration> runningHub =
-                runningHubRepository.findByUserIdAndPageIdOrderByCreatedAtDesc(user.id(), pageId);
-        return build(images, runningHub);
+        return build(repository.findByUserIdAndPageIdOrderByCreatedAtDesc(user.id(), pageId));
     }
 
-    private LibraryResponse build(List<ImageGeneration> images, List<RunningHubGeneration> runningHub) {
+    private LibraryResponse build(List<ContentGeneration> generations) {
         List<LibraryItem> inputs = new ArrayList<>();
         List<LibraryItem> outputs = new ArrayList<>();
 
-        for (ImageGeneration generation : images) {
-            for (String key : generation.inputKeys()) {
-                inputs.add(item(key, null, "image", generation.id(), generation.pageId(), generation.createdAt()));
-            }
-            for (ImageGeneration.ImageResult result : generation.results()) {
-                if (result.key() != null) {
-                    outputs.add(item(result.key(), null, "image", generation.id(), generation.pageId(),
-                            generation.createdAt()));
-                }
-            }
-        }
-
-        for (RunningHubGeneration generation : runningHub) {
+        for (ContentGeneration generation : generations) {
+            String source = generation.provider() == ContentGeneration.Provider.OPENAI ? "image" : "runninghub";
             for (String key : valuesOf(generation.inputFileKeys())) {
-                inputs.add(item(key, null, "runninghub", generation.id(), generation.pageId(),
+                inputs.add(item(key, null, source, generation.id(), generation.pageId(),
                         generation.createdAt()));
             }
-            if (generation.resultKey() != null) {
-                outputs.add(item(generation.resultKey(), generation.resultContentType(), "runninghub",
-                        generation.id(), generation.pageId(), generation.createdAt()));
+            for (ContentGeneration.Output output : generation.outputs()) {
+                if (output.key() != null) {
+                    outputs.add(item(output.key(), output.contentType(), source,
+                            generation.id(), generation.pageId(), generation.createdAt()));
+                }
             }
         }
 

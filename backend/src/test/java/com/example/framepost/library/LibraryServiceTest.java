@@ -12,31 +12,31 @@ import java.util.Map;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.image.ImageGeneration;
-import com.example.framepost.image.ImageGenerationRepository;
+import com.example.framepost.generation.ContentGeneration;
+import com.example.framepost.generation.ContentGenerationRepository;
 import com.example.framepost.image.ImageGenerationStatus;
 import com.example.framepost.library.LibraryService.LibraryResponse;
 import com.example.framepost.page.PageService;
 import com.example.framepost.runninghub.RunningHubGeneration;
-import com.example.framepost.runninghub.RunningHubGenerationRepository;
 import com.example.framepost.runninghub.RunningHubGenerationStatus;
 import com.example.framepost.storage.StorageService;
 import org.junit.jupiter.api.Test;
 
 class LibraryServiceTest {
 
-    private final ImageGenerationRepository images = mock(ImageGenerationRepository.class);
-    private final RunningHubGenerationRepository runningHub = mock(RunningHubGenerationRepository.class);
+    private final ContentGenerationRepository repository = mock(ContentGenerationRepository.class);
     private final PageService pageService = mock(PageService.class);
     private final StorageService storage = mock(StorageService.class);
-    private final LibraryService service = new LibraryService(images, runningHub, pageService, storage);
+    private final LibraryService service = new LibraryService(repository, pageService, storage);
     private final User user = new User("u1", "jane", "hash", Instant.now());
 
     @Test
     void allCollectsInputsAndOutputsAcrossPagesAndGlobal() {
         Instant now = Instant.now();
         when(storage.publicUrl(any())).thenAnswer(i -> "https://cdn.example/" + i.getArgument(0));
-        when(images.findByUserIdOrderByCreatedAtDesc("u1")).thenReturn(List.of(imageGeneration(now)));
-        when(runningHub.findByUserIdOrderByCreatedAtDesc("u1")).thenReturn(List.of(runningHubGeneration(now)));
+        when(repository.findByUserIdOrderByCreatedAtDesc("u1")).thenReturn(List.of(
+            ContentGeneration.fromImage(imageGeneration(now)),
+            ContentGeneration.fromRunningHub(runningHubGeneration(now), "video")));
 
         LibraryResponse response = service.all(user);
 
@@ -53,14 +53,12 @@ class LibraryServiceTest {
 
     @Test
     void forPageOnlyReadsThatPage() {
-        when(images.findByUserIdAndPageIdOrderByCreatedAtDesc("u1", "p1")).thenReturn(List.of());
-        when(runningHub.findByUserIdAndPageIdOrderByCreatedAtDesc("u1", "p1")).thenReturn(List.of());
+        when(repository.findByUserIdAndPageIdOrderByCreatedAtDesc("u1", "p1")).thenReturn(List.of());
 
         LibraryResponse response = service.forPage(user, "p1");
 
         verify(pageService).get(user, "p1");
-        verify(images).findByUserIdAndPageIdOrderByCreatedAtDesc("u1", "p1");
-        verify(runningHub).findByUserIdAndPageIdOrderByCreatedAtDesc("u1", "p1");
+        verify(repository).findByUserIdAndPageIdOrderByCreatedAtDesc("u1", "p1");
         assertEquals(List.of(), response.inputs());
         assertEquals(List.of(), response.outputs());
     }

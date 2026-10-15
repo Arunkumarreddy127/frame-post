@@ -35,6 +35,7 @@ class StorageKeysMigration implements ApplicationRunner {
 
     static final String IMAGE_COLLECTION = "image_generations";
     static final String RUNNINGHUB_COLLECTION = "runninghub_generations";
+    static final String CONTENT_COLLECTION = "content_generations";
     static final String LEGACY_IMAGE_PREFIX = "image-generations/";
     static final String LEGACY_RUNNINGHUB_PREFIX = "runninghub-generations/";
     static final int BATCH_SIZE = 500;
@@ -61,6 +62,9 @@ class StorageKeysMigration implements ApplicationRunner {
     }
 
     Result migrate(boolean dryRun) {
+        if (mongo.collectionExists(CONTENT_COLLECTION)) {
+            return migrateCollection(CONTENT_COLLECTION, dryRun);
+        }
         return migrateCollection(IMAGE_COLLECTION, dryRun)
                 .plus(migrateCollection(RUNNINGHUB_COLLECTION, dryRun));
     }
@@ -97,11 +101,12 @@ class StorageKeysMigration implements ApplicationRunner {
 
     private boolean migrateRecord(String collection, Document doc, boolean dryRun) {
         boolean image = IMAGE_COLLECTION.equals(collection);
+        boolean content = CONTENT_COLLECTION.equals(collection);
         Object id = doc.get("_id");
         String workflowKey = doc.getString("workflowKey");
 
         Map<String, String> moves = new LinkedHashMap<>();
-        for (String key : keysOf(image, doc)) {
+        for (String key : content ? contentKeys(doc) : keysOf(image, doc)) {
             if (key == null || moves.containsKey(key)) {
                 continue;
             }
@@ -129,8 +134,16 @@ class StorageKeysMigration implements ApplicationRunner {
             storage.copy(move.getKey(), move.getValue());
         }
 
-        Update update = image ? imageUpdate(doc, moves) : runningHubUpdate(doc, moves);
-        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), update, collection);
+        Update update = content ? contentUpdate(doc, moves) : image ? imageUpdate(doc, moves) : runningHubUpdate(doc, moves);
+        if (mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), update, collection).getMatchedCount() != 1) {
+            throw new IllegalStateException("Generation disappeared before storage references were updated");
+        }
+        for (Map.Entry<String, String> move : moves.entrySet()) {
+            for (String targetCollection : List.of(IMAGE_COLLECTION, CONTENT_COLLECTION)) {
+                mongo.updateMulti(Query.query(Criteria.where("parentResultKey").is(move.getKey())),
+                        new Update().set("parentResultKey", move.getValue()), targetCollection);
+            }
+        }
 
         for (String oldKey : moves.keySet()) {
             storage.delete(oldKey);
@@ -155,6 +168,25 @@ class StorageKeysMigration implements ApplicationRunner {
             keys.add(doc.getString("resultKey"));
         }
         return keys;
+    }
+
+    private static List<String> contentKeys(Document doc) {
+        List<String> keys = new ArrayList<>();
+        Document files = doc.get("inputFileKeys", Document.class);
+        if (files != null) files.values().forEach(value -> { if (value != null) keys.add(value.toString()); });
+        for (Document output : doc.getList("outputs", Document.class, List.of())) keys.add(output.getString("key"));
+        return keys;
+    }
+
+    static Update contentUpdate(Document doc, Map<String, String> moves) {
+        Document files = new Document();
+        Document original = doc.get("inputFileKeys", Document.class);
+        if (original != null) original.forEach((name, key) -> files.put(name,
+                key == null ? null : moves.getOrDefault(key.toString(), key.toString())));
+        List<Document> outputs = doc.getList("outputs", Document.class, List.of()).stream()
+                .map(output -> new Document(output).append("key", moves.getOrDefault(output.getString("key"), output.getString("key"))))
+                .toList();
+        return new Update().set("inputFileKeys", files).set("outputs", outputs);
     }
 
     private static Update imageUpdate(Document doc, Map<String, String> moves) {

@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
+import java.util.Map;
+import org.bson.Document;
 
 import com.example.framepost.auth.User;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,19 @@ class StorageKeysMigrationTest {
     }
 
     @Test
+        void updatesSharedAssetsWithoutDroppingOutputMetadata() {
+        Document source = new Document("inputFileKeys", new Document("attachment-1", "old-input.png"))
+            .append("outputs", List.of(new Document("key", "old-output.png")
+                .append("type", "image").append("contentType", "image/png")));
+        Document fields = StorageKeysMigration.contentUpdate(source,
+            Map.of("old-input.png", "new-input.png", "old-output.png", "new-output.png"))
+            .getUpdateObject().get("$set", Document.class);
+        assertEquals("new-input.png", fields.get("inputFileKeys", Document.class).getString("attachment-1"));
+        assertEquals(new Document("key", "new-output.png").append("type", "image").append("contentType", "image/png"),
+            fields.getList("outputs", Document.class).getFirst());
+        }
+
+        @Test
     void ignoresKeysAlreadyInNewLayoutOrUnrecognized() {
         assertTrue(StorageKeysMigration.targetKey("inputs/jane-doe-u1/gen-1/input-1.png", owner, null).isEmpty());
         assertTrue(StorageKeysMigration.targetKey("image-generations/u1/gen-1", owner, null).isEmpty());

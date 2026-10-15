@@ -3,13 +3,38 @@ package com.example.framepost.image;
 import java.util.List;
 import java.util.Optional;
 
-import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+import com.example.framepost.generation.ContentGeneration;
+import com.example.framepost.generation.ContentGenerationRepository;
+import static com.example.framepost.generation.ContentGeneration.Provider.OPENAI;
 
-public interface ImageGenerationRepository extends MongoRepository<ImageGeneration, String> {
+@Repository
+public class ImageGenerationRepository {
+    private final ContentGenerationRepository repository;
 
-    List<ImageGeneration> findByUserIdAndPageIdOrderByCreatedAtDesc(String userId, String pageId);
+    public ImageGenerationRepository(ContentGenerationRepository repository) {
+        this.repository = repository;
+    }
 
-    List<ImageGeneration> findByUserIdOrderByCreatedAtDesc(String userId);
+    public ImageGeneration save(ImageGeneration generation) {
+        return repository.save(ContentGeneration.fromImage(generation)).toImage();
+    }
 
-    Optional<ImageGeneration> findByIdAndUserIdAndPageId(String id, String userId, String pageId);
+    public List<ImageGeneration> findByUserIdAndPageIdOrderByCreatedAtDesc(String userId, String pageId) {
+        return repository.findByProviderAndUserIdAndPageIdOrderByCreatedAtDesc(OPENAI, userId, pageId)
+                .stream().map(ContentGeneration::toImage).toList();
+    }
+
+    public List<ImageGeneration> findByUserIdOrderByCreatedAtDesc(String userId) {
+        return repository.findByProviderAndUserIdOrderByCreatedAtDesc(OPENAI, userId)
+                .stream().map(ContentGeneration::toImage).toList();
+    }
+
+    public Optional<ImageGeneration> findByIdAndUserIdAndPageId(String id, String userId, String pageId) {
+        return repository.findByProviderAndIdAndUserIdAndPageId(OPENAI, id, userId, pageId).map(ContentGeneration::toImage);
+    }
+
+    public void delete(ImageGeneration generation) {
+        repository.deleteByProviderAndId(OPENAI, generation.id());
+    }
 }

@@ -5,15 +5,10 @@ import java.util.List;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.PersistenceCreator;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 
-@Document("image_generations")
-@CompoundIndex(name = "user_scope_created", def = "{'userId': 1, 'pageId': 1, 'createdAt': -1}")
 public record ImageGeneration(
         @Id String id,
-        @Indexed String userId,
+    String userId,
         String pageId,
         String prompt,
         String model,
@@ -29,7 +24,7 @@ public record ImageGeneration(
         ImageGenerationStatus status,
         String error,
         Instant createdAt,
-        @Indexed String parentGenerationId,
+        String parentGenerationId,
         String parentResultKey
 ) {
 
