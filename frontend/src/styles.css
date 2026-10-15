@@ -425,66 +425,177 @@ textarea {
 }
 
 .library-panel {
-  max-width: 64rem;
+  display: grid;
+  max-width: 68rem;
+  gap: 1.5rem;
+  padding: 0.25rem 0 2rem;
+}
+
+.library-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  min-height: 7rem;
+  padding: 0.5rem 0 1.4rem;
+  border-bottom: 1px solid #d0d7de;
+  gap: 1rem;
+}
+
+.library-heading h2 {
+  margin: 0.2rem 0 0.35rem;
+  color: #24292f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.library-heading p:not(.eyebrow) {
+  margin: 0;
+  color: #656d76;
+  font-size: 0.9rem;
+}
+
+.library-heading .eyebrow {
+  margin: 0;
+  color: #096b64;
+}
+
+.library-total {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #c7e5dd;
+  border-radius: 999px;
+  background: #eaf6f1;
+  color: #176b5d;
+  font-size: 0.78rem;
+  font-weight: 650;
 }
 
 .library-folders {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  padding-top: 0.25rem;
 }
 
 .library-folder {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 1.25rem;
+  position: relative;
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 7.5rem;
+  padding: 1.1rem 1.2rem;
   text-align: left;
-  border: 1px solid var(--border, #d9d9e3);
-  border-radius: 0.75rem;
-  background: transparent;
-  cursor: pointer;
+  border: 1px solid #d0d7de;
+  border-radius: 0.45rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(31 35 40 / 4%);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.library-folder:hover {
+  transform: translateY(-2px);
+  border-color: #77b8ae;
+  box-shadow: 0 8px 20px rgb(31 35 40 / 8%);
+}
+
+.library-folder:focus-visible {
+  outline: 2px solid #16877b;
+  outline-offset: 3px;
+}
+
+.library-folder-mark {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  grid-row: span 2;
+  border-radius: 0.35rem;
+  background: #eaf6f1;
+  color: #176b5d;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
 }
 
 .library-folder-title {
-  font-weight: 600;
-  font-size: 1.1rem;
+  align-self: end;
+  color: #24292f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.3rem;
+  font-weight: 500;
 }
 
-.library-folder-count,
 .library-folder-description {
-  font-size: 0.875rem;
-  opacity: 0.7;
+  align-self: start;
+  color: #656d76;
+  font-size: 0.8rem;
+}
+
+.library-folder-count {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  color: #656d76;
+  font-size: 0.78rem;
 }
 
 .library-back {
-  margin-bottom: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.7rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #176b5d;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.library-back:hover {
+  color: #0c5148;
+  text-decoration: underline;
 }
 
 .library-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
   gap: 1rem;
-  margin-top: 1rem;
 }
 
 .library-card {
+  min-width: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  border: 1px solid var(--border, #d9d9e3);
-  border-radius: 0.75rem;
+  border: 1px solid #d0d7de;
+  border-radius: 0.4rem;
+  background: #fff;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgb(31 35 40 / 4%);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.library-card:hover {
+  transform: translateY(-2px);
+  border-color: #aab4bf;
+  box-shadow: 0 8px 18px rgb(31 35 40 / 9%);
 }
 
 .library-preview {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 3;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  background: #eef2f1;
 }
 
 .library-preview img,
@@ -495,26 +606,104 @@ textarea {
 }
 
 .library-file {
-  padding: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  color: #176b5d;
   font-size: 0.8rem;
   word-break: break-all;
   text-align: center;
 }
 
 .library-card figcaption {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0 0.6rem 0.6rem;
+  min-height: 3.35rem;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
   font-size: 0.8rem;
 }
 
 .library-name {
+  min-width: 0;
+  color: #424a53;
+  font-size: 0.78rem;
+  font-weight: 550;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.library-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #c7e5dd;
+  border-radius: 0.3rem;
+  background: #eaf6f1;
+  color: #176b5d;
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.library-download:hover {
+  border-color: #77b8ae;
+  background: #d9eee7;
+}
+
+.library-card .status.error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .library-panel {
+    gap: 1rem;
+    padding-top: 0;
+  }
+
+  .library-heading {
+    min-height: 6rem;
+    padding-bottom: 1rem;
+  }
+
+  .library-heading h2 {
+    font-size: 1.7rem;
+  }
+
+  .library-folders {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
+  .library-folder {
+    min-height: 6.25rem;
+    padding: 0.9rem;
+  }
+
+  .library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  .library-card figcaption {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .library-download {
+    width: 100%;
+  }
+}
 
 .page-list-header,
 .page-header-row {
@@ -1227,7 +1416,10 @@ h2 {
   border-color: #d8dee4;
   border-radius: 0.55rem;
   background: #fbfcfe;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 .workflow-field input:not([type="file"]):hover,
@@ -1266,12 +1458,17 @@ h2 {
   padding: 0.65rem 0.75rem;
   border: 1px solid #d8dee4;
   border-radius: 0.55rem;
-  background: #fbfcfe url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="m2 5 6 6 6-6"/></svg>') no-repeat right 0.75rem center;
+  background: #fbfcfe
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="m2 5 6 6 6-6"/></svg>')
+    no-repeat right 0.75rem center;
   background-size: 1rem;
   padding-right: 2.5rem;
   font-size: 0.9rem;
   color: #24292f;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
   appearance: none;
 }
 
@@ -1281,7 +1478,9 @@ h2 {
 
 .form-select:focus {
   outline: none;
-  background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="m2 5 6 6 6-6"/></svg>') no-repeat right 0.75rem center;
+  background: #fff
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="m2 5 6 6 6-6"/></svg>')
+    no-repeat right 0.75rem center;
   background-size: 1rem;
   box-shadow: 0 0 0 3px rgb(31 111 235 / 10%);
   border-color: #1f6feb;
@@ -1302,7 +1501,9 @@ h2 {
   border: 1px dashed #a8b3c2;
   border-radius: 0.65rem;
   background: #fbfcfe;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .workflow-file-field:hover {
@@ -1451,7 +1652,9 @@ h2 {
 }
 
 @keyframes workflow-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .result-media {
@@ -1488,7 +1691,9 @@ h2 {
   background: #fff;
   color: #24292f;
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .workflow-history-item:hover,
@@ -1717,7 +1922,10 @@ h2 {
   border-radius: 0.45rem;
   background: #fff;
   font-size: 0.85rem;
-  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .instruction-file:hover {
@@ -1802,7 +2010,9 @@ h2 {
 }
 
 .instruction-editor textarea {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   line-height: 1.5;
 }
 
@@ -1847,7 +2057,10 @@ h2 {
   flex: 1;
 }
 
-.chat-sidebar .instruction-files-chat > .instruction-file-list > .secondary-button {
+.chat-sidebar
+  .instruction-files-chat
+  > .instruction-file-list
+  > .secondary-button {
   justify-content: center;
   width: 100%;
   min-height: 2rem;
@@ -2005,7 +2218,10 @@ h2 {
   background: #fff;
 }
 
-.page-instructions-panel .instruction-files-overview > .instruction-file-list > .secondary-button {
+.page-instructions-panel
+  .instruction-files-overview
+  > .instruction-file-list
+  > .secondary-button {
   justify-content: center;
   min-height: 2.4rem;
   border-style: dashed;

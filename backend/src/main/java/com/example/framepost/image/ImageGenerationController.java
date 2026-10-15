@@ -5,6 +5,8 @@ import java.util.List;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.example.framepost.auth.AuthService;
 import com.example.framepost.auth.User;
 import com.example.framepost.image.ImageGenerationService.ImageGenerationResponse;
@@ -32,6 +34,7 @@ import com.example.framepost.config.R2Properties;
 public class ImageGenerationController {
 
     private static final String COOKIE_NAME = "framepost_session";
+    private static final Logger log = LoggerFactory.getLogger(ImageGenerationController.class);
 
     private final ImageGenerationService service;
     private final AuthService authService;
@@ -126,7 +129,7 @@ public class ImageGenerationController {
         service.delete(currentUser(request), pageId, id);
     }
 
-    @GetMapping("/images/download/**")
+    @GetMapping({"/images/download", "/images/download/**"})
     public ResponseEntity<byte[]> downloadImage(HttpServletRequest request, @RequestParam(required = false) String key) {
         currentUser(request);
         
@@ -151,7 +154,12 @@ public class ImageGenerationController {
                     .header("Content-Disposition", "attachment; filename=\"image." + getFileExtension(storageKey) + "\"")
                     .body(imageData);
         } catch (S3Exception e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found");
+            String errorCode = e.awsErrorDetails() == null ? null : e.awsErrorDetails().errorCode();
+            if (e.statusCode() == HttpStatus.NOT_FOUND.value() || "NoSuchKey".equals(errorCode)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found");
+            }
+            log.warn("R2 image download failed with status {} and error code {}", e.statusCode(), errorCode);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Image storage request failed");
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to download image");
         }

@@ -1,4 +1,14 @@
-import { ArrowLeft, ArrowUp, ChevronDown, Download, Maximize2, Paperclip, Pencil, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  ChevronDown,
+  Download,
+  Maximize2,
+  Paperclip,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
@@ -21,7 +31,9 @@ const FALLBACK_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
 const PROMPT_PREVIEW_LENGTH = 120;
 
 function truncatePrompt(prompt: string) {
-  return prompt.length > PROMPT_PREVIEW_LENGTH ? `${prompt.slice(0, PROMPT_PREVIEW_LENGTH).trimEnd()}…` : prompt;
+  return prompt.length > PROMPT_PREVIEW_LENGTH
+    ? `${prompt.slice(0, PROMPT_PREVIEW_LENGTH).trimEnd()}…`
+    : prompt;
 }
 
 const POPOVER_WIDTH = 480;
@@ -32,13 +44,26 @@ function popoverPosition(anchor: HTMLElement): React.CSSProperties {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const width = Math.min(POPOVER_WIDTH, viewportWidth - POPOVER_GAP * 2);
-  const left = Math.min(Math.max(rect.left, POPOVER_GAP), viewportWidth - width - POPOVER_GAP);
+  const left = Math.min(
+    Math.max(rect.left, POPOVER_GAP),
+    viewportWidth - width - POPOVER_GAP,
+  );
   const spaceBelow = viewportHeight - rect.bottom;
   const spaceAbove = rect.top;
   if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-    return { top: rect.bottom + POPOVER_GAP, left, width, maxHeight: spaceBelow - POPOVER_GAP * 2 };
+    return {
+      top: rect.bottom + POPOVER_GAP,
+      left,
+      width,
+      maxHeight: spaceBelow - POPOVER_GAP * 2,
+    };
   }
-  return { bottom: viewportHeight - rect.top + POPOVER_GAP, left, width, maxHeight: spaceAbove - POPOVER_GAP * 2 };
+  return {
+    bottom: viewportHeight - rect.top + POPOVER_GAP,
+    left,
+    width,
+    maxHeight: spaceAbove - POPOVER_GAP * 2,
+  };
 }
 
 const SIZES = [
@@ -60,7 +85,11 @@ const QUALITIES = [
 const MAX_IMAGES = 4;
 const MAX_ATTACHMENTS = 4;
 
-export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps) {
+export function GptImageGenPage({
+  user,
+  onLogout,
+  pageId,
+}: GptImageGenPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const activePageId = pageId ?? routePageId;
   const createPath = activePageId ? `/pages/${activePageId}/create` : "/create";
@@ -75,12 +104,21 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<ImageGeneration[]>([]);
-  const [parent, setParent] = useState<{ generationId: string; resultKey: string; url: string } | null>(null);
+  const [parent, setParent] = useState<{
+    generationId: string;
+    resultKey: string;
+    url: string;
+  } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const promptInput = useRef<HTMLTextAreaElement>(null);
-  const [promptPopover, setPromptPopover] = useState<{ text: string; anchor: HTMLElement } | null>(null);
+  const [promptPopover, setPromptPopover] = useState<{
+    text: string;
+    anchor: HTMLElement;
+  } | null>(null);
   const [, setLayoutTick] = useState(0);
-  const [fullView, setFullView] = useState<{ url: string; alt: string } | null>(null);
+  const [fullView, setFullView] = useState<{ url: string; alt: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!fullView) return;
@@ -115,7 +153,9 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
       .then((available) => {
         if (cancelled || available.length === 0) return;
         setModels(available);
-        setModel((current) => (available.includes(current) ? current : available[0]));
+        setModel((current) =>
+          available.includes(current) ? current : available[0],
+        );
       })
       .catch(() => undefined);
     listImageGenerations(activePageId)
@@ -132,44 +172,70 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
     if (!files) return;
     const selected = Array.from(files);
     if (fileInput.current) fileInput.current.value = "";
-    setAttachments((current) => [...current, ...selected].slice(0, MAX_ATTACHMENTS));
+    setAttachments((current) =>
+      [...current, ...selected].slice(0, MAX_ATTACHMENTS),
+    );
   }
 
-  async function startEdit(item: ImageGeneration, result: { key: string; url: string }) {
+  async function startEdit(
+    item: ImageGeneration,
+    result: { key: string; url: string },
+  ) {
     setError("");
     setPrompt(item.prompt);
     if (models.includes(item.model)) setModel(item.model);
     setSize(item.size);
     setQuality(item.quality);
     setCount(item.imageCount);
-    setParent({ generationId: item.id, resultKey: result.key, url: result.url });
+    setParent({
+      generationId: item.id,
+      resultKey: result.key,
+      url: result.url,
+    });
     setAttachments([]);
     promptInput.current?.focus();
-    promptInput.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    promptInput.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
     try {
       const files = await Promise.all(
         (item.inputs ?? []).map(async (input, index) => {
-          const response = await fetch(`${API_BASE_URL}/api/images/download/${encodeURIComponent(input.key)}`, {
-            credentials: "include",
-          });
+          const response = await fetch(
+            `${API_BASE_URL}/api/images/download?key=${encodeURIComponent(input.key)}`,
+            {
+              credentials: "include",
+            },
+          );
           if (!response.ok) throw new Error("Unable to load input image");
           const blob = await response.blob();
           const extension = blob.type.split("/")[1] ?? "png";
-          return new File([blob], `input-${index + 1}.${extension}`, { type: blob.type });
+          return new File([blob], `input-${index + 1}.${extension}`, {
+            type: blob.type,
+          });
         }),
       );
       setAttachments(files.slice(0, MAX_ATTACHMENTS));
     } catch {
-      setError("Original input images could not be loaded; add them again if needed.");
+      setError(
+        "Original input images could not be loaded; add them again if needed.",
+      );
     }
   }
 
-  async function downloadResult(item: ImageGeneration, result: { key: string; url: string }, index: number) {
+  async function downloadResult(
+    item: ImageGeneration,
+    result: { key: string; url: string },
+    index: number,
+  ) {
     setError("");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/images/download/${encodeURIComponent(result.key)}`, {
-        credentials: "include",
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/images/download?key=${encodeURIComponent(result.key)}`,
+        {
+          credentials: "include",
+        },
+      );
       if (!response.ok) throw new Error("Unable to download the image");
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -181,19 +247,30 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
       link.remove();
       URL.revokeObjectURL(objectUrl);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to download the image");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to download the image",
+      );
     }
   }
 
   async function removeGeneration(item: ImageGeneration) {
-    if (!window.confirm("Delete this generated image? This cannot be undone.")) return;
+    if (!window.confirm("Delete this generated image? This cannot be undone."))
+      return;
     setError("");
     try {
       await deleteImageGeneration(item.id, activePageId);
       setHistory((current) => current.filter((entry) => entry.id !== item.id));
-      setParent((current) => (current?.generationId === item.id ? null : current));
+      setParent((current) =>
+        current?.generationId === item.id ? null : current,
+      );
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to delete the image");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to delete the image",
+      );
     }
   }
 
@@ -224,7 +301,11 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
       const generation = await generateImages(input, activePageId);
       setHistory((current) => [generation, ...current]);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to generate images");
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to generate images",
+      );
     } finally {
       setGenerating(false);
     }
@@ -253,7 +334,11 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                 <div className="image-gen-parent">
                   <img src={parent.url} alt="Original image" />
                   <span>Editing from this image</span>
-                  <button type="button" aria-label="Cancel edit" onClick={() => setParent(null)}>
+                  <button
+                    type="button"
+                    aria-label="Cancel edit"
+                    onClick={() => setParent(null)}
+                  >
                     <X size={12} aria-hidden="true" />
                   </button>
                 </div>
@@ -266,13 +351,20 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                         src={URL.createObjectURL(file)}
                         alt={file.name}
                         title="Double-click to view"
-                        onDoubleClick={() => setFullView({ url: URL.createObjectURL(file), alt: file.name })}
+                        onDoubleClick={() =>
+                          setFullView({
+                            url: URL.createObjectURL(file),
+                            alt: file.name,
+                          })
+                        }
                       />
                       <button
                         type="button"
                         aria-label={`Remove ${file.name}`}
                         onClick={() =>
-                          setAttachments((current) => current.filter((_, i) => i !== index))
+                          setAttachments((current) =>
+                            current.filter((_, i) => i !== index),
+                          )
                         }
                       >
                         <X size={12} aria-hidden="true" />
@@ -312,53 +404,88 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                 <label className="image-gen-control">
                   <span className="image-gen-control-label">Model</span>
                   <div className="image-gen-select-wrapper">
-                    <select value={model} onChange={(event) => setModel(event.target.value)} disabled={generating}>
+                    <select
+                      value={model}
+                      onChange={(event) => setModel(event.target.value)}
+                      disabled={generating}
+                    >
                       {models.map((item) => (
                         <option key={item} value={item}>
                           {item}
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                    <ChevronDown
+                      className="image-gen-select-icon"
+                      size={14}
+                      aria-hidden="true"
+                    />
                   </div>
                 </label>
                 <label className="image-gen-control">
                   <span className="image-gen-control-label">Size</span>
                   <div className="image-gen-select-wrapper">
-                    <select value={size} onChange={(event) => setSize(event.target.value)} disabled={generating}>
+                    <select
+                      value={size}
+                      onChange={(event) => setSize(event.target.value)}
+                      disabled={generating}
+                    >
                       {SIZES.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                    <ChevronDown
+                      className="image-gen-select-icon"
+                      size={14}
+                      aria-hidden="true"
+                    />
                   </div>
                 </label>
                 <label className="image-gen-control">
                   <span className="image-gen-control-label">Quality</span>
                   <div className="image-gen-select-wrapper">
-                    <select value={quality} onChange={(event) => setQuality(event.target.value)} disabled={generating}>
+                    <select
+                      value={quality}
+                      onChange={(event) => setQuality(event.target.value)}
+                      disabled={generating}
+                    >
                       {QUALITIES.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                    <ChevronDown
+                      className="image-gen-select-icon"
+                      size={14}
+                      aria-hidden="true"
+                    />
                   </div>
                 </label>
                 <label className="image-gen-control">
                   <span className="image-gen-control-label">Count</span>
                   <div className="image-gen-select-wrapper">
-                    <select value={count} onChange={(event) => setCount(Number(event.target.value))} disabled={generating}>
-                      {Array.from({ length: MAX_IMAGES }, (_, index) => index + 1).map((item) => (
+                    <select
+                      value={count}
+                      onChange={(event) => setCount(Number(event.target.value))}
+                      disabled={generating}
+                    >
+                      {Array.from(
+                        { length: MAX_IMAGES },
+                        (_, index) => index + 1,
+                      ).map((item) => (
                         <option key={item} value={item}>
                           {item}
                         </option>
                       ))}
                     </select>
-                    <ChevronDown className="image-gen-select-icon" size={14} aria-hidden="true" />
+                    <ChevronDown
+                      className="image-gen-select-icon"
+                      size={14}
+                      aria-hidden="true"
+                    />
                   </div>
                 </label>
                 <button
@@ -390,7 +517,9 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                         src={result.url}
                         alt={item.prompt}
                         title="Double-click to view"
-                        onDoubleClick={() => setFullView({ url: result.url, alt: item.prompt })}
+                        onDoubleClick={() =>
+                          setFullView({ url: result.url, alt: item.prompt })
+                        }
                       />
                       <div className="image-gen-tile-actions">
                         <button
@@ -398,7 +527,9 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                           className="image-gen-icon-button"
                           aria-label="View full image"
                           title="Full view"
-                          onClick={() => setFullView({ url: result.url, alt: item.prompt })}
+                          onClick={() =>
+                            setFullView({ url: result.url, alt: item.prompt })
+                          }
                         >
                           <Maximize2 size={14} aria-hidden="true" />
                         </button>
@@ -436,7 +567,8 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
               )}
               <div className="image-gen-meta">
                 <p className="status">
-                  {item.model} · {item.size} · {item.quality} · {item.imageCount}
+                  {item.model} · {item.size} · {item.quality} ·{" "}
+                  {item.imageCount}
                 </p>
                 {item.parentGenerationId && (
                   <p className="status">Edited from a previous image</p>
@@ -446,7 +578,10 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
                   className="image-gen-result-prompt"
                   title="View full prompt"
                   onClick={(event) =>
-                    setPromptPopover({ text: item.prompt, anchor: event.currentTarget })
+                    setPromptPopover({
+                      text: item.prompt,
+                      anchor: event.currentTarget,
+                    })
                   }
                 >
                   {truncatePrompt(item.prompt)}
@@ -480,7 +615,10 @@ export function GptImageGenPage({ user, onLogout, pageId }: GptImageGenPageProps
         </div>
       )}
       {promptPopover && (
-        <div className="image-gen-popover-layer" onMouseDown={() => setPromptPopover(null)}>
+        <div
+          className="image-gen-popover-layer"
+          onMouseDown={() => setPromptPopover(null)}
+        >
           <div
             className="panel image-gen-popover"
             role="dialog"
