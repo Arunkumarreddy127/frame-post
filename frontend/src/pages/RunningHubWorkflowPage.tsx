@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { initialValueFor } from "../components/DynamicInputField";
@@ -36,8 +36,14 @@ function AttachmentThumb({
   file: File;
   kind: "image" | "video";
 }) {
-  const url = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const [url, setUrl] = useState<string | null>(null);
+  // Create inside the effect so StrictMode's mount/cleanup/mount cycle doesn't leave a revoked URL.
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  if (!url) return null;
   return kind === "video" ? (
     <video src={url} muted preload="metadata" aria-label={file.name} />
   ) : (
