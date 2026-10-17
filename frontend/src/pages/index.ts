@@ -1,5 +1,6 @@
 export { ChatPage } from "./ChatPage";
 export { CreatePage } from "./CreatePage";
+export { GenerationsPage } from "./GenerationsPage";
 export { GptImageGenPage } from "./GptImageGenPage";
 export { HomePage } from "./HomePage";
 export { PageDetailPage } from "./PageDetailPage";

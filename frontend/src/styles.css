@@ -2380,6 +2380,17 @@ h2 {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+.image-gen-select-wrapper input {
+  width: 5rem;
+  padding: 0 0.3rem;
+  border: none;
+  background: transparent;
+  color: #1f2328;
+  font-size: 0.8rem;
+  font-weight: 500;
+  outline: none;
+}
+
 .image-gen-select-icon {
   position: absolute;
   right: 0.25rem;
@@ -2436,7 +2447,8 @@ h2 {
   position: relative;
 }
 
-.image-gen-attachments img {
+.image-gen-attachments img,
+.image-gen-attachments video {
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 0.35rem;
@@ -2470,7 +2482,8 @@ h2 {
   gap: 0.75rem;
 }
 
-.image-gen-grid img {
+.image-gen-grid img,
+.image-gen-grid video {
   display: block;
   width: 100%;
   aspect-ratio: 1;

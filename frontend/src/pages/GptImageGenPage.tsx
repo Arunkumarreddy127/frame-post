@@ -2,69 +2,26 @@ import {
   ArrowLeft,
   ArrowUp,
   ChevronDown,
-  Download,
-  Maximize2,
   Paperclip,
-  Pencil,
-  Trash2,
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { API_BASE_URL } from "../api";
+import { GenerationFeed } from "../components/generations/GenerationFeed";
 import {
-  deleteImageGeneration,
-  generateImages,
-  listImageGenerations,
-  listImageModels,
-  type ImageGeneration,
-} from "../imageApi";
-import type { ShellRouteProps } from "../types";
+  createImageGeneration,
+  downloadFile,
+  getCatalog,
+} from "../generationApi";
+import { useGenerationPages } from "../hooks/useGenerationPages";
+import type { Generation, MediaItem, ShellRouteProps } from "../types";
 
 type GptImageGenPageProps = ShellRouteProps & {
   pageId?: string;
 };
 
 const FALLBACK_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
-
-const PROMPT_PREVIEW_LENGTH = 120;
-
-function truncatePrompt(prompt: string) {
-  return prompt.length > PROMPT_PREVIEW_LENGTH
-    ? `${prompt.slice(0, PROMPT_PREVIEW_LENGTH).trimEnd()}…`
-    : prompt;
-}
-
-const POPOVER_WIDTH = 480;
-const POPOVER_GAP = 8;
-
-function popoverPosition(anchor: HTMLElement): React.CSSProperties {
-  const rect = anchor.getBoundingClientRect();
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const width = Math.min(POPOVER_WIDTH, viewportWidth - POPOVER_GAP * 2);
-  const left = Math.min(
-    Math.max(rect.left, POPOVER_GAP),
-    viewportWidth - width - POPOVER_GAP,
-  );
-  const spaceBelow = viewportHeight - rect.bottom;
-  const spaceAbove = rect.top;
-  if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-    return {
-      top: rect.bottom + POPOVER_GAP,
-      left,
-      width,
-      maxHeight: spaceBelow - POPOVER_GAP * 2,
-    };
-  }
-  return {
-    bottom: viewportHeight - rect.top + POPOVER_GAP,
-    left,
-    width,
-    maxHeight: spaceAbove - POPOVER_GAP * 2,
-  };
-}
 
 const SIZES = [
   { value: "auto", label: "Auto" },
@@ -103,7 +60,20 @@ export function GptImageGenPage({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
-  const [history, setHistory] = useState<ImageGeneration[]>([]);
+  const {
+    items: history,
+    hasMore,
+    loading: historyLoading,
+    error: historyError,
+    loadMore,
+    prepend,
+    update,
+    removeWhere,
+  } = useGenerationPages({
+    pageId: activePageId,
+    provider: "OPENAI",
+    globalOnly: true,
+  });
   const [parent, setParent] = useState<{
     generationId: string;
     resultKey: string;
@@ -111,11 +81,6 @@ export function GptImageGenPage({
   } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const promptInput = useRef<HTMLTextAreaElement>(null);
-  const [promptPopover, setPromptPopover] = useState<{
-    text: string;
-    anchor: HTMLElement;
-  } | null>(null);
-  const [, setLayoutTick] = useState(0);
   const [fullView, setFullView] = useState<{ url: string; alt: string } | null>(
     null,
   );
@@ -130,43 +95,20 @@ export function GptImageGenPage({
   }, [fullView]);
 
   useEffect(() => {
-    if (!promptPopover) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setPromptPopover(null);
-    }
-    function onLayoutChange() {
-      setLayoutTick((tick) => tick + 1);
-    }
-    document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", onLayoutChange, true);
-    window.addEventListener("resize", onLayoutChange);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onLayoutChange, true);
-      window.removeEventListener("resize", onLayoutChange);
-    };
-  }, [promptPopover]);
-
-  useEffect(() => {
     let cancelled = false;
-    listImageModels()
-      .then((available) => {
-        if (cancelled || available.length === 0) return;
-        setModels(available);
+    getCatalog()
+      .then(({ imageModels }) => {
+        if (cancelled || imageModels.length === 0) return;
+        setModels(imageModels);
         setModel((current) =>
-          available.includes(current) ? current : available[0],
+          imageModels.includes(current) ? current : imageModels[0],
         );
-      })
-      .catch(() => undefined);
-    listImageGenerations(activePageId)
-      .then((items) => {
-        if (!cancelled) setHistory(items);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [activePageId]);
+  }, []);
 
   function addFiles(files: FileList | null) {
     if (!files) return;
@@ -177,16 +119,15 @@ export function GptImageGenPage({
     );
   }
 
-  async function startEdit(
-    item: ImageGeneration,
-    result: { key: string; url: string },
-  ) {
+  async function startEdit(item: Generation, result: MediaItem) {
     setError("");
-    setPrompt(item.prompt);
-    if (models.includes(item.model)) setModel(item.model);
-    setSize(item.size);
-    setQuality(item.quality);
-    setCount(item.imageCount);
+    setPrompt(item.inputs.prompt ?? "");
+    if (item.inputs.model && models.includes(item.inputs.model)) {
+      setModel(item.inputs.model);
+    }
+    setSize(item.inputs.size ?? "auto");
+    setQuality(item.inputs.quality ?? "auto");
+    setCount(Number(item.inputs.count) || 1);
     setParent({
       generationId: item.id,
       resultKey: result.key,
@@ -200,15 +141,8 @@ export function GptImageGenPage({
     });
     try {
       const files = await Promise.all(
-        (item.inputs ?? []).map(async (input, index) => {
-          const response = await fetch(
-            `${API_BASE_URL}/api/images/download?key=${encodeURIComponent(input.key)}`,
-            {
-              credentials: "include",
-            },
-          );
-          if (!response.ok) throw new Error("Unable to load input image");
-          const blob = await response.blob();
+        item.inputFiles.map(async (input, index) => {
+          const blob = await downloadFile(input.key);
           const extension = blob.type.split("/")[1] ?? "png";
           return new File([blob], `input-${index + 1}.${extension}`, {
             type: blob.type,
@@ -219,57 +153,6 @@ export function GptImageGenPage({
     } catch {
       setError(
         "Original input images could not be loaded; add them again if needed.",
-      );
-    }
-  }
-
-  async function downloadResult(
-    item: ImageGeneration,
-    result: { key: string; url: string },
-    index: number,
-  ) {
-    setError("");
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/images/download?key=${encodeURIComponent(result.key)}`,
-        {
-          credentials: "include",
-        },
-      );
-      if (!response.ok) throw new Error("Unable to download the image");
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = `framepost-${item.id}-${index + 1}.${item.outputFormat || "png"}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to download the image",
-      );
-    }
-  }
-
-  async function removeGeneration(item: ImageGeneration) {
-    if (!window.confirm("Delete this generated image? This cannot be undone."))
-      return;
-    setError("");
-    try {
-      await deleteImageGeneration(item.id, activePageId);
-      setHistory((current) => current.filter((entry) => entry.id !== item.id));
-      setParent((current) =>
-        current?.generationId === item.id ? null : current,
-      );
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to delete the image",
       );
     }
   }
@@ -298,8 +181,8 @@ export function GptImageGenPage({
     setGenerating(true);
     setError("");
     try {
-      const generation = await generateImages(input, activePageId);
-      setHistory((current) => [generation, ...current]);
+      const generation = await createImageGeneration(input, activePageId);
+      prepend(generation);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -504,92 +387,22 @@ export function GptImageGenPage({
           {generating && <p className="status">Generating images...</p>}
         </form>
 
-        <section className="image-gen-results">
-          {history.map((item) => (
-            <article className="panel image-gen-result" key={item.id}>
-              {item.status === "FAILED" ? (
-                <p className="error">{item.error ?? "Generation failed"}</p>
-              ) : (
-                <div className="image-gen-grid">
-                  {item.results.map((result, index) => (
-                    <div className="image-gen-tile" key={result.key}>
-                      <img
-                        src={result.url}
-                        alt={item.prompt}
-                        title="Double-click to view"
-                        onDoubleClick={() =>
-                          setFullView({ url: result.url, alt: item.prompt })
-                        }
-                      />
-                      <div className="image-gen-tile-actions">
-                        <button
-                          type="button"
-                          className="image-gen-icon-button"
-                          aria-label="View full image"
-                          title="Full view"
-                          onClick={() =>
-                            setFullView({ url: result.url, alt: item.prompt })
-                          }
-                        >
-                          <Maximize2 size={14} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className="image-gen-icon-button"
-                          aria-label="Edit image"
-                          title="Edit"
-                          onClick={() => startEdit(item, result)}
-                        >
-                          <Pencil size={14} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className="image-gen-icon-button"
-                          aria-label="Download image"
-                          title="Download"
-                          onClick={() => downloadResult(item, result, index)}
-                        >
-                          <Download size={14} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          className="image-gen-icon-button"
-                          aria-label="Delete image"
-                          title="Delete"
-                          onClick={() => removeGeneration(item)}
-                        >
-                          <Trash2 size={14} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="image-gen-meta">
-                <p className="status">
-                  {item.model} · {item.size} · {item.quality} ·{" "}
-                  {item.imageCount}
-                </p>
-                {item.parentGenerationId && (
-                  <p className="status">Edited from a previous image</p>
-                )}
-                <button
-                  type="button"
-                  className="image-gen-result-prompt"
-                  title="View full prompt"
-                  onClick={(event) =>
-                    setPromptPopover({
-                      text: item.prompt,
-                      anchor: event.currentTarget,
-                    })
-                  }
-                >
-                  {truncatePrompt(item.prompt)}
-                </button>
-              </div>
-            </article>
-          ))}
-        </section>
+        <GenerationFeed
+          items={history}
+          hasMore={hasMore}
+          loading={historyLoading}
+          loadError={historyError}
+          emptyMessage="No images yet."
+          onLoadMore={loadMore}
+          onUpdate={update}
+          onDeleted={(generation) => {
+            removeWhere((item) => item.id === generation.id);
+            setParent((current) =>
+              current?.generationId === generation.id ? null : current,
+            );
+          }}
+          onEdit={startEdit}
+        />
       </div>
       {fullView && (
         <div
@@ -612,34 +425,6 @@ export function GptImageGenPage({
             alt={fullView.alt}
             onMouseDown={(event) => event.stopPropagation()}
           />
-        </div>
-      )}
-      {promptPopover && (
-        <div
-          className="image-gen-popover-layer"
-          onMouseDown={() => setPromptPopover(null)}
-        >
-          <div
-            className="panel image-gen-popover"
-            role="dialog"
-            aria-modal="false"
-            aria-labelledby="image-gen-popover-title"
-            style={popoverPosition(promptPopover.anchor)}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header className="image-gen-popover-header">
-              <h3 id="image-gen-popover-title">Prompt</h3>
-              <button
-                type="button"
-                className="secondary-button"
-                aria-label="Close"
-                onClick={() => setPromptPopover(null)}
-              >
-                <X size={14} aria-hidden="true" />
-              </button>
-            </header>
-            <p className="image-gen-popover-body">{promptPopover.text}</p>
-          </div>
         </div>
       )}
     </AppShell>

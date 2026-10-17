@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import type { ShellRouteProps } from "../types";
-import { RunningHubWorkflow, listRunningHubWorkflows } from "../runninghubApi";
+import type { ShellRouteProps, Workflow } from "../types";
+import { getCatalog } from "../generationApi";
 
 type CreatePageProps = ShellRouteProps & {
   pageId?: string;
@@ -25,12 +25,12 @@ const copilotItems: CreateItem[] = [
 export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const activePageId = pageId ?? routePageId;
-  const [workflows, setWorkflows] = useState<RunningHubWorkflow[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    listRunningHubWorkflows()
-      .then(setWorkflows)
+    getCatalog()
+      .then((catalog) => setWorkflows(catalog.runningHubWorkflows))
       .catch((caught: Error) => setLoadError(caught.message));
   }, []);
 

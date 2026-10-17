@@ -19,19 +19,18 @@ import com.example.framepost.runninghub.RunningHubGenerationStatus;
 public record ContentGeneration(
         @Id String id, String userId, String pageId, int schemaVersion, Provider provider,
         MediaType generationType, String workflowKey, Map<String, String> inputs,
-        Map<String, String> inputFileKeys, List<Output> outputs, ProviderMetadata providerMetadata,
+        List<String> inputIds, List<String> outputIds, ProviderMetadata providerMetadata,
         Status status, String error, Instant createdAt, String parentGenerationId, String parentResultKey
 ) {
     public enum Provider { OPENAI, RUNNINGHUB }
     public enum MediaType { IMAGE, VIDEO }
     public enum Status { PROCESSING, COMPLETED, FAILED }
-    public record Output(String key, String type, String contentType) {}
     public record ProviderMetadata(String runningHubTaskId, String instanceType) {}
 
     public ContentGeneration {
         inputs = immutableMap(inputs);
-        inputFileKeys = immutableMap(inputFileKeys);
-        outputs = outputs == null ? List.of() : List.copyOf(outputs);
+        inputIds = inputIds == null ? List.of() : List.copyOf(inputIds);
+        outputIds = outputIds == null ? List.of() : List.copyOf(outputIds);
     }
 
     private static Map<String, String> immutableMap(Map<String, String> source) {
@@ -39,6 +38,14 @@ public record ContentGeneration(
     }
 
     public static ContentGeneration fromImage(ImageGeneration source) {
+        return fromImage(source, List.of(), List.of());
+    }
+
+    public static ContentGeneration fromImage(
+            ImageGeneration source,
+            List<String> inputIds,
+            List<String> outputIds
+    ) {
         Map<String, String> values = new LinkedHashMap<>();
         values.put("prompt", source.prompt());
         values.put("model", source.model());
@@ -49,60 +56,82 @@ public record ContentGeneration(
         values.put("background", source.background());
         values.put("moderation", source.moderation());
         values.put("partialImages", source.partialImages());
-        Map<String, String> files = new LinkedHashMap<>();
-        for (int index = 0; index < source.inputKeys().size(); index++) {
-            files.put("attachment-" + (index + 1), source.inputKeys().get(index));
-        }
-        List<Output> outputs = source.results().stream()
-                .map(result -> new Output(result.key(), "image", imageContentType(result.key(), source.outputFormat())))
-                .toList();
-        return new ContentGeneration(source.id(), source.userId(), source.pageId(), 1, Provider.OPENAI,
-                MediaType.IMAGE, null, values, files, outputs, null, Status.valueOf(source.status().name()),
+        return new ContentGeneration(source.id(), source.userId(), source.pageId(), 2, Provider.OPENAI,
+                MediaType.IMAGE, null, values, inputIds, outputIds, null, Status.valueOf(source.status().name()),
                 source.error(), source.createdAt(), source.parentGenerationId(), source.parentResultKey());
     }
 
-    private static String imageContentType(String key, String format) {
-        String extension = key != null && key.contains(".") ? key.substring(key.lastIndexOf('.') + 1) : format;
-        if (extension == null) return "application/octet-stream";
-        return switch (extension.toLowerCase(java.util.Locale.ROOT)) {
-            case "jpg", "jpeg" -> "image/jpeg";
-            case "png", "webp", "gif" -> "image/" + extension.toLowerCase(java.util.Locale.ROOT);
-            default -> "application/octet-stream";
-        };
+    public ImageGeneration toImage() {
+        return toImage(List.of(), List.of());
     }
 
-    public ImageGeneration toImage() {
+    public ImageGeneration toImage(List<ContentInput> inputFiles, List<ContentOutput> outputFiles) {
         requireProvider(Provider.OPENAI);
-        List<String> keys = inputFileKeys.entrySet().stream()
-                .sorted(Comparator.comparingInt(entry -> Integer.parseInt(entry.getKey().substring("attachment-".length()))))
-                .map(Map.Entry::getValue).toList();
+        List<ContentInput> orderedInputs = inputFiles.stream()
+                .sorted(Comparator.comparingInt(ContentInput::position)).toList();
+        List<ContentOutput> orderedOutputs = outputFiles.stream()
+                .sorted(Comparator.comparingInt(ContentOutput::position)).toList();
+        Map<String, MediaMetadata> metadata = new LinkedHashMap<>();
+        orderedInputs.forEach(file -> putMetadata(metadata, file.key(), file.sizeBytes(), file.width(), file.height(), file.durationSeconds()));
+        orderedOutputs.forEach(file -> putMetadata(metadata, file.key(), file.sizeBytes(), file.width(), file.height(), file.durationSeconds()));
         return new ImageGeneration(id, userId, pageId, inputs.get("prompt"), inputs.get("model"),
                 inputs.get("size"), inputs.get("quality"), Integer.parseInt(inputs.get("count")),
                 inputs.get("outputFormat"), inputs.get("background"), inputs.get("moderation"),
-                inputs.get("partialImages"), keys,
-                outputs.stream().map(output -> new ImageGeneration.ImageResult(output.key())).toList(),
-                ImageGenerationStatus.valueOf(status.name()), error, createdAt, parentGenerationId, parentResultKey);
+                inputs.get("partialImages"), orderedInputs.stream().map(ContentInput::key).toList(),
+                orderedOutputs.stream().map(file -> new ImageGeneration.ImageResult(file.key())).toList(),
+                ImageGenerationStatus.valueOf(status.name()), error, createdAt, parentGenerationId, parentResultKey,
+                metadata);
     }
 
     public static ContentGeneration fromRunningHub(RunningHubGeneration source, String outputType) {
+        return fromRunningHub(source, outputType, List.of(), List.of());
+    }
+
+    public static ContentGeneration fromRunningHub(
+            RunningHubGeneration source,
+            String outputType,
+            List<String> inputIds,
+            List<String> outputIds
+    ) {
         MediaType type = MediaType.valueOf(outputType.toUpperCase(java.util.Locale.ROOT));
-        List<Output> outputs = source.resultKey() == null ? List.of()
-                : List.of(new Output(source.resultKey(), source.resultType(), source.resultContentType()));
-        return new ContentGeneration(source.id(), source.userId(), source.pageId(), 1, Provider.RUNNINGHUB,
-                type, source.workflowKey(), source.inputs(), source.inputFileKeys(), outputs,
+        return new ContentGeneration(source.id(), source.userId(), source.pageId(), 2, Provider.RUNNINGHUB,
+                type, source.workflowKey(), source.inputs(), inputIds, outputIds,
                 new ProviderMetadata(source.runningHubTaskId(), source.instanceType()),
                 Status.valueOf(source.status().name()), source.error(), source.createdAt(), null, null);
     }
 
     public RunningHubGeneration toRunningHub() {
+        return toRunningHub(List.of(), List.of());
+    }
+
+    public RunningHubGeneration toRunningHub(List<ContentInput> inputFiles, List<ContentOutput> outputFiles) {
         requireProvider(Provider.RUNNINGHUB);
-        Output result = outputs.isEmpty() ? null : outputs.getFirst();
+        Map<String, String> inputFileKeys = new LinkedHashMap<>();
+        Map<String, MediaMetadata> metadata = new LinkedHashMap<>();
+        inputFiles.stream().sorted(Comparator.comparingInt(ContentInput::position)).forEach(file -> {
+            inputFileKeys.put(file.slot(), file.key());
+            putMetadata(metadata, file.key(), file.sizeBytes(), file.width(), file.height(), file.durationSeconds());
+        });
+        ContentOutput result = outputFiles.stream()
+                .min(Comparator.comparingInt(ContentOutput::position)).orElse(null);
+        if (result != null) {
+            putMetadata(metadata, result.key(), result.sizeBytes(), result.width(), result.height(), result.durationSeconds());
+        }
         return new RunningHubGeneration(id, userId, pageId, workflowKey, inputs, inputFileKeys,
                 result == null ? null : result.key(), result == null ? null : result.type(),
                 result == null ? null : result.contentType(),
                 providerMetadata == null ? null : providerMetadata.runningHubTaskId(),
                 RunningHubGenerationStatus.valueOf(status.name()), error,
-                providerMetadata == null ? null : providerMetadata.instanceType(), createdAt);
+                providerMetadata == null ? null : providerMetadata.instanceType(), createdAt, metadata);
+    }
+
+    private static void putMetadata(
+            Map<String, MediaMetadata> target, String key, Long sizeBytes, Integer width, Integer height,
+            Long durationSeconds
+    ) {
+        if (sizeBytes != null || width != null || height != null || durationSeconds != null) {
+            target.put(key, new MediaMetadata(sizeBytes, width, height, durationSeconds));
+        }
     }
 
     private void requireProvider(Provider expected) {

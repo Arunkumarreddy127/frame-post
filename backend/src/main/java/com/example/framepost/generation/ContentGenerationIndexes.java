@@ -11,7 +11,7 @@ import org.springframework.data.mongodb.core.index.PartialIndexFilter;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!migrate-content-generations & !migrate-video-generations & !migrate-storage-keys")
+@Profile("!migrate-content-generations & !migrate-video-generations & !migrate-storage-keys & !migrate-content-media")
 public class ContentGenerationIndexes implements ApplicationRunner {
     private final MongoTemplate mongo;
 
@@ -39,5 +39,17 @@ public class ContentGenerationIndexes implements ApplicationRunner {
                 .unique().partial(PartialIndexFilter.of(new Document("provider", "RUNNINGHUB")
                         .append("providerMetadata.runningHubTaskId", new Document("$type", "string"))))
                 .named("content_provider_task"));
+
+        var inputIndexes = mongo.indexOps(ContentInput.class);
+        inputIndexes.ensureIndex(new Index().on("generationId", Direction.ASC).on("position", Direction.ASC)
+                .named("content_input_generation_position"));
+        inputIndexes.ensureIndex(new Index().on("userId", Direction.ASC).on("pageId", Direction.ASC)
+                .on("createdAt", Direction.DESC).named("content_input_scope_created"));
+
+        var outputIndexes = mongo.indexOps(ContentOutput.class);
+        outputIndexes.ensureIndex(new Index().on("generationId", Direction.ASC).on("position", Direction.ASC)
+                .named("content_output_generation_position"));
+        outputIndexes.ensureIndex(new Index().on("userId", Direction.ASC).on("pageId", Direction.ASC)
+                .on("createdAt", Direction.DESC).named("content_output_scope_created"));
     }
 }

@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import {
-  fetchLibrary,
-  type LibraryItem,
-  type LibraryResponse,
-} from "../libraryApi";
-import { API_BASE_URL } from "../api";
-import type { ShellRouteProps } from "../types";
+import { LibraryMediaGrid } from "../components/library/LibraryMediaGrid";
+import { deleteGeneration, getGeneration, saveFile } from "../generationApi";
+import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
+import { useMediaPages } from "../hooks/useGenerationPages";
+import type { MediaItem, ShellRouteProps } from "../types";
 
 type LibraryPageProps = ShellRouteProps & {
   pageId?: string;
@@ -24,30 +23,11 @@ const folders: { key: Folder; title: string; description: string }[] = [
 ];
 
 export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
-  const [library, setLibrary] = useState<LibraryResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [folder, setFolder] = useState<Folder | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLibrary(null);
-    setError(null);
-    fetchLibrary(pageId)
-      .then((data) => {
-        if (active) setLibrary(data);
-      })
-      .catch((err: Error) => {
-        if (active) setError(err.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [pageId]);
 
   const title = folder
     ? (folders.find((f) => f.key === folder)?.title ?? "Library")
     : "Library";
-  const items = library && folder ? library[folder] : [];
 
   return (
     <AppShell
@@ -60,36 +40,13 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
     >
       <section className="library-panel">
         {folder ? (
-          <>
-            <header className="library-heading">
-              <div>
-                <button
-                  type="button"
-                  className="library-back"
-                  onClick={() => setFolder(null)}
-                >
-                  <span aria-hidden="true">←</span> All files
-                </button>
-                <h2>{title}</h2>
-                <p>
-                  {items.length} {items.length === 1 ? "file" : "files"}
-                </p>
-              </div>
-            </header>
-            {error && <p className="status error">{error}</p>}
-            {!error && !library && <p className="status">Loading…</p>}
-            {library && items.length === 0 && (
-              <p className="status">Nothing here yet.</p>
-            )}
-            <div className="library-grid">
-              {items.map((item) => (
-                <LibraryCard
-                  key={`${item.generationId}-${item.key}`}
-                  item={item}
-                />
-              ))}
-            </div>
-          </>
+          <LibraryFolder
+            key={folder}
+            kind={folder}
+            title={title}
+            pageId={pageId}
+            onBack={() => setFolder(null)}
+          />
         ) : (
           <>
             <header className="library-heading">
@@ -98,13 +55,7 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
                 <h2>Library</h2>
                 <p>Your generated work and source files, together.</p>
               </div>
-              {library && (
-                <span className="library-total">
-                  {library.inputs.length + library.outputs.length} files
-                </span>
-              )}
             </header>
-            {error && <p className="status error">{error}</p>}
             <div className="library-folders">
               {folders.map((entry) => (
                 <button
@@ -117,11 +68,6 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
                     {entry.key === "inputs" ? "IN" : "OUT"}
                   </span>
                   <span className="library-folder-title">{entry.title}</span>
-                  <span className="library-folder-count">
-                    {library
-                      ? `${library[entry.key].length} files`
-                      : "Loading…"}
-                  </span>
                   <span className="library-folder-description">
                     {entry.description}
                   </span>
@@ -135,58 +81,94 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
   );
 }
 
-function LibraryCard({ item }: { item: LibraryItem }) {
-  const [downloadError, setDownloadError] = useState<string | null>(null);
+function LibraryFolder({
+  kind,
+  title,
+  pageId,
+  onBack,
+}: {
+  kind: Folder;
+  title: string;
+  pageId?: string;
+  onBack: () => void;
+}) {
+  const navigate = useNavigate();
+  const { items, hasMore, loading, error, loadMore, removeWhere } =
+    useMediaPages(kind, pageId);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const sentinel = useInfiniteScroll<HTMLDivElement>(
+    loadMore,
+    hasMore && !loading,
+  );
 
-  async function downloadItem() {
-    setDownloadError(null);
+  async function download(item: MediaItem) {
+    setActionError(null);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/images/download?key=${encodeURIComponent(item.key)}`,
-        { credentials: "include" },
-      );
-      if (!response.ok) throw new Error("Download failed");
-      const objectUrl = URL.createObjectURL(await response.blob());
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = item.name;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
+      await saveFile(item.key, item.name);
     } catch {
-      setDownloadError("Unable to download this file");
+      setActionError("Unable to download this file");
+    }
+  }
+
+  async function remove(item: MediaItem) {
+    if (
+      !window.confirm(
+        "Delete the generation this file belongs to, including all of its files? This cannot be undone.",
+      )
+    )
+      return;
+    setActionError(null);
+    try {
+      await deleteGeneration(item.generationId);
+      removeWhere((entry) => entry.generationId === item.generationId);
+    } catch (caught) {
+      setActionError(
+        caught instanceof Error ? caught.message : "Unable to delete this file",
+      );
+    }
+  }
+
+  async function open(item: MediaItem) {
+    setActionError(null);
+    try {
+      const generation = await getGeneration(item.generationId);
+      const base = generation.pageId ? `/pages/${generation.pageId}` : "";
+      navigate(
+        generation.provider === "OPENAI"
+          ? `${base}/create/gpt-image-gen`
+          : `${base}/create/rh/${generation.workflowKey}`,
+      );
+    } catch (caught) {
+      setActionError(
+        caught instanceof Error ? caught.message : "Unable to open this file",
+      );
     }
   }
 
   return (
-    <figure className="library-card">
-      <div className="library-preview">
-        {item.contentType.startsWith("image/") && (
-          <img src={item.url} alt={item.name} loading="lazy" />
-        )}
-        {item.contentType.startsWith("video/") && (
-          <video src={item.url} controls preload="metadata" />
-        )}
-        {!item.contentType.startsWith("image/") &&
-          !item.contentType.startsWith("video/") && (
-            <span className="library-file">{item.name}</span>
-          )}
-      </div>
-      <figcaption>
-        <span className="library-name" title={item.name}>
-          {item.name}
-        </span>
-        <button
-          type="button"
-          className="library-download"
-          onClick={downloadItem}
-        >
-          <span aria-hidden="true">↓</span>
-          Download
-        </button>
-        {downloadError && <span className="status error">{downloadError}</span>}
-      </figcaption>
-    </figure>
+    <>
+      <header className="library-heading">
+        <div>
+          <button type="button" className="library-back" onClick={onBack}>
+            <span aria-hidden="true">←</span> All files
+          </button>
+          <h2>{title}</h2>
+        </div>
+      </header>
+      {(error || actionError) && (
+        <p className="status error">{error || actionError}</p>
+      )}
+      {!error && !loading && items.length === 0 && (
+        <p className="status">Nothing here yet.</p>
+      )}
+      <LibraryMediaGrid
+        items={items}
+        onDownload={download}
+        onDelete={remove}
+        onEdit={open}
+      />
+      {loading && <p className="status">Loading…</p>}
+      {hasMore && <div ref={sentinel} style={{ height: 1 }} />}
+    </>
   );
 }

@@ -22,6 +22,8 @@ import java.util.function.Function;
 import com.example.framepost.auth.User;
 import com.example.framepost.auth.UserRepository;
 import com.example.framepost.config.RunningHubProperties;
+import com.example.framepost.generation.GenerationEvents;
+import com.example.framepost.generation.MediaMetadata;
 import com.example.framepost.page.PageService;
 import com.example.framepost.runninghub.WorkflowDefinition.InputDefinition;
 import com.example.framepost.runninghub.WorkflowDefinition.NodeMapping;
@@ -64,7 +66,7 @@ public class RunningHubGenerationService {
     private final RunningHubClient client;
     private final WorkflowRegistry registry;
     private final StorageService storage;
-    private final RunningHubGenerationEvents events;
+    private final GenerationEvents events;
     private final Map<String, InputTransform> transforms;
     private final UserRepository users;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -78,7 +80,7 @@ public class RunningHubGenerationService {
             RunningHubClient client,
             WorkflowRegistry registry,
             StorageService storage,
-            RunningHubGenerationEvents events,
+            GenerationEvents events,
             List<InputTransform> transforms,
             UserRepository users
     ) {
@@ -101,22 +103,6 @@ public class RunningHubGenerationService {
 
     public List<WorkflowView> workflows() {
         return registry.all().stream().map(definition -> WorkflowView.from(definition, registry.workflowId(definition).isPresent())).toList();
-    }
-
-    public List<GenerationResponse> list(User user, String pageId, String workflowKey) {
-        validateScope(user, pageId);
-        definition(workflowKey);
-        return repository.findByUserIdAndPageIdAndWorkflowKeyOrderByCreatedAtDesc(user.id(), pageId, workflowKey).stream()
-                .map(generation -> GenerationResponse.from(generation, storage::publicUrl))
-                .toList();
-    }
-
-    public GenerationResponse get(User user, String pageId, String workflowKey, String id) {
-        validateScope(user, pageId);
-        definition(workflowKey);
-        return repository.findByIdAndUserIdAndPageIdAndWorkflowKey(id, user.id(), pageId, workflowKey)
-                .map(generation -> GenerationResponse.from(generation, storage::publicUrl))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Generation not found"));
     }
 
     /**
@@ -180,14 +166,17 @@ public class RunningHubGenerationService {
 
         String id = UUID.randomUUID().toString();
         Map<String, String> inputKeys = new LinkedHashMap<>();
+        Map<String, MediaMetadata> metadata = new LinkedHashMap<>();
         for (Map.Entry<String, FileUpload> upload : uploads.entrySet()) {
             String key = StorageKeys.inputPrefix(user, id) + upload.getValue().filename();
             store(key, upload.getValue().bytes(), upload.getValue().contentType());
             inputKeys.put(upload.getKey(), key);
+            metadata.put(key, MediaMetadata.of(upload.getValue().bytes(), upload.getValue().contentType()));
         }
 
         RunningHubGeneration generation = new RunningHubGeneration(id, user.id(), pageId, workflowKey, values, inputKeys,
-                null, null, null, null, RunningHubGenerationStatus.PROCESSING, null, instanceType, Instant.now());
+                null, null, null, null, RunningHubGenerationStatus.PROCESSING, null, instanceType, Instant.now(),
+                metadata);
         repository.save(generation);
         executor.execute(() -> process(generation, definition, workflowId, nodes, uploads));
         return GenerationResponse.from(generation, storage::publicUrl);
@@ -328,7 +317,8 @@ public class RunningHubGenerationService {
                     .orElseThrow(() -> new RunningHubException("Generation owner no longer exists"));
             String key = StorageKeys.outputPrefix(owner, id) + generation.workflowKey() + "-output." + extension;
             store(key, bytes, output.contentType());
-            publish(repository.save(generation.completed(key, output.type(), output.contentType())));
+            publish(repository.save(generation.completed(key, output.type(), output.contentType(),
+                    MediaMetadata.of(bytes, output.contentType()))));
         } catch (RuntimeException exception) {
             log.warn("RunningHub generation {} could not be completed", id, exception);
             failIfProcessing(id, failureMessage(exception));
@@ -350,7 +340,7 @@ public class RunningHubGenerationService {
     }
 
     private void publish(RunningHubGeneration generation) {
-        events.publish(GenerationResponse.from(generation, storage::publicUrl));
+        events.publish(generation.id());
     }
 
     private static String failureMessage(RuntimeException exception) {

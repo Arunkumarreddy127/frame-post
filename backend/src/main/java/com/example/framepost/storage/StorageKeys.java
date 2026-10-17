@@ -26,6 +26,17 @@ public final class StorageKeys {
         return prefix(OUTPUTS, user, id);
     }
 
+    /** True when the key sits under the user's own folder, e.g. {@code outputs/{username}-{userId}/...}. */
+    public static boolean ownedBy(User user, String key) {
+        if (key == null || key.contains("..")) {
+            return false;
+        }
+        String[] parts = key.split("/");
+        return parts.length >= 4
+                && (INPUTS.equals(parts[0]) || OUTPUTS.equals(parts[0]))
+                && parts[1].endsWith("-" + user.id());
+    }
+
     /** Returns a kebab-case file name with the given extension, unique within {@code used}. */
     public static String fileName(String originalName, String extension, String fallback, Set<String> used) {
         String stem = stripExtension(baseName(originalName));

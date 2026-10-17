@@ -1,13 +1,20 @@
 import { StrictMode } from "react";
 import { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useParams,
+} from "react-router-dom";
 import { AuthPage } from "./components/AuthPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import {
   ChatPage,
   CreatePage,
+  GenerationsPage,
   GptImageGenPage,
   HomePage,
   PageDetailPage,
@@ -23,7 +30,13 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 const LEGACY_MINIMAX_KEY = "minimax-h3-ff-image-to-video";
 
-function PageLibraryRoute({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
+function PageLibraryRoute({
+  user,
+  onLogout,
+}: {
+  user: User;
+  onLogout: () => Promise<void>;
+}) {
   const { pageId } = useParams<{ pageId: string }>();
   return <LibraryPage user={user} onLogout={onLogout} pageId={pageId} />;
 }
@@ -168,10 +181,7 @@ function App() {
           path="/pages/:pageId/create/rh/:workflowKey"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <RunningHubWorkflowPage
-                user={user as User}
-                onLogout={logout}
-              />
+              <RunningHubWorkflowPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />
@@ -180,6 +190,22 @@ function App() {
           element={
             <ProtectedRoute user={user} loading={loading}>
               <PageLibraryRoute user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pages/:pageId/generations"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <GenerationsPage user={user as User} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/generations"
+          element={
+            <ProtectedRoute user={user} loading={loading}>
+              <GenerationsPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />
@@ -215,10 +241,7 @@ function App() {
           path="/create/rh/:workflowKey"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <RunningHubWorkflowPage
-                user={user as User}
-                onLogout={logout}
-              />
+              <RunningHubWorkflowPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />

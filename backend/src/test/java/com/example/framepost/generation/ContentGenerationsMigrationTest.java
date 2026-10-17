@@ -59,7 +59,6 @@ class ContentGenerationsMigrationTest {
                 .singleElement().satisfies(content -> {
                     assertThat(content.toImage().imageCount()).isEqualTo(2);
                     assertThat(content.toImage().parentResultKey()).isEqualTo("parent.png");
-                    assertThat(content.toImage().inputKeys()).containsExactly("first.png", "second.png");
                 });
         assertThat(repository.findByProviderAndProviderMetadataRunningHubTaskId(ContentGeneration.Provider.RUNNINGHUB, "task"))
                 .isPresent();
@@ -74,8 +73,11 @@ class ContentGenerationsMigrationTest {
     @Test
     void providerAdaptersWriteOnlyToSharedCollectionAndKeepScopesSeparate() {
         ContentGenerationRepository repository = new MongoRepositoryFactory(mongo).getRepository(ContentGenerationRepository.class);
-        ImageGenerationRepository images = new ImageGenerationRepository(repository);
-        RunningHubGenerationRepository videos = new RunningHubGenerationRepository(repository, null);
+        ContentGenerationStore store = new ContentGenerationStore(repository,
+                new MongoRepositoryFactory(mongo).getRepository(ContentInputRepository.class),
+                new MongoRepositoryFactory(mongo).getRepository(ContentOutputRepository.class), mongo);
+        ImageGenerationRepository images = new ImageGenerationRepository(repository, store);
+        RunningHubGenerationRepository videos = new RunningHubGenerationRepository(repository, store, null);
         var image = mongo.getConverter().read(com.example.framepost.image.ImageGeneration.class, image("new-image"));
         var video = mongo.getConverter().read(com.example.framepost.runninghub.RunningHubGeneration.class, video("new-video"));
         assertThat(images.save(image)).isEqualTo(image);

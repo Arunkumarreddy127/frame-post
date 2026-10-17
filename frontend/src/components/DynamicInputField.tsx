@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { RunningHubInput } from "../runninghubApi";
+import type { WorkflowInput as RunningHubInput } from "../types";
 
 type DynamicInputFieldProps = {
   input: RunningHubInput;

@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.example.framepost.auth.User;
 import com.example.framepost.auth.UserRepository;
 import com.example.framepost.config.RunningHubProperties;
+import com.example.framepost.generation.GenerationEvents;
 import com.example.framepost.page.PageService;
 import com.example.framepost.runninghub.transform.AspectRatioDimensionsTransform;
 import com.example.framepost.runninghub.transform.InputTransform;
@@ -63,7 +64,7 @@ class RunningHubGenerationServiceTest {
         UserRepository users = mock(UserRepository.class);
         when(users.findById("user-1")).thenReturn(Optional.of(user));
         return new RunningHubGenerationService(repository, pageService, props, client, registry, storage,
-                new RunningHubGenerationEvents(), transforms, users);
+                new GenerationEvents(), transforms, users);
     }
 
     @Test

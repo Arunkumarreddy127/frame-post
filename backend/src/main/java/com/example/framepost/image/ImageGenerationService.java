@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -13,6 +14,7 @@ import java.util.function.Function;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.config.ImageProperties;
+import com.example.framepost.generation.MediaMetadata;
 import com.example.framepost.image.ImageGeneration.ImageResult;
 import com.example.framepost.image.OpenAiImageClient.ImageRequest;
 import com.example.framepost.image.OpenAiImageClient.ImageRequestException;
@@ -142,6 +144,7 @@ public class ImageGenerationService {
         List<String> storedKeys = new ArrayList<>();
         List<String> inputKeys = new ArrayList<>();
         List<ImageResult> results = new ArrayList<>();
+        Map<String, MediaMetadata> metadata = new LinkedHashMap<>();
         Instant now = Instant.now();
         try {
             List<byte[]> generated = client.generate(new ImageRequest(
@@ -155,18 +158,20 @@ public class ImageGenerationService {
                 store(key, input.bytes(), input.contentType());
                 storedKeys.add(key);
                 inputKeys.add(key);
+                metadata.put(key, MediaMetadata.of(input.bytes(), input.contentType()));
             }
             for (int index = 0; index < generated.size(); index++) {
                 String key = outputPrefix + "output-" + (index + 1) + "." + OUTPUT_FORMAT;
                 store(key, generated.get(index), "image/" + OUTPUT_FORMAT);
                 storedKeys.add(key);
                 results.add(new ImageResult(key));
+                metadata.put(key, MediaMetadata.of(generated.get(index), "image/" + OUTPUT_FORMAT));
             }
         } catch (ImageRequestException exception) {
             log.warn("OpenAI image generation failed for model {}", model, exception);
             repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                     inputKeys, List.of(), ImageGenerationStatus.FAILED, exception.getMessage(), now,
-                    parentGenerationId, parentResultKey));
+                    parentGenerationId, parentResultKey, Map.of()));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, exception.getMessage());
         } catch (RuntimeException exception) {
             storedKeys.forEach(this::deleteQuietly);
@@ -176,12 +181,12 @@ public class ImageGenerationService {
             log.error("Storing generated images failed for generation {}", id, exception);
             repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                     List.of(), List.of(), ImageGenerationStatus.FAILED, "Unable to store the generated images", now,
-                    parentGenerationId, parentResultKey));
+                    parentGenerationId, parentResultKey, Map.of()));
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to store the generated images");
         }
         ImageGeneration saved = repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                 inputKeys, results, ImageGenerationStatus.COMPLETED, null, now,
-                parentGenerationId, parentResultKey));
+                parentGenerationId, parentResultKey, metadata));
         return ImageGenerationResponse.from(saved, storage::publicUrl);
     }
 
@@ -198,11 +203,11 @@ public class ImageGenerationService {
             String id, User user, String pageId, String prompt, String model, String size, String quality,
             int count, List<String> inputKeys, List<ImageResult> results,
             ImageGenerationStatus status, String error, Instant createdAt,
-            String parentGenerationId, String parentResultKey
+            String parentGenerationId, String parentResultKey, Map<String, MediaMetadata> metadata
     ) {
         return new ImageGeneration(id, user.id(), pageId, prompt, model, size, quality, count,
                 OUTPUT_FORMAT, BACKGROUND, MODERATION, PARTIAL_IMAGES, inputKeys, results, status, error, createdAt,
-                parentGenerationId, parentResultKey);
+                parentGenerationId, parentResultKey, metadata);
     }
 
     private List<InputImage> readAttachments(List<MultipartFile> files) {
