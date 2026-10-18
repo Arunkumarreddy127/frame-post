@@ -238,6 +238,7 @@ export function RunningHubWorkflowPage({
             <h2>{workflow.label}</h2>
             <section className="image-gen-section">
               <h3>{promptInput ? "Prompt" : "Source"}</h3>
+              {/* GenerationComposer */}
               <div className="image-gen-prompt">
                 {attached.length > 0 && (
                   <ul className="image-gen-attachments">

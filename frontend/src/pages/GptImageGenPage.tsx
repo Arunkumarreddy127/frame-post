@@ -212,6 +212,7 @@ export function GptImageGenPage({
           <h2>Images</h2>
           <section className="image-gen-section">
             <h3>Prompt</h3>
+            {/* GenerationComposer */}
             <div className="image-gen-prompt">
               {parent && (
                 <div className="image-gen-parent">
