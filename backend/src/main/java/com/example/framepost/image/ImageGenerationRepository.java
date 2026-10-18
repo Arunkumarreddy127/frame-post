@@ -36,7 +36,8 @@ public class ImageGenerationRepository {
                     ContentGenerationStore.inputId(generation.id(), slot), generation.id(), generation.userId(),
                     generation.pageId(), slot, index, key, null, MediaMetadata.fileName(key), contentType,
                     MediaMetadata.mediaTypeFor(contentType), metadata.sizeBytes(), metadata.width(),
-                    metadata.height(), metadata.durationSeconds(), generation.createdAt()));
+                    metadata.height(), metadata.durationSeconds(), generation.createdAt(),
+                    ContentInput.isReference(generation.id(), key) ? Boolean.TRUE : null));
         }
         List<ContentOutput> outputs = new ArrayList<>();
         for (int index = 0; index < generation.results().size(); index++) {

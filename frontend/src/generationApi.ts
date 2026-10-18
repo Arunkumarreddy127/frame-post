@@ -89,6 +89,8 @@ export type CreateImageInput = {
   quality: string;
   count: number;
   attachments: File[];
+  /** Library files used by reference instead of being uploaded. */
+  attachmentKeys?: string[];
   parentGenerationId?: string;
   parentResultKey?: string;
 };
@@ -106,6 +108,7 @@ export function createImageGeneration(input: CreateImageInput, pageId?: string) 
     form.append("parentResultKey", input.parentResultKey);
   }
   input.attachments.forEach((file) => form.append("attachments", file));
+  input.attachmentKeys?.forEach((key) => form.append("attachmentKeys", key));
   return request<Generation>(scoped(pageId, "/generations"), {
     method: "POST",
     body: form,
@@ -115,6 +118,8 @@ export function createImageGeneration(input: CreateImageInput, pageId?: string) 
 export type StartWorkflowInput = {
   values: Record<string, string>;
   files: Record<string, File>;
+  /** Library file keys by input name, used by reference instead of an upload. */
+  libraryKeys?: Record<string, string>;
   instanceType: InstanceType;
 };
 
@@ -133,6 +138,9 @@ export function startWorkflowGeneration(
   );
   Object.entries(input.files).forEach(([name, file]) =>
     form.append(name, file),
+  );
+  Object.entries(input.libraryKeys ?? {}).forEach(([name, key]) =>
+    form.append(`libraryKeys.${name}`, key),
   );
   return request<Generation>(scoped(pageId, "/generations"), {
     method: "POST",

@@ -2,6 +2,7 @@ package com.example.framepost.generation;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import jakarta.servlet.http.Cookie;
@@ -42,6 +43,7 @@ import com.example.framepost.storage.StorageKeys;
 @RequestMapping("/api")
 public class GenerationController {
 
+    private static final String LIBRARY_KEY_PREFIX = "libraryKeys.";
     private static final String COOKIE_NAME = "framepost_session";
     private static final Logger log = LoggerFactory.getLogger(GenerationController.class);
 
@@ -151,6 +153,7 @@ public class GenerationController {
             GenerationResponse created = service.createImage(user, pageId, new ImageRequest(
                     fields.get("prompt"), fields.get("model"), fields.get("size"), fields.get("quality"),
                     count(fields.get("count")), request.getFiles("attachments"),
+                    values(request, "attachmentKeys"),
                     fields.get("parentGenerationId"), fields.get("parentResultKey")));
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         }
@@ -161,7 +164,16 @@ public class GenerationController {
             }
             String instanceType = fields.remove("instanceType");
             Map<String, MultipartFile> files = new HashMap<>(request.getFileMap());
-            GenerationResponse started = service.startWorkflow(user, pageId, workflowKey, fields, files, instanceType);
+            Map<String, String> libraryKeys = new LinkedHashMap<>();
+            fields.entrySet().removeIf(field -> {
+                if (!field.getKey().startsWith(LIBRARY_KEY_PREFIX)) {
+                    return false;
+                }
+                libraryKeys.put(field.getKey().substring(LIBRARY_KEY_PREFIX.length()), field.getValue());
+                return true;
+            });
+            GenerationResponse started = service.startWorkflow(
+                    user, pageId, workflowKey, fields, files, libraryKeys, instanceType);
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(started);
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "provider must be openai or runninghub");
@@ -201,6 +213,11 @@ public class GenerationController {
             log.warn("R2 download failed with status {} and error code {}", exception.statusCode(), errorCode);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "File storage request failed");
         }
+    }
+
+    private static List<String> values(HttpServletRequest request, String name) {
+        String[] values = request.getParameterValues(name);
+        return values == null ? List.of() : List.of(values);
     }
 
     private static int count(String value) {

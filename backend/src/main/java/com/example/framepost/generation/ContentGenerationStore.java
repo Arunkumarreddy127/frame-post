@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -132,8 +133,39 @@ public class ContentGenerationStore {
         return mongo.find(build(criteria, cursor, limit), ContentGeneration.class);
     }
 
+    /** Files that belong to a generation; inputs picked from the Library are references and are left out. */
     public List<ContentInput> queryInputs(String userId, String pageId, boolean globalOnly, Cursor cursor, int limit) {
-        return mongo.find(build(scope(userId, pageId, globalOnly), cursor, limit), ContentInput.class);
+        List<Criteria> criteria = scope(userId, pageId, globalOnly);
+        criteria.add(Criteria.where("referenced").ne(true));
+        return mongo.find(build(criteria, cursor, limit), ContentInput.class);
+    }
+
+    /** A Library file the user owns in the given scope: a stored input or output that is not itself a reference. */
+    public Optional<LibraryEntry> findLibraryEntry(String userId, String pageId, boolean globalOnly, String key) {
+        List<Criteria> criteria = scope(userId, pageId, globalOnly);
+        criteria.add(Criteria.where("key").is(key));
+        Query query = new Query(new Criteria().andOperator(criteria.toArray(new Criteria[0]))).limit(1);
+        Query inputQuery = new Query(new Criteria().andOperator(
+                Stream.concat(criteria.stream(), Stream.of(Criteria.where("referenced").ne(true)))
+                        .toArray(Criteria[]::new))).limit(1);
+        ContentOutput output = mongo.findOne(query, ContentOutput.class);
+        if (output != null) {
+            return Optional.of(new LibraryEntry(output.contentType(), output.name(), new MediaMetadata(
+                    output.sizeBytes(), output.width(), output.height(), output.durationSeconds())));
+        }
+        ContentInput input = mongo.findOne(inputQuery, ContentInput.class);
+        return Optional.ofNullable(input).map(row -> new LibraryEntry(row.contentType(), row.name(),
+                new MediaMetadata(row.sizeBytes(), row.width(), row.height(), row.durationSeconds())));
+    }
+
+    public record LibraryEntry(String contentType, String name, MediaMetadata metadata) {
+    }
+
+    /** True when a generation other than {@code generationId} still uses the stored object. */
+    public boolean isKeyUsedElsewhere(String key, String generationId) {
+        Query query = new Query(new Criteria().andOperator(
+                Criteria.where("key").is(key), Criteria.where("generationId").ne(generationId)));
+        return mongo.exists(query, ContentInput.class) || mongo.exists(query, ContentOutput.class);
     }
 
     public List<ContentOutput> queryOutputs(String userId, String pageId, boolean globalOnly, Cursor cursor, int limit) {

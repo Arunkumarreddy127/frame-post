@@ -45,7 +45,8 @@ public class RunningHubGenerationRepository {
                                         generation.userId(), generation.pageId(), file.getKey(), position++, key, null,
                                         MediaMetadata.fileName(key), contentType, MediaMetadata.mediaTypeFor(contentType),
                                         metadata.sizeBytes(), metadata.width(), metadata.height(),
-                                        metadata.durationSeconds(), generation.createdAt()));
+                                        metadata.durationSeconds(), generation.createdAt(),
+                                        ContentInput.isReference(generation.id(), key) ? Boolean.TRUE : null));
                 }
 
                 List<ContentOutput> outputs = new ArrayList<>();

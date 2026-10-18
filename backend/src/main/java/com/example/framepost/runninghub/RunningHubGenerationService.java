@@ -23,6 +23,7 @@ import com.example.framepost.auth.User;
 import com.example.framepost.auth.UserRepository;
 import com.example.framepost.config.RunningHubProperties;
 import com.example.framepost.generation.GenerationEvents;
+import com.example.framepost.generation.LibraryFile;
 import com.example.framepost.generation.MediaMetadata;
 import com.example.framepost.page.PageService;
 import com.example.framepost.runninghub.WorkflowDefinition.InputDefinition;
@@ -111,6 +112,13 @@ public class RunningHubGenerationService {
      */
     public GenerationResponse start(User user, String pageId, String workflowKey,
             Map<String, String> textValues, Map<String, MultipartFile> files, String instanceType) {
+        return start(user, pageId, workflowKey, textValues, files, Map.of(), instanceType);
+    }
+
+    /** Like the upload form, but an input can also name a Library file, which is used by reference. */
+    public GenerationResponse start(User user, String pageId, String workflowKey,
+            Map<String, String> textValues, Map<String, MultipartFile> files,
+            Map<String, LibraryFile> libraryFiles, String instanceType) {
         validateScope(user, pageId);
         WorkflowDefinition definition = definition(workflowKey);
         String workflowId = registry.workflowId(definition).orElseThrow(() ->
@@ -129,10 +137,20 @@ public class RunningHubGenerationService {
 
         Map<String, String> values = new LinkedHashMap<>();
         Map<String, FileUpload> uploads = new LinkedHashMap<>();
+        Map<String, LibraryFile> references = new LinkedHashMap<>();
         Set<String> usedFileNames = new HashSet<>();
         for (InputDefinition input : definition.inputs()) {
             if (FILE_TYPES.contains(input.type())) {
                 MultipartFile file = files.get(input.name());
+                LibraryFile library = libraryFiles.get(input.name());
+                if (file != null && !file.isEmpty() && library != null) {
+                    throw badRequest(input.label() + " takes either an upload or a Library file");
+                }
+                if (library != null) {
+                    uploads.put(input.name(), readLibraryFile(input, library));
+                    references.put(input.name(), library);
+                    continue;
+                }
                 if (file == null || file.isEmpty()) {
                     requireUnlessOptional(input);
                     continue;
@@ -168,6 +186,12 @@ public class RunningHubGenerationService {
         Map<String, String> inputKeys = new LinkedHashMap<>();
         Map<String, MediaMetadata> metadata = new LinkedHashMap<>();
         for (Map.Entry<String, FileUpload> upload : uploads.entrySet()) {
+            LibraryFile reference = references.get(upload.getKey());
+            if (reference != null) {
+                inputKeys.put(upload.getKey(), reference.key());
+                metadata.put(reference.key(), reference.metadata());
+                continue;
+            }
             String key = StorageKeys.inputPrefix(user, id) + upload.getValue().filename();
             store(key, upload.getValue().bytes(), upload.getValue().contentType());
             inputKeys.put(upload.getKey(), key);
@@ -388,6 +412,17 @@ public class RunningHubGenerationService {
         String extension = EXTENSIONS.getOrDefault(contentType, "bin");
         String name = StorageKeys.fileName(file.getOriginalFilename(), extension, input.name(), usedNames);
         return new FileUpload(input.type(), name, contentType, bytes);
+    }
+
+    private FileUpload readLibraryFile(InputDefinition input, LibraryFile file) {
+        if (input.accept() == null || !input.accept().contains(file.contentType())) {
+            throw badRequest(input.label() + " must be one of: " + String.join(", ", input.accept()));
+        }
+        long maxBytes = input.maxBytes() == null ? DEFAULT_MAX_FILE_BYTES : input.maxBytes();
+        if (file.bytes().length > maxBytes) {
+            throw badRequest(input.label() + " must be " + maxBytes / (1024 * 1024) + " MB or smaller");
+        }
+        return new FileUpload(input.type(), file.name(), file.contentType(), file.bytes());
     }
 
     private void validateText(InputDefinition input, String value) {

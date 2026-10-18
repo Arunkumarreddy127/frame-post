@@ -46,10 +46,13 @@ public class ContentGenerationIndexes implements ApplicationRunner {
         inputIndexes.ensureIndex(new Index().on("userId", Direction.ASC).on("pageId", Direction.ASC)
                 .on("createdAt", Direction.DESC).named("content_input_scope_created"));
 
+        inputIndexes.ensureIndex(new Index().on("key", Direction.ASC).named("content_input_key"));
+
         var outputIndexes = mongo.indexOps(ContentOutput.class);
         outputIndexes.ensureIndex(new Index().on("generationId", Direction.ASC).on("position", Direction.ASC)
                 .named("content_output_generation_position"));
         outputIndexes.ensureIndex(new Index().on("userId", Direction.ASC).on("pageId", Direction.ASC)
                 .on("createdAt", Direction.DESC).named("content_output_scope_created"));
+        outputIndexes.ensureIndex(new Index().on("key", Direction.ASC).named("content_output_key"));
     }
 }

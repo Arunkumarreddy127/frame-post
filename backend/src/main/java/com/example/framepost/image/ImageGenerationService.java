@@ -14,6 +14,7 @@ import java.util.function.Function;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.config.ImageProperties;
+import com.example.framepost.generation.LibraryFile;
 import com.example.framepost.generation.MediaMetadata;
 import com.example.framepost.image.ImageGeneration.ImageResult;
 import com.example.framepost.image.OpenAiImageClient.ImageRequest;
@@ -111,6 +112,23 @@ public class ImageGenerationService {
             String parentGenerationId,
             String parentResultKey
     ) {
+        return generate(user, pageId, prompt, model, size, quality, count, attachments, List.of(),
+                parentGenerationId, parentResultKey);
+    }
+
+    public ImageGenerationResponse generate(
+            User user,
+            String pageId,
+            String prompt,
+            String model,
+            String size,
+            String quality,
+            int count,
+            List<MultipartFile> attachments,
+            List<LibraryFile> libraryFiles,
+            String parentGenerationId,
+            String parentResultKey
+    ) {
         validateScope(user, pageId);
         validateParent(user, pageId, parentGenerationId, parentResultKey);
         String cleanPrompt = prompt == null ? "" : prompt.trim();
@@ -132,10 +150,12 @@ public class ImageGenerationService {
         List<MultipartFile> files = attachments == null
                 ? List.of()
                 : attachments.stream().filter(file -> !file.isEmpty()).toList();
-        if (files.size() > MAX_ATTACHMENTS) {
+        List<LibraryFile> library = libraryFiles == null ? List.of() : libraryFiles;
+        if (files.size() + library.size() > MAX_ATTACHMENTS) {
             throw badRequest("Attach up to " + MAX_ATTACHMENTS + " images");
         }
         List<InputImage> inputs = readAttachments(files);
+        library.forEach(file -> inputs.add(readLibraryFile(file, inputs.size())));
 
         String id = UUID.randomUUID().toString();
         String inputPrefix = StorageKeys.inputPrefix(user, id);
@@ -150,7 +170,7 @@ public class ImageGenerationService {
             List<byte[]> generated = client.generate(new ImageRequest(
                     model, cleanPrompt, count, size, "auto".equals(quality) ? null : quality,
                     OUTPUT_FORMAT, BACKGROUND, MODERATION), inputs);
-            for (int index = 0; index < inputs.size(); index++) {
+            for (int index = 0; index < files.size(); index++) {
                 InputImage input = inputs.get(index);
                 String name = StorageKeys.fileName(files.get(index).getOriginalFilename(),
                         ATTACHMENT_TYPES.get(input.contentType()), "input-" + (index + 1), inputNames);
@@ -159,6 +179,10 @@ public class ImageGenerationService {
                 storedKeys.add(key);
                 inputKeys.add(key);
                 metadata.put(key, MediaMetadata.of(input.bytes(), input.contentType()));
+            }
+            for (LibraryFile file : library) {
+                inputKeys.add(file.key());
+                metadata.put(file.key(), file.metadata());
             }
             for (int index = 0; index < generated.size(); index++) {
                 String key = outputPrefix + "output-" + (index + 1) + "." + OUTPUT_FORMAT;
@@ -228,6 +252,17 @@ public class ImageGenerationService {
             }
         }
         return inputs;
+    }
+
+    private InputImage readLibraryFile(LibraryFile file, int index) {
+        String extension = ATTACHMENT_TYPES.get(file.contentType());
+        if (extension == null) {
+            throw badRequest("Library files must be PNG, JPEG, or WebP images");
+        }
+        if (file.bytes().length > MAX_ATTACHMENT_BYTES) {
+            throw badRequest("Each attachment must be 20 MB or smaller");
+        }
+        return new InputImage("image-" + (index + 1) + "." + extension, file.contentType(), file.bytes());
     }
 
     private void store(String key, byte[] bytes, String contentType) {

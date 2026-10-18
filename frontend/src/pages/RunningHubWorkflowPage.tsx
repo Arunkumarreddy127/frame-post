@@ -1,13 +1,22 @@
-import { ArrowLeft, ArrowUp, ChevronDown, Paperclip, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  ChevronDown,
+  FolderOpen,
+  Paperclip,
+  X,
+} from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { initialValueFor } from "../components/DynamicInputField";
+import { LibraryPicker } from "../components/library/LibraryPicker";
 import { GenerationFeed } from "../components/generations/GenerationFeed";
 import { getCatalog, startWorkflowGeneration } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
 import type {
   InstanceType,
+  MediaItem,
   ShellRouteProps,
   Workflow,
   WorkflowInput,
@@ -67,6 +76,10 @@ export function RunningHubWorkflowPage({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, File | null>>({});
+  const [libraryFiles, setLibraryFiles] = useState<
+    Record<string, MediaItem | null>
+  >({});
+  const [pickerFor, setPickerFor] = useState<WorkflowInput | null>(null);
   const [instanceType, setInstanceType] = useState<InstanceType>("default");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +112,7 @@ export function RunningHubWorkflowPage({
             ),
           );
           setFiles({});
+          setLibraryFiles({});
         }
       })
       .catch((caught: Error) => setLoadError(caught.message));
@@ -111,13 +125,21 @@ export function RunningHubWorkflowPage({
     workflow?.inputs.filter(
       (input) => !isFileInput(input) && input !== promptInput,
     ) ?? [];
-  const attached = fileInputs.filter((input) => files[input.name]);
+  const attached = fileInputs.filter(
+    (input) => files[input.name] || libraryFiles[input.name],
+  );
 
   function setFile(input: WorkflowInput, file: File | null) {
     setFiles((current) => ({ ...current, [input.name]: file }));
+    if (file) setLibraryFiles((current) => ({ ...current, [input.name]: null }));
     if (!file && fileRefs.current[input.name]) {
       fileRefs.current[input.name]!.value = "";
     }
+  }
+
+  function setLibraryFile(input: WorkflowInput, item: MediaItem | null) {
+    setLibraryFiles((current) => ({ ...current, [input.name]: item }));
+    if (item) setFile(input, null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -128,7 +150,9 @@ export function RunningHubWorkflowPage({
     }
     const missing = workflow.inputs.find((input) => {
       if (!input.required) return false;
-      if (isFileInput(input)) return !files[input.name];
+      if (isFileInput(input)) {
+        return !files[input.name] && !libraryFiles[input.name];
+      }
       return !(values[input.name] ?? "").trim();
     });
     if (missing) {
@@ -138,10 +162,13 @@ export function RunningHubWorkflowPage({
 
     const cleanValues: Record<string, string> = {};
     const cleanFiles: Record<string, File> = {};
+    const libraryKeys: Record<string, string> = {};
     for (const input of workflow.inputs) {
       if (isFileInput(input)) {
         const file = files[input.name];
+        const library = libraryFiles[input.name];
         if (file) cleanFiles[input.name] = file;
+        else if (library) libraryKeys[input.name] = library.key;
       } else if ((values[input.name] ?? "").trim() !== "") {
         cleanValues[input.name] = values[input.name].trim();
       }
@@ -156,11 +183,15 @@ export function RunningHubWorkflowPage({
         {
           values: cleanValues,
           files: cleanFiles,
+          libraryKeys,
           instanceType,
         },
       );
       prepend(created);
-      fileInputs.forEach((input) => setFile(input, null));
+      fileInputs.forEach((input) => {
+        setFile(input, null);
+        setLibraryFile(input, null);
+      });
       if (promptInput) {
         setValues((current) => ({ ...current, [promptInput.name]: "" }));
       }
@@ -244,14 +275,34 @@ export function RunningHubWorkflowPage({
                   <ul className="image-gen-attachments">
                     {attached.map((input) => (
                       <li key={input.name}>
-                        <AttachmentThumb
-                          file={files[input.name]!}
-                          kind={input.type as "image" | "video"}
-                        />
+                        {files[input.name] ? (
+                          <AttachmentThumb
+                            file={files[input.name]!}
+                            kind={input.type as "image" | "video"}
+                          />
+                        ) : input.type === "video" ? (
+                          <video
+                            src={libraryFiles[input.name]!.url}
+                            muted
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img
+                            src={libraryFiles[input.name]!.url}
+                            alt={libraryFiles[input.name]!.name}
+                            title="From Library"
+                          />
+                        )}
                         <button
                           type="button"
-                          aria-label={`Remove ${files[input.name]!.name}`}
-                          onClick={() => setFile(input, null)}
+                          aria-label={`Remove ${
+                            files[input.name]?.name ??
+                            libraryFiles[input.name]!.name
+                          }`}
+                          onClick={() => {
+                            setFile(input, null);
+                            setLibraryFile(input, null);
+                          }}
                         >
                           <X size={12} aria-hidden="true" />
                         </button>
@@ -301,6 +352,16 @@ export function RunningHubWorkflowPage({
                         onClick={() => fileRefs.current[input.name]?.click()}
                       >
                         <Paperclip size={16} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        aria-label={`Choose ${input.label} from Library`}
+                        title="Choose from Library"
+                        disabled={submitting}
+                        onClick={() => setPickerFor(input)}
+                      >
+                        <FolderOpen size={16} aria-hidden="true" />
                       </button>
                     </span>
                   ))}
@@ -365,6 +426,18 @@ export function RunningHubWorkflowPage({
           ) : null}
         </div>
       ) : null}
+      {pickerFor && (
+        <LibraryPicker
+          pageId={activePageId}
+          accept={pickerFor.accept ?? []}
+          limit={1}
+          onClose={() => setPickerFor(null)}
+          onSelect={([item]) => {
+            setLibraryFile(pickerFor, item);
+            setPickerFor(null);
+          }}
+        />
+      )}
     </AppShell>
   );
 }

@@ -1,5 +1,6 @@
 package com.example.framepost.generation;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,14 +35,17 @@ public class GenerationService {
     private final StorageService storage;
     private final ImageGenerationService imageService;
     private final RunningHubGenerationService runningHubService;
+    private final LibraryFileResolver libraryFiles;
 
     public GenerationService(
             ContentGenerationStore store,
             PageService pageService,
             StorageService storage,
             ImageGenerationService imageService,
-            RunningHubGenerationService runningHubService
+            RunningHubGenerationService runningHubService,
+            LibraryFileResolver libraryFiles
     ) {
+        this.libraryFiles = libraryFiles;
         this.store = store;
         this.pageService = pageService;
         this.storage = storage;
@@ -54,7 +58,8 @@ public class GenerationService {
 
     public record ImageRequest(
             String prompt, String model, String size, String quality, int count,
-            List<MultipartFile> attachments, String parentGenerationId, String parentResultKey
+            List<MultipartFile> attachments, List<String> attachmentKeys,
+            String parentGenerationId, String parentResultKey
     ) {
     }
 
@@ -88,25 +93,31 @@ public class GenerationService {
     public void delete(User user, String pageId, String id) {
         Hydrated hydrated = load(user, pageId, id);
         store.delete(id);
-        hydrated.inputs().forEach(file -> deleteQuietly(file.key()));
-        hydrated.outputs().forEach(file -> deleteQuietly(file.key()));
+        // Library files can be shared with other generations, so an object goes only with its last user.
+        hydrated.inputs().stream().map(ContentInput::key).filter(key -> !store.isKeyUsedElsewhere(key, id))
+                .forEach(this::deleteQuietly);
+        hydrated.outputs().stream().map(ContentOutput::key).filter(key -> !store.isKeyUsedElsewhere(key, id))
+                .forEach(this::deleteQuietly);
     }
 
     public GenerationResponse createImage(User user, String pageId, ImageRequest request) {
+        List<LibraryFile> library = libraryFiles.resolve(user, pageId, request.attachmentKeys());
         String id = imageService.generate(user, pageId, request.prompt(), request.model(), request.size(),
-                request.quality(), request.count(), request.attachments(), request.parentGenerationId(),
+                request.quality(), request.count(), request.attachments(), library, request.parentGenerationId(),
                 request.parentResultKey()).id();
         return get(user, pageId, id);
     }
 
     public GenerationResponse startWorkflow(
             User user, String pageId, String workflowKey, Map<String, String> textValues,
-            Map<String, MultipartFile> files, String instanceType
+            Map<String, MultipartFile> files, Map<String, String> libraryKeys, String instanceType
     ) {
         if (pageId == null) {
             throw badRequest("Workflows run inside a page");
         }
-        String id = runningHubService.start(user, pageId, workflowKey, textValues, files, instanceType).id();
+        Map<String, LibraryFile> library = new LinkedHashMap<>();
+        libraryKeys.forEach((input, key) -> library.put(input, libraryFiles.resolve(user, pageId, key)));
+        String id = runningHubService.start(user, pageId, workflowKey, textValues, files, library, instanceType).id();
         return get(user, pageId, id);
     }
 

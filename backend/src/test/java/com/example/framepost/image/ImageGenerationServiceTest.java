@@ -68,6 +68,26 @@ class ImageGenerationServiceTest {
     }
 
     @Test
+    void usesLibraryFilesByReferenceWithoutStoringThem() {
+        when(client.generate(any(), any())).thenReturn(List.of(new byte[] {1}));
+        when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
+        String key = "outputs/name-user-1/old/output-1.png";
+        var file = new com.example.framepost.generation.LibraryFile(key, "output-1.png", "image/png",
+                new byte[] {7, 7, 7}, new com.example.framepost.generation.MediaMetadata(3L, 1, 1, null));
+
+        service.generate(user, null, "a cat", "gpt-image-2.5-flare", "auto", "auto", 1, null, List.of(file),
+                null, null);
+
+        ArgumentCaptor<List<OpenAiImageClient.InputImage>> inputs = ArgumentCaptor.forClass(List.class);
+        verify(client).generate(any(), inputs.capture());
+        assertEquals(3, inputs.getValue().get(0).bytes().length);
+        ArgumentCaptor<ImageGeneration> saved = ArgumentCaptor.forClass(ImageGeneration.class);
+        verify(repository).save(saved.capture());
+        assertEquals(List.of(key), saved.getValue().inputKeys());
+        verify(storage, org.mockito.Mockito.never()).store(eq(key), any(), anyLong(), any());
+    }
+
+    @Test
     void tagsParentGenerationAndResult() {
         var parent = new ImageGeneration("p1", "user-1", null, "old", "gpt-image-2.5-flare", "auto", "auto", 1,
                 "png", "auto", "auto", "none", List.of(), List.of(new ImageGeneration.ImageResult("k/1.png")),

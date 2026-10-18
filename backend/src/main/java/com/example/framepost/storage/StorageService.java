@@ -8,6 +8,8 @@ public interface StorageService {
 
     void copy(String sourceKey, String targetKey);
 
+    byte[] read(String key);
+
     void delete(String key);
 
     String publicUrl(String key);

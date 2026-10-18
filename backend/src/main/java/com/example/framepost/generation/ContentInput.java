@@ -22,6 +22,12 @@ public record ContentInput(
         Integer width,
         Integer height,
         Long durationSeconds,
-        Instant createdAt
+        Instant createdAt,
+        Boolean referenced
 ) {
+
+    /** True when the file was stored by another generation, i.e. the key is not under this generation's folder. */
+    public static boolean isReference(String generationId, String key) {
+        return !key.contains("/" + generationId + "/");
+    }
 }

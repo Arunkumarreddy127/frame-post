@@ -2,12 +2,14 @@ import {
   ArrowLeft,
   ArrowUp,
   ChevronDown,
+  FolderOpen,
   Paperclip,
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { LibraryPicker } from "../components/library/LibraryPicker";
 import { GenerationFeed } from "../components/generations/GenerationFeed";
 import {
   createImageGeneration,
@@ -58,6 +60,9 @@ export function GptImageGenPage({
   const [quality, setQuality] = useState("auto");
   const [count, setCount] = useState(1);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [libraryItems, setLibraryItems] = useState<MediaItem[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const attachmentCount = attachments.length + libraryItems.length;
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const {
@@ -115,7 +120,10 @@ export function GptImageGenPage({
     const selected = Array.from(files);
     if (fileInput.current) fileInput.current.value = "";
     setAttachments((current) =>
-      [...current, ...selected].slice(0, MAX_ATTACHMENTS),
+      [...current, ...selected].slice(
+        0,
+        Math.max(0, MAX_ATTACHMENTS - libraryItems.length),
+      ),
     );
   }
 
@@ -149,6 +157,7 @@ export function GptImageGenPage({
           });
         }),
       );
+      setLibraryItems([]);
       setAttachments(files.slice(0, MAX_ATTACHMENTS));
     } catch {
       setError(
@@ -167,6 +176,7 @@ export function GptImageGenPage({
       quality,
       count,
       attachments,
+      attachmentKeys: libraryItems.map((item) => item.key),
       parentGenerationId: parent?.generationId,
       parentResultKey: parent?.resultKey,
     };
@@ -176,6 +186,7 @@ export function GptImageGenPage({
     setQuality("auto");
     setCount(1);
     setAttachments([]);
+    setLibraryItems([]);
     setParent(null);
     if (fileInput.current) fileInput.current.value = "";
     setGenerating(true);
@@ -227,8 +238,28 @@ export function GptImageGenPage({
                   </button>
                 </div>
               )}
-              {attachments.length > 0 && (
+              {attachmentCount > 0 && (
                 <ul className="image-gen-attachments">
+                  {libraryItems.map((item) => (
+                    <li key={item.key}>
+                      <img
+                        src={item.url}
+                        alt={item.name}
+                        title="From Library"
+                      />
+                      <button
+                        type="button"
+                        aria-label={`Remove ${item.name}`}
+                        onClick={() =>
+                          setLibraryItems((current) =>
+                            current.filter((entry) => entry.key !== item.key),
+                          )
+                        }
+                      >
+                        <X size={12} aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
                   {attachments.map((file, index) => (
                     <li key={`${file.name}-${index}`}>
                       <img
@@ -279,10 +310,20 @@ export function GptImageGenPage({
                   type="button"
                   className="secondary-button"
                   aria-label="Attach images"
-                  disabled={attachments.length >= MAX_ATTACHMENTS}
+                  disabled={attachmentCount >= MAX_ATTACHMENTS}
                   onClick={() => fileInput.current?.click()}
                 >
                   <Paperclip size={16} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  aria-label="Choose images from Library"
+                  title="Choose from Library"
+                  disabled={attachmentCount >= MAX_ATTACHMENTS}
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <FolderOpen size={16} aria-hidden="true" />
                 </button>
                 <div style={{ flex: 1 }} />
                 <label className="image-gen-control">
@@ -405,6 +446,23 @@ export function GptImageGenPage({
           onEdit={startEdit}
         />
       </div>
+      {pickerOpen && (
+        <LibraryPicker
+          pageId={activePageId}
+          accept={["image/png", "image/jpeg", "image/webp"]}
+          limit={MAX_ATTACHMENTS - attachmentCount}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(items) => {
+            setLibraryItems((current) => [
+              ...current,
+              ...items.filter(
+                (item) => !current.some((entry) => entry.key === item.key),
+              ),
+            ]);
+            setPickerOpen(false);
+          }}
+        />
+      )}
       {fullView && (
         <div
           className="image-gen-fullview-layer"
