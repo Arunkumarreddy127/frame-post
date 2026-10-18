@@ -25,11 +25,13 @@ import org.springframework.mock.env.MockEnvironment;
 class WorkflowRegistryTest {
 
     private static final String MINIMAX = "minimax-h3-ff-image-to-video";
+    private static final String MINIMAX_REFERENCE = "minimax-h3-single-image-reference";
     private static final String SEEDVR2 = "seedvr2-video-upscale";
 
     /** Export file for each definition key, relative to the backend module directory. */
     private static final Map<String, String> EXPORTS = Map.of(
             MINIMAX, "../resources/Minimax H3 - FF Image to Video_api.json",
+            MINIMAX_REFERENCE, "../resources/Minimax H3 Single Image Reference_api.json",
             SEEDVR2, "../resources/SeedVR2 - Video Upscale_api.json");
 
     private final List<InputTransform> transforms = List.of(
@@ -40,8 +42,9 @@ class WorkflowRegistryTest {
         WorkflowRegistry registry = new WorkflowRegistry(transforms, new MockEnvironment());
 
         assertTrue(registry.find(MINIMAX).isPresent());
+        assertTrue(registry.find(MINIMAX_REFERENCE).isPresent());
         assertTrue(registry.find(SEEDVR2).isPresent());
-        assertEquals(2, registry.all().size());
+        assertEquals(3, registry.all().size());
     }
 
     @Test

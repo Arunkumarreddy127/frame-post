@@ -17,11 +17,12 @@ Copy `.env.example` to `.env` and replace the R2 placeholders when needed. The d
 
 To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The default `OPENAI_ALLOWED_MODELS` allowlist contains `gpt-6-luna`, `gpt-6.1-sol`, and `gpt-6-astra`; adjust it only when different models are available to the configured key.
 
-RunningHub workflows are defined in `backend/src/main/resources/runninghub/workflows/*.json`. Each file describes one workflow: its inputs, the RunningHub node and field each input is written to, any derived-value transforms, and the output type. The app loads and validates all definitions at startup and renders one page per workflow at `/create/rh/{workflowKey}` (or `/pages/{pageId}/create/rh/{workflowKey}`). The current workflows are `minimax-h3-ff-image-to-video` and `seedvr2-video-upscale`.
+RunningHub workflows are defined in `backend/src/main/resources/runninghub/workflows/*.json`. Each file describes one workflow: its inputs, the RunningHub node and field each input is written to, any derived-value transforms, and the output type. The app loads and validates all definitions at startup and renders one page per workflow at `/create/rh/{workflowKey}` (or `/pages/{pageId}/create/rh/{workflowKey}`). The current workflows are `minimax-h3-ff-image-to-video`, `minimax-h3-single-image-reference`, and `seedvr2-video-upscale`.
 
 Workflow IDs are never stored in the definitions. Each definition names the env var that holds its ID in `workflowIdEnv`. Set `RUNNINGHUB_API_KEY` plus one ID per workflow in `.env`:
 
 - `RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF`
+- `RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_SINGLE_IMAGE_REFERENCE`
 - `RUNNINGHUB_WORKFLOW_ID_SEEDVR2`
 
 The workflow must already be saved on RunningHub. A workflow whose ID is missing is listed as not configured and its page reports it. Node IDs and field names are no longer read from env vars. **Breaking change:** the old `RUNNINGHUB_*_NODE_ID` and `RUNNINGHUB_*_FIELD_NAME` variables are ignored. Remove them from `.env`.
