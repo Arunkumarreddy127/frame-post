@@ -7,21 +7,26 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.List;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.config.OpenAiProperties;
 import com.example.framepost.instruction.InstructionFile;
 import com.example.framepost.instruction.InstructionFileService;
+import com.example.framepost.generation.LibraryFileResolver;
 import com.example.framepost.page.Page;
 import com.example.framepost.page.PageRepository;
 import com.example.framepost.page.PageService;
+import com.example.framepost.storage.StorageService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 class ChatServiceTest {
@@ -32,6 +37,8 @@ class ChatServiceTest {
     private final PageRepository pages = Mockito.mock(PageRepository.class);
     private final OpenAiClient openAiClient = Mockito.mock(OpenAiClient.class);
     private final InstructionFileService instructionService = Mockito.mock(InstructionFileService.class);
+        private final StorageService storage = Mockito.mock(StorageService.class);
+        private final LibraryFileResolver libraryFiles = Mockito.mock(LibraryFileResolver.class);
     private final ChatService service = new ChatService(
             conversations,
             messages,
@@ -39,7 +46,9 @@ class ChatServiceTest {
             pages,
             new OpenAiProperties("test-key", List.of("gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"), 120),
             openAiClient,
-            instructionService
+            instructionService,
+            storage,
+            libraryFiles
     );
     private final User user = new User("user-id", "framepost", "hash", Instant.now());
 
@@ -83,6 +92,46 @@ class ChatServiceTest {
         assertEquals(400, exception.getStatusCode().value());
         verifyNoInteractions(conversations, messages, pageService, pages, openAiClient, instructionService);
     }
+
+        @Test
+        void rejectsNonImageUploadsBeforeCallingOpenAiOrStorage() {
+                Instant now = Instant.now();
+                ChatConversation conversation = new ChatConversation(
+                        "conversation-id", user.id(), null, "Chat", "gpt-6-luna", now, now);
+                when(conversations.findByIdAndUserIdAndPageIdIsNull(conversation.id(), user.id()))
+                        .thenReturn(Optional.of(conversation));
+                MockMultipartFile upload = new MockMultipartFile("attachments", "notes.txt", "text/plain", "not image".getBytes());
+
+                ResponseStatusException exception = assertThrows(
+                                ResponseStatusException.class,
+                                () -> service.streamMessage(user, null, "conversation-id",
+                                                new ChatService.SendMessageRequest("look", "gpt-6-luna"), List.of(upload), List.of())
+                );
+
+                assertEquals(400, exception.getStatusCode().value());
+                verify(storage, never()).store(any(), any(), org.mockito.ArgumentMatchers.anyLong(), any());
+                verifyNoInteractions(openAiClient);
+        }
+
+            @Test
+            void deletesStoredAttachmentsWhenConversationIsDeleted() {
+                Instant now = Instant.now();
+                ChatConversation conversation = new ChatConversation(
+                        "conversation-id", user.id(), null, "Chat", "gpt-6-luna", now, now);
+                ChatMessage userMessage = new ChatMessage(
+                        "message-id", conversation.id(), ChatRole.USER, "look", null,
+                        ChatMessageStatus.COMPLETED, now,
+                        List.of(new ChatAttachment("image.png", "image/png", 3, "chats/framepost-user-id/key.png")));
+                when(conversations.findByIdAndUserIdAndPageIdIsNull(conversation.id(), user.id()))
+                        .thenReturn(Optional.of(conversation));
+                when(messages.findByConversationIdOrderByCreatedAtAsc(conversation.id())).thenReturn(List.of(userMessage));
+
+                service.delete(user, null, conversation.id());
+
+                verify(storage).delete("chats/framepost-user-id/key.png");
+                verify(messages).deleteByConversationId(conversation.id());
+                verify(conversations).delete(conversation);
+            }
 
     @Test
     void listsGlobalAndPageConversationsForTheCurrentUser() {

@@ -16,6 +16,8 @@ import com.example.framepost.chat.ChatService.UpdateConversationTitleRequest;
 import com.example.framepost.chat.ChatService.UpdateInstructionsRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api")
@@ -139,13 +142,38 @@ public class ChatController {
         chatService.delete(currentUser(request), null, conversationId);
     }
 
-    @PostMapping(value = "/chats/{conversationId}/messages/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamGlobal(
+        @PostMapping(value = "/chats/{conversationId}/messages/stream", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        public SseEmitter streamGlobalJson(
             @PathVariable String conversationId,
             @RequestBody SendMessageRequest request,
             HttpServletRequest servletRequest
+        ) {
+        return chatService.streamMessage(currentUser(servletRequest), null, conversationId, request, List.of(), List.of());
+        }
+
+        @PostMapping(value = "/chats/{conversationId}/messages/stream", consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamGlobal(
+            @PathVariable String conversationId,
+            @RequestParam(required = false) String content,
+            @RequestParam String model,
+            @RequestParam(required = false) List<String> attachmentKeys,
+            @RequestParam(required = false) List<MultipartFile> attachments,
+            HttpServletRequest servletRequest
     ) {
-        return chatService.streamMessage(currentUser(servletRequest), null, conversationId, request);
+        return chatService.streamMessage(currentUser(servletRequest), null, conversationId,
+                new SendMessageRequest(content, model), attachments, attachmentKeys);
+    }
+
+    @GetMapping("/chats/{conversationId}/attachments/{messageId}/{index}")
+    public ResponseEntity<byte[]> globalAttachment(
+            @PathVariable String conversationId,
+            @PathVariable String messageId,
+            @PathVariable int index,
+            HttpServletRequest request
+    ) {
+        return chatService.attachment(currentUser(request), null, conversationId, messageId, index);
     }
 
     @GetMapping("/pages/{pageId}/chats")
@@ -195,17 +223,41 @@ public class ChatController {
         chatService.delete(currentUser(request), pageId, conversationId);
     }
 
-    @PostMapping(
-            value = "/pages/{pageId}/chats/{conversationId}/messages/stream",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE
-    )
-    public SseEmitter streamForPage(
+        @PostMapping(value = "/pages/{pageId}/chats/{conversationId}/messages/stream",
+            consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+        public SseEmitter streamForPageJson(
             @PathVariable String pageId,
             @PathVariable String conversationId,
             @RequestBody SendMessageRequest request,
             HttpServletRequest servletRequest
+        ) {
+        return chatService.streamMessage(currentUser(servletRequest), pageId, conversationId, request, List.of(), List.of());
+        }
+
+        @PostMapping(value = "/pages/{pageId}/chats/{conversationId}/messages/stream",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamForPage(
+            @PathVariable String pageId,
+            @PathVariable String conversationId,
+            @RequestParam(required = false) String content,
+            @RequestParam String model,
+            @RequestParam(required = false) List<String> attachmentKeys,
+            @RequestParam(required = false) List<MultipartFile> attachments,
+            HttpServletRequest servletRequest
     ) {
-        return chatService.streamMessage(currentUser(servletRequest), pageId, conversationId, request);
+        return chatService.streamMessage(currentUser(servletRequest), pageId, conversationId,
+                new SendMessageRequest(content, model), attachments, attachmentKeys);
+    }
+
+    @GetMapping("/pages/{pageId}/chats/{conversationId}/attachments/{messageId}/{index}")
+    public ResponseEntity<byte[]> pageAttachment(
+            @PathVariable String pageId,
+            @PathVariable String conversationId,
+            @PathVariable String messageId,
+            @PathVariable int index,
+            HttpServletRequest request
+    ) {
+        return chatService.attachment(currentUser(request), pageId, conversationId, messageId, index);
     }
 
     private User currentUser(HttpServletRequest request) {

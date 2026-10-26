@@ -1187,6 +1187,73 @@ textarea {
   white-space: pre-wrap;
 }
 
+.chat-message-attachments,
+.chat-attachment-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chat-message-attachments img,
+.chat-attachment-preview img {
+  display: block;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 0.35rem;
+  object-fit: cover;
+}
+
+.chat-attachment-preview {
+  position: relative;
+}
+
+.chat-attachment-remove {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(31 35 40 / 78%);
+  color: #fff;
+}
+
+.chat-attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.chat-attachment-button {
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #57606a;
+}
+
+.chat-attachment-button:hover:not(:disabled) {
+  background: #f6f8fa;
+  color: #1f6feb;
+}
+
+.chat-attachment-button:disabled {
+  color: #c4cbd3;
+}
+
+.chat-attachment-count {
+  color: #57606a;
+  font-size: 0.72rem;
+}
+
 .chat-composer {
   display: grid;
   grid-template-rows: minmax(3.5rem, 1fr) auto;
@@ -1197,6 +1264,10 @@ textarea {
   border-radius: 0.75rem;
   background: #fff;
   box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+.chat-composer.has-attachments {
+  grid-template-rows: auto minmax(3.5rem, 1fr) auto;
 }
 
 .chat-composer textarea {

@@ -23,6 +23,13 @@ export type ShellRouteProps = {
 export type ChatRole = "user" | "assistant";
 export type ChatMessageStatus = "completed" | "failed";
 
+export type ChatMessageAttachment = {
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  index: number;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
@@ -30,6 +37,7 @@ export type ChatMessage = {
   model: string | null;
   status: ChatMessageStatus;
   createdAt: string;
+  attachments: ChatMessageAttachment[];
 };
 
 export type ChatConversationSummary = {

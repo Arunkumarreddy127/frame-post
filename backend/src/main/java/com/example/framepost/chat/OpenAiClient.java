@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Iterator;
 import java.util.stream.Stream;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.example.framepost.storage.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -36,19 +38,29 @@ public class OpenAiClient {
     private final ObjectMapper objectMapper;
     private final OpenAiProperties properties;
     private final URI responsesUri;
+    private final StorageService storage;
+
+    public OpenAiClient(OpenAiProperties properties) {
+        this(properties, DEFAULT_RESPONSES_URI, null);
+    }
 
     @Autowired
-    public OpenAiClient(OpenAiProperties properties) {
-        this(properties, DEFAULT_RESPONSES_URI);
+    public OpenAiClient(OpenAiProperties properties, StorageService storage) {
+        this(properties, DEFAULT_RESPONSES_URI, storage);
     }
 
     OpenAiClient(OpenAiProperties properties, URI responsesUri) {
+        this(properties, responsesUri, null);
+    }
+
+    OpenAiClient(OpenAiProperties properties, URI responsesUri, StorageService storage) {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(20))
                 .build();
         this.objectMapper = new ObjectMapper();
         this.properties = properties;
         this.responsesUri = responsesUri;
+        this.storage = storage;
     }
 
     public void streamResponse(
@@ -115,9 +127,24 @@ public class OpenAiClient {
                     .put("role", "developer")
                     .put("content", developerInstructions);
             for (ChatMessage message : messages) {
-                input.addObject()
-                        .put("role", message.role() == ChatRole.USER ? "user" : "assistant")
-                        .put("content", message.content());
+                ObjectNode item = input.addObject();
+                item.put("role", message.role() == ChatRole.USER ? "user" : "assistant");
+                if (message.attachments().isEmpty()) {
+                    item.put("content", message.content());
+                } else {
+                    ArrayNode content = item.putArray("content");
+                    if (!message.content().isBlank()) {
+                        content.addObject().put("type", "input_text").put("text", message.content());
+                    }
+                    for (ChatAttachment attachment : message.attachments()) {
+                        if (storage == null) {
+                            throw new OpenAiRequestException("Chat attachments are not available");
+                        }
+                        String encoded = Base64.getEncoder().encodeToString(storage.read(attachment.storageKey()));
+                        content.addObject().put("type", "input_image").put("image_url",
+                                "data:" + attachment.contentType() + ";base64," + encoded);
+                    }
+                }
             }
         } else {
             payload.put("previous_response_id", previousResponseId);

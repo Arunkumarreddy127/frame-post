@@ -74,18 +74,27 @@ export function updateConversationInstructions(
   instructionFileIds: string[],
   pageId?: string,
 ) {
-  return request<ChatConversation>(`${chatPath(pageId)}/${conversationId}/instructions`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ instructionFileIds }),
-  });
+  return request<ChatConversation>(
+    `${chatPath(pageId)}/${conversationId}/instructions`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instructionFileIds }),
+    },
+  );
 }
 
-export async function deleteConversation(conversationId: string, pageId?: string) {
-  const response = await fetch(`${API_BASE_URL}${chatPath(pageId)}/${conversationId}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
+export async function deleteConversation(
+  conversationId: string,
+  pageId?: string,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}${chatPath(pageId)}/${conversationId}`,
+    {
+      method: "DELETE",
+      credentials: "include",
+    },
+  );
   if (!response.ok) {
     throw new Error(await readError(response));
   }
@@ -97,14 +106,20 @@ export async function streamMessage(
   model: ChatModel,
   onEvent: (event: ChatStreamEvent) => void,
   pageId?: string,
+  attachments: File[] = [],
+  attachmentKeys: string[] = [],
 ) {
+  const form = new FormData();
+  form.append("content", content);
+  form.append("model", model);
+  attachments.forEach((file) => form.append("attachments", file));
+  attachmentKeys.forEach((key) => form.append("attachmentKeys", key));
   const response = await fetch(
     `${API_BASE_URL}${chatPath(pageId)}/${conversationId}/messages/stream`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ content, model }),
+      body: form,
     },
   );
   if (!response.ok) {
@@ -148,7 +163,7 @@ export function parseSseFrame(frame: string): ChatStreamEvent | null {
 
   if (!eventType || data.length === 0) return null;
   const payload = JSON.parse(data.join("\n")) as Record<string, unknown>;
-  
+
   // Check for update proposal
   if (
     eventType === "instruction_proposal" &&
@@ -167,7 +182,7 @@ export function parseSseFrame(frame: string): ChatStreamEvent | null {
       },
     } as const;
   }
-  
+
   // Check for creation proposal
   if (
     eventType === "instruction_proposal" &&

@@ -1,6 +1,20 @@
-import { FormEvent, useEffect, useState, type KeyboardEvent } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowUp, ChevronDown, Pencil, Plus } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronDown,
+  FolderOpen,
+  Paperclip,
+  Pencil,
+  Plus,
+  X,
+} from "lucide-react";
 import {
   type ChatModel,
   createConversation,
@@ -16,6 +30,7 @@ import {
 import { API_BASE_URL } from "../api";
 import { AppShell } from "../components/AppShell";
 import { InstructionFiles } from "../components/InstructionFiles";
+import { LibraryPicker } from "../components/library/LibraryPicker";
 import { updateInstructionFile } from "../instructionApi";
 import type {
   ChatConversation,
@@ -24,6 +39,7 @@ import type {
   InstructionFileProposal,
   InstructionProposal,
   InstructionCreationProposal,
+  MediaItem,
   ShellRouteProps,
 } from "../types";
 
@@ -31,17 +47,28 @@ type ChatPageProps = ShellRouteProps & {
   pageId?: string;
 };
 
+const CHAT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_CHAT_ATTACHMENTS = 4;
+const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
+
 export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const activePageId = pageId ?? routePageId;
   const [chatModels, setChatModels] = useState<ChatModel[]>([]);
-  const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
-  const [conversation, setConversation] = useState<ChatConversation | null>(null);
+  const [conversations, setConversations] = useState<ChatConversationSummary[]>(
+    [],
+  );
+  const [conversation, setConversation] = useState<ChatConversation | null>(
+    null,
+  );
   const [model, setModel] = useState<ChatModel>("");
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
   const [draft, setDraft] = useState("");
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [libraryImages, setLibraryImages] = useState<MediaItem[]>([]);
+  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -52,9 +79,11 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const fileInput = useRef<HTMLInputElement>(null);
   const requestedConversationId = searchParams.get("conversation");
 
   const isPageChat = Boolean(activePageId);
+  const attachmentCount = imageFiles.length + libraryImages.length;
 
   useEffect(() => {
     let active = true;
@@ -77,12 +106,18 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         setModel(availableModels[0] ?? "");
         setConversations(loaded);
         const selectedConversation =
-          loaded.find((item) => item.id === requestedConversationId) ?? loaded[0];
+          loaded.find((item) => item.id === requestedConversationId) ??
+          loaded[0];
         if (selectedConversation) {
-          await loadConversation(selectedConversation.id, active, availableModels);
+          await loadConversation(
+            selectedConversation.id,
+            active,
+            availableModels,
+          );
         }
       } catch (requestError) {
-        if (active) setError(messageFrom(requestError, "Unable to load conversations"));
+        if (active)
+          setError(messageFrom(requestError, "Unable to load conversations"));
       } finally {
         if (active) setLoading(false);
       }
@@ -103,7 +138,11 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     setSelectedFileIds(ids);
     if (!conversation) return;
     try {
-      const updated = await updateConversationInstructions(conversation.id, ids, activePageId);
+      const updated = await updateConversationInstructions(
+        conversation.id,
+        ids,
+        activePageId,
+      );
       setConversation((current) =>
         current && current.id === updated.id
           ? { ...current, instructionFileIds: updated.instructionFileIds }
@@ -117,7 +156,11 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   async function withSelection(created: ChatConversation) {
     if (selectedFileIds.length === 0) return created;
     try {
-      return await updateConversationInstructions(created.id, selectedFileIds, activePageId);
+      return await updateConversationInstructions(
+        created.id,
+        selectedFileIds,
+        activePageId,
+      );
     } catch (requestError) {
       setError(messageFrom(requestError, "Unable to update instruction files"));
       return created;
@@ -141,17 +184,26 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ name: proposal.name, content: proposal.content }),
+          body: JSON.stringify({
+            name: proposal.name,
+            content: proposal.content,
+          }),
         });
         if (!response.ok) {
           const body = await response.json().catch(() => null);
-          throw new Error(body?.detail ?? body?.message ?? "Unable to create instruction file");
+          throw new Error(
+            body?.detail ??
+              body?.message ??
+              "Unable to create instruction file",
+          );
         }
       }
       setProposals((current) => current.filter((item) => item !== proposal));
       setFilesRefreshKey((current) => current + 1);
     } catch (requestError) {
-      setError(messageFrom(requestError, "Unable to apply the instruction proposal"));
+      setError(
+        messageFrom(requestError, "Unable to apply the instruction proposal"),
+      );
     }
   }
 
@@ -169,10 +221,11 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       setModel(
         availableModels.includes(loaded.model)
           ? loaded.model
-          : availableModels[0] ?? "",
+          : (availableModels[0] ?? ""),
       );
     } catch (requestError) {
-      if (active) setError(messageFrom(requestError, "Unable to load conversation"));
+      if (active)
+        setError(messageFrom(requestError, "Unable to load conversation"));
     }
   }
 
@@ -212,7 +265,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       return;
     }
     try {
-      const created = await withSelection(await createConversation(model, activePageId));
+      const created = await withSelection(
+        await createConversation(model, activePageId),
+      );
       setConversations((current) => [created, ...current]);
       setConversation(created);
       setEditingTitle(false);
@@ -227,7 +282,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     if (!conversation || sending) return;
     try {
       await deleteConversation(conversation.id, activePageId);
-      const remaining = conversations.filter((item) => item.id !== conversation.id);
+      const remaining = conversations.filter(
+        (item) => item.id !== conversation.id,
+      );
       setConversations(remaining);
       setConversation(null);
       setEditingTitle(false);
@@ -284,7 +341,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       setEditingTitle(false);
       setTitleDraft("");
     } catch (requestError) {
-      setError(messageFrom(requestError, "Unable to update conversation title"));
+      setError(
+        messageFrom(requestError, "Unable to update conversation title"),
+      );
     } finally {
       setSavingTitle(false);
     }
@@ -301,16 +360,40 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
       event.preventDefault();
       event.currentTarget.form?.requestSubmit();
+    }
+  }
+
+  function addImages(files: FileList | null) {
+    if (!files) return;
+    const selected = Array.from(files);
+    if (fileInput.current) fileInput.current.value = "";
+    const valid = selected.filter(
+      (file) =>
+        CHAT_IMAGE_TYPES.includes(file.type) &&
+        file.size <= MAX_CHAT_IMAGE_BYTES,
+    );
+    setImageFiles((current) =>
+      [...current, ...valid].slice(
+        0,
+        Math.max(0, MAX_CHAT_ATTACHMENTS - libraryImages.length),
+      ),
+    );
+    if (valid.length !== selected.length) {
+      setError("Choose PNG, JPEG, or WebP images up to 10 MB each.");
     }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const content = draft.trim();
-    if (!content || sending || !model) return;
+    if ((!content && attachmentCount === 0) || sending || !model) return;
 
     setSending(true);
     setError("");
@@ -334,6 +417,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         model: null,
         status: "completed",
         createdAt: new Date().toISOString(),
+        attachments: [],
       };
       setConversation((current) =>
         current
@@ -356,8 +440,15 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           }
         },
         activePageId,
+        imageFiles,
+        libraryImages.map((item) => item.key),
       );
-      await Promise.all([loadConversation(selectedConversation.id), refreshConversations()]);
+      setImageFiles([]);
+      setLibraryImages([]);
+      await Promise.all([
+        loadConversation(selectedConversation.id),
+        refreshConversations(),
+      ]);
     } catch (requestError) {
       setError(messageFrom(requestError, "Unable to send message"));
       if (selectedConversation) {
@@ -391,14 +482,17 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                 onClick={() => void startConversation()}
                 disabled={sending || !model}
               >
-                <Plus className="chat-new-icon" size={17} strokeWidth={2} aria-hidden="true" />
+                <Plus
+                  className="chat-new-icon"
+                  size={17}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
                 <span>New chat</span>
               </button>
             </div>
             {!isPageChat && (
-              <label
-                className="secondary-button small-button chat-all-chats-toggle"
-              >
+              <label className="secondary-button small-button chat-all-chats-toggle">
                 <input
                   type="checkbox"
                   checked={showAllChats}
@@ -429,7 +523,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                   >
                     <span>{item.title}</span>
                     {showAllChats && (
-                      <span className={`chat-history-scope ${scopeColorClass(item.pageId)}`}>
+                      <span
+                        className={`chat-history-scope ${scopeColorClass(item.pageId)}`}
+                      >
                         {item.pageName ?? "Global chat"}
                       </span>
                     )}
@@ -508,9 +604,23 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                     key={message.id}
                   >
                     <span className="chat-message-role">{message.role}</span>
-                    <p>{message.content}</p>
+                    {message.content && <p>{message.content}</p>}
+                    {message.attachments?.length > 0 && (
+                      <div className="chat-message-attachments">
+                        {message.attachments.map((attachment) => (
+                          <img
+                            key={attachment.index}
+                            src={`${API_BASE_URL}${activePageId ? `/api/pages/${activePageId}` : "/api"}/chats/${conversation?.id}/attachments/${message.id}/${attachment.index}`}
+                            alt={attachment.name}
+                            loading="lazy"
+                          />
+                        ))}
+                      </div>
+                    )}
                     {message.status === "failed" && (
-                      <span className="chat-message-status">Response failed</span>
+                      <span className="chat-message-status">
+                        Response failed
+                      </span>
                     )}
                   </article>
                 ))}
@@ -520,7 +630,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                       ? `${proposal.fileId}-${proposal.proposedContent}`
                       : `create-${proposal.name}`;
                   const isUpdate = "fileId" in proposal;
-                  const title = isUpdate ? `Proposed update: ${proposal.fileName}` : `Proposed new file: ${proposal.name}`;
+                  const title = isUpdate
+                    ? `Proposed update: ${proposal.fileName}`
+                    : `Proposed new file: ${proposal.name}`;
 
                   return (
                     <article
@@ -558,7 +670,9 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                           className="secondary-button small-button"
                           type="button"
                           onClick={() =>
-                            setProposals((current) => current.filter((item) => item !== proposal))
+                            setProposals((current) =>
+                              current.filter((item) => item !== proposal),
+                            )
                           }
                         >
                           Dismiss
@@ -581,7 +695,45 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               {error}
             </p>
           )}
-          <form className="chat-composer" onSubmit={submit}>
+          <form
+            className={`chat-composer${attachmentCount > 0 ? " has-attachments" : ""}`}
+            onSubmit={submit}
+          >
+            {attachmentCount > 0 && (
+              <div
+                className="chat-attachment-tray"
+                aria-label="Message attachments"
+              >
+                {imageFiles.map((file, index) => (
+                  <LocalImagePreview
+                    key={`${file.name}-${file.size}-${index}`}
+                    file={file}
+                    onRemove={() =>
+                      setImageFiles((current) =>
+                        current.filter((_, itemIndex) => itemIndex !== index),
+                      )
+                    }
+                  />
+                ))}
+                {libraryImages.map((item) => (
+                  <div className="chat-attachment-preview" key={item.key}>
+                    <img src={item.url} alt={item.name} />
+                    <button
+                      type="button"
+                      className="chat-attachment-remove"
+                      aria-label={`Remove ${item.name}`}
+                      onClick={() =>
+                        setLibraryImages((current) =>
+                          current.filter((entry) => entry.key !== item.key),
+                        )
+                      }
+                    >
+                      <X size={13} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <label className="sr-only" htmlFor="chat-message">
               Message
             </label>
@@ -594,9 +746,44 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               rows={2}
               maxLength={8000}
               disabled={sending}
-              required
             />
             <div className="chat-composer-toolbar">
+              <div className="chat-attachment-actions">
+                <input
+                  ref={fileInput}
+                  className="sr-only"
+                  type="file"
+                  accept={CHAT_IMAGE_TYPES.join(",")}
+                  multiple
+                  onChange={(event) => addImages(event.target.files)}
+                  aria-label="Attach images"
+                />
+                <button
+                  type="button"
+                  className="chat-attachment-button"
+                  aria-label="Attach images"
+                  title="Attach images"
+                  disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Paperclip size={17} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="chat-attachment-button"
+                  aria-label="Browse Library"
+                  title="Browse Library"
+                  disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
+                  onClick={() => setLibraryPickerOpen(true)}
+                >
+                  <FolderOpen size={17} aria-hidden="true" />
+                </button>
+                {attachmentCount > 0 && (
+                  <span className="chat-attachment-count">
+                    {attachmentCount}/{MAX_CHAT_ATTACHMENTS}
+                  </span>
+                )}
+              </div>
               <label className="chat-model-control">
                 <span className="sr-only">Model</span>
                 <span className="chat-model-select">
@@ -623,7 +810,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                 className="chat-composer-submit"
                 type="submit"
                 aria-label={sending ? "Responding" : "Send message"}
-                disabled={sending || !draft.trim()}
+                disabled={sending || (!draft.trim() && attachmentCount === 0)}
               >
                 <ArrowUp size={19} strokeWidth={2} aria-hidden="true" />
               </button>
@@ -631,7 +818,52 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           </form>
         </div>
       </section>
+      {libraryPickerOpen && (
+        <LibraryPicker
+          pageId={activePageId}
+          accept={CHAT_IMAGE_TYPES}
+          limit={MAX_CHAT_ATTACHMENTS - imageFiles.length}
+          onSelect={(items) => {
+            setLibraryImages(
+              items.slice(
+                0,
+                Math.max(0, MAX_CHAT_ATTACHMENTS - imageFiles.length),
+              ),
+            );
+            setLibraryPickerOpen(false);
+          }}
+          onClose={() => setLibraryPickerOpen(false)}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function LocalImagePreview({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  return (
+    <div className="chat-attachment-preview">
+      {url && <img src={url} alt={file.name} />}
+      <button
+        type="button"
+        className="chat-attachment-remove"
+        aria-label={`Remove ${file.name}`}
+        onClick={onRemove}
+      >
+        <X size={13} aria-hidden="true" />
+      </button>
+    </div>
   );
 }
 

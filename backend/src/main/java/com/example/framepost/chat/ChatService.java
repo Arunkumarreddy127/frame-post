@@ -1,12 +1,16 @@
 package com.example.framepost.chat;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -17,12 +21,18 @@ import com.example.framepost.instruction.InstructionFileService;
 import com.example.framepost.page.Page;
 import com.example.framepost.page.PageRepository;
 import com.example.framepost.page.PageService;
+import com.example.framepost.generation.LibraryFile;
+import com.example.framepost.generation.LibraryFileResolver;
+import com.example.framepost.storage.StorageService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ChatService {
@@ -31,6 +41,10 @@ public class ChatService {
     private static final int MAX_CONTEXT_MESSAGES = 30;
     private static final int MAX_CONTEXT_CHARACTERS = 60_000;
     private static final long STREAM_TIMEOUT_MILLIS = 130_000L;
+    private static final int MAX_ATTACHMENTS = 4;
+    private static final long MAX_ATTACHMENT_BYTES = 10L * 1024 * 1024;
+    private static final long MAX_TOTAL_ATTACHMENT_BYTES = 20L * 1024 * 1024;
+    private static final Set<String> IMAGE_TYPES = Set.of("image/png", "image/jpeg", "image/webp");
 
     private final ChatConversationRepository conversations;
     private final ChatMessageRepository messages;
@@ -39,6 +53,8 @@ public class ChatService {
     private final OpenAiProperties openAiProperties;
     private final OpenAiClient openAiClient;
     private final InstructionFileService instructionService;
+    private final StorageService storage;
+    private final LibraryFileResolver libraryFiles;
 
     public ChatService(
             ChatConversationRepository conversations,
@@ -47,7 +63,9 @@ public class ChatService {
             PageRepository pages,
             OpenAiProperties openAiProperties,
             OpenAiClient openAiClient,
-            InstructionFileService instructionService
+            InstructionFileService instructionService,
+            StorageService storage,
+            LibraryFileResolver libraryFiles
     ) {
         this.conversations = conversations;
         this.messages = messages;
@@ -56,6 +74,8 @@ public class ChatService {
         this.openAiProperties = openAiProperties;
         this.openAiClient = openAiClient;
         this.instructionService = instructionService;
+        this.storage = storage;
+        this.libraryFiles = libraryFiles;
     }
 
     public List<ChatConversationSummary> list(User user, String pageId) {
@@ -96,7 +116,7 @@ public class ChatService {
         ChatConversation conversation = findConversation(user, pageId, conversationId);
         return ChatConversationResponse.from(
                 conversation,
-                pageName(conversation),
+            pageName(conversation),
                 messages.findByConversationIdOrderByCreatedAtAsc(conversation.id())
         );
     }
@@ -149,14 +169,28 @@ public class ChatService {
     public void delete(User user, String pageId, String conversationId) {
         validateScope(user, pageId);
         ChatConversation conversation = findConversation(user, pageId, conversationId);
+        List<ChatMessage> conversationMessages = messages.findByConversationIdOrderByCreatedAtAsc(conversation.id());
+        conversationMessages.stream().flatMap(message -> message.attachments().stream())
+            .forEach(attachment -> storage.delete(attachment.storageKey()));
         messages.deleteByConversationId(conversation.id());
         conversations.delete(conversation);
     }
 
     public SseEmitter streamMessage(User user, String pageId, String conversationId, SendMessageRequest request) {
+        return streamMessage(user, pageId, conversationId, request, List.of(), List.of());
+    }
+
+    public SseEmitter streamMessage(
+            User user,
+            String pageId,
+            String conversationId,
+            SendMessageRequest request,
+            List<MultipartFile> uploads,
+            List<String> libraryKeys
+    ) {
         validateScope(user, pageId);
         ChatConversation conversation = findConversation(user, pageId, conversationId);
-        String content = validateContent(request.content());
+        String content = validateContent(request.content(), uploads, libraryKeys);
         String model = validateModel(request.model());
         Page page = pageId == null ? null : pageService.get(user, pageId);
         List<InstructionFile> instructionFiles = instructionService.resolveSelected(
@@ -165,17 +199,26 @@ public class ChatService {
                 conversation.instructionFileIds()
         );
 
+        String messageId = UUID.randomUUID().toString();
+        List<ChatAttachment> persistedAttachments = persistAttachments(user, conversation, messageId, uploads, libraryKeys);
         Instant now = Instant.now();
-        ChatMessage userMessage = messages.save(new ChatMessage(
-                null,
+        try {
+            messages.save(new ChatMessage(
+                messageId,
                 conversation.id(),
                 ChatRole.USER,
                 content,
                 null,
                 ChatMessageStatus.COMPLETED,
-                now
-        ));
-        ChatConversation updatedConversation = updateConversationForPrompt(conversation, model, content, now);
+                now,
+                persistedAttachments
+            ));
+        } catch (RuntimeException exception) {
+            persistedAttachments.forEach(file -> storage.delete(file.storageKey()));
+            throw exception;
+        }
+        ChatConversation updatedConversation = updateConversationForPrompt(
+            conversation, model, content.isBlank() ? "Image conversation" : content, now);
         List<ChatMessage> context = contextForConversation(updatedConversation.id());
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
 
@@ -188,6 +231,140 @@ public class ChatService {
                 model
         ));
         return emitter;
+    }
+
+    private List<ChatAttachment> persistAttachments(
+            User user,
+            ChatConversation conversation,
+            String messageId,
+            List<MultipartFile> uploads,
+            List<String> libraryKeys
+    ) {
+        List<MultipartFile> nonEmptyUploads = (uploads == null ? List.<MultipartFile>of() : uploads).stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .toList();
+        List<String> nonBlankKeys = (libraryKeys == null ? List.<String>of() : libraryKeys).stream()
+                .filter(key -> key != null && !key.isBlank())
+                .distinct()
+                .toList();
+        if (nonEmptyUploads.size() + nonBlankKeys.size() > MAX_ATTACHMENTS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach up to 4 images per message");
+        }
+        List<AttachmentSource> sources = new ArrayList<>();
+        for (MultipartFile upload : nonEmptyUploads) {
+            if (upload.getSize() > MAX_ATTACHMENT_BYTES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be 10 MB or smaller");
+            }
+            byte[] bytes;
+            try {
+                bytes = upload.getBytes();
+            } catch (IOException exception) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to read an attached image");
+            }
+            String contentType = normalizedImageType(upload.getContentType(), bytes);
+            sources.add(new AttachmentSource(safeName(upload.getOriginalFilename(), contentType), contentType, bytes));
+            validateAttachmentLimits(sources);
+        }
+        for (String key : nonBlankKeys) {
+            LibraryFile file = libraryFiles.resolve(user, conversation.pageId(), key);
+            String contentType = normalizedImageType(file.contentType(), file.bytes());
+            sources.add(new AttachmentSource(safeName(file.name(), contentType), contentType, file.bytes()));
+            validateAttachmentLimits(sources);
+        }
+
+        List<ChatAttachment> stored = new ArrayList<>();
+        try {
+            for (int index = 0; index < sources.size(); index++) {
+                AttachmentSource source = sources.get(index);
+                String key = "chats/" + safeName(user.username(), "") + "-" + user.id() + "/"
+                        + conversation.id() + "/" + messageId + "/" + index + extension(source.contentType());
+                storage.store(key, new ByteArrayInputStream(source.bytes()), source.bytes().length, source.contentType());
+                stored.add(new ChatAttachment(source.name(), source.contentType(), source.bytes().length, key));
+            }
+            return List.copyOf(stored);
+        } catch (RuntimeException exception) {
+            stored.forEach(file -> storage.delete(file.storageKey()));
+            throw exception;
+        }
+    }
+
+    private void validateAttachmentLimits(List<AttachmentSource> sources) {
+        if (sources.size() > MAX_ATTACHMENTS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach up to 4 images per message");
+        }
+        long total = 0;
+        for (AttachmentSource source : sources) {
+            if (source.bytes().length == 0 || source.bytes().length > MAX_ATTACHMENT_BYTES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be 10 MB or smaller");
+            }
+            total += source.bytes().length;
+        }
+        if (total > MAX_TOTAL_ATTACHMENT_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Images must total 20 MB or less");
+        }
+    }
+
+    private String normalizedImageType(String declaredType, byte[] bytes) {
+        String type = declaredType == null ? "" : declaredType.toLowerCase(Locale.ROOT).split(";")[0].trim();
+        String detected = detectImageType(bytes);
+        if (!IMAGE_TYPES.contains(type) || !type.equals(detected)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PNG, JPEG, and WebP images are supported");
+        }
+        return type;
+    }
+
+    private String detectImageType(byte[] bytes) {
+        if (bytes.length >= 8 && (bytes[0] & 0xff) == 0x89 && "PNG\r\n\u001a\n".equals(
+                new String(bytes, 1, 7, StandardCharsets.ISO_8859_1))) {
+            return "image/png";
+        }
+        if (bytes.length >= 3 && (bytes[0] & 0xff) == 0xff && (bytes[1] & 0xff) == 0xd8 && (bytes[2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        if (bytes.length >= 12 && "RIFF".equals(new String(bytes, 0, 4, StandardCharsets.US_ASCII))
+                && "WEBP".equals(new String(bytes, 8, 4, StandardCharsets.US_ASCII))) {
+            return "image/webp";
+        }
+        return "";
+    }
+
+    private String safeName(String rawName, String contentType) {
+        String name = rawName == null ? "image" : rawName.replace('\\', '/');
+        name = name.substring(name.lastIndexOf('/') + 1).replaceAll("[^A-Za-z0-9._-]", "-");
+        if (name.isBlank() || name.equals(".")) {
+            name = "image" + extension(contentType);
+        }
+        return name.length() > 120 ? name.substring(name.length() - 120) : name;
+    }
+
+    private String extension(String contentType) {
+        return switch (contentType) {
+            case "image/png" -> ".png";
+            case "image/jpeg" -> ".jpg";
+            case "image/webp" -> ".webp";
+            default -> "";
+        };
+    }
+
+    private record AttachmentSource(String name, String contentType, byte[] bytes) {
+    }
+
+    public ResponseEntity<byte[]> attachment(
+            User user, String pageId, String conversationId, String messageId, int index
+    ) {
+        validateScope(user, pageId);
+        findConversation(user, pageId, conversationId);
+        ChatMessage message = messages.findById(messageId)
+            .filter(value -> value.conversationId().equals(conversationId) && value.role() == ChatRole.USER)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chat attachment not found"));
+        if (index < 0 || index >= message.attachments().size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Chat attachment not found");
+        }
+        ChatAttachment file = message.attachments().get(index);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.contentType()))
+                .header("Cache-Control", "private, no-store")
+                .body(storage.read(file.storageKey()));
     }
 
     private void streamAssistantResponse(
@@ -280,13 +457,17 @@ public class ChatService {
         List<ChatMessage> recent = history.subList(Math.max(0, history.size() - MAX_CONTEXT_MESSAGES), history.size());
         List<ChatMessage> context = new ArrayList<>();
         int characters = 0;
+        long attachmentBytes = 0;
         for (int index = recent.size() - 1; index >= 0; index--) {
             ChatMessage message = recent.get(index);
-            if (characters + message.content().length() > MAX_CONTEXT_CHARACTERS) {
+            long messageAttachmentBytes = message.attachments().stream().mapToLong(ChatAttachment::sizeBytes).sum();
+            if (characters + message.content().length() > MAX_CONTEXT_CHARACTERS
+                    || attachmentBytes + messageAttachmentBytes > MAX_TOTAL_ATTACHMENT_BYTES) {
                 break;
             }
             context.addFirst(message);
             characters += message.content().length();
+            attachmentBytes += messageAttachmentBytes;
         }
         return context;
     }
@@ -317,11 +498,13 @@ public class ChatService {
         return model;
     }
 
-    private String validateContent(String content) {
-        if (content == null || content.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message content is required");
+    private String validateContent(String content, List<MultipartFile> uploads, List<String> libraryKeys) {
+        String trimmed = content == null ? "" : content.trim();
+        boolean hasUpload = uploads != null && uploads.stream().anyMatch(file -> file != null && !file.isEmpty());
+        boolean hasLibraryKey = libraryKeys != null && libraryKeys.stream().anyMatch(key -> key != null && !key.isBlank());
+        if (trimmed.isEmpty() && !hasUpload && !hasLibraryKey) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message or image attachment is required");
         }
-        String trimmed = content.trim();
         if (trimmed.length() > MAX_MESSAGE_LENGTH) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -576,7 +759,8 @@ public class ChatService {
             String content,
             String model,
             String status,
-            Instant createdAt
+            Instant createdAt,
+            List<ChatAttachmentResponse> attachments
     ) {
         static ChatMessageResponse from(ChatMessage message) {
             return new ChatMessageResponse(
@@ -585,12 +769,25 @@ public class ChatService {
                     message.content(),
                     message.model(),
                     message.status().name().toLowerCase(Locale.ROOT),
-                    message.createdAt()
+                        message.createdAt(),
+                        java.util.stream.IntStream.range(0, message.attachments().size())
+                            .mapToObj(index -> new ChatAttachmentResponse(
+                                message.attachments().get(index).name(),
+                                message.attachments().get(index).contentType(),
+                                message.attachments().get(index).sizeBytes(),
+                                index))
+                            .toList()
             );
         }
     }
 
+                public record ChatAttachmentResponse(String name, String contentType, long sizeBytes, int index) {
+                }
+
     private String titleFrom(String content) {
+        if (content.isBlank()) {
+            return "Image conversation";
+        }
         return content.length() <= 60 ? content : content.substring(0, 57) + "...";
     }
 }
