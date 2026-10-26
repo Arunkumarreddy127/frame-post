@@ -46,7 +46,11 @@ export function InstructionFiles({
       })
       .catch((error) => {
         if (active) {
-          onError(error instanceof Error ? error.message : "Unable to load instruction files");
+          onError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load instruction files",
+          );
         }
       });
     return () => {
@@ -86,7 +90,8 @@ export function InstructionFiles({
           (current ?? [])
             .map((file) => (file.id === updated.id ? updated : file))
             .sort((a, b) => {
-              const scopeOrder = (a.pageId === null ? 0 : 1) - (b.pageId === null ? 0 : 1);
+              const scopeOrder =
+                (a.pageId === null ? 0 : 1) - (b.pageId === null ? 0 : 1);
               return scopeOrder || a.name.localeCompare(b.name);
             }),
         );
@@ -99,7 +104,11 @@ export function InstructionFiles({
       }
       setEditor(null);
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Unable to save instruction file");
+      onError(
+        error instanceof Error
+          ? error.message
+          : "Unable to save instruction file",
+      );
     } finally {
       setSaving(false);
     }
@@ -115,11 +124,17 @@ export function InstructionFiles({
       await deleteInstructionFile(id);
       setFiles((current) => (current ?? []).filter((file) => file.id !== id));
       if (selectedIds.includes(id)) {
-        onSelectionChange(selectedIds.filter((selectedId) => selectedId !== id));
+        onSelectionChange(
+          selectedIds.filter((selectedId) => selectedId !== id),
+        );
       }
       setEditor(null);
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Unable to delete instruction file");
+      onError(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete instruction file",
+      );
     } finally {
       setSaving(false);
     }
@@ -133,10 +148,16 @@ export function InstructionFiles({
             <h3>Instruction files</h3>
             <p>Select files to guide replies</p>
           </div>
-          <span className="instruction-files-count">{selectedIds.length} selected</span>
+          <span className="instruction-files-count">
+            {selectedIds.length} selected
+          </span>
         </div>
       )}
-      <div className="instruction-file-list" role="group" aria-label="Instruction files">
+      <div
+        className="instruction-file-list"
+        role="group"
+        aria-label="Instruction files"
+      >
         {(files ?? []).map((file) => (
           <span
             key={file.id}
@@ -180,7 +201,9 @@ export function InstructionFiles({
           type="button"
           className="secondary-button small-button"
           disabled={disabled || saving}
-          onClick={() => setEditor({ id: null, name: "", content: "", scope: "user" })}
+          onClick={() =>
+            setEditor({ id: null, name: "", content: "", scope: "user" })
+          }
         >
           <Plus size={14} strokeWidth={2} aria-hidden="true" />
           <span>New instruction file</span>
@@ -194,16 +217,20 @@ export function InstructionFiles({
             placeholder="File name"
             aria-label="Instruction file name"
             required
-            onChange={(event) => setEditor({ ...editor, name: event.target.value })}
+            onChange={(event) =>
+              setEditor({ ...editor, name: event.target.value })
+            }
           />
           <textarea
             value={editor.content}
-            maxLength={20000}
+            maxLength={30000}
             rows={6}
             placeholder="Instructions"
             aria-label="Instruction file content"
             required
-            onChange={(event) => setEditor({ ...editor, content: event.target.value })}
+            onChange={(event) =>
+              setEditor({ ...editor, content: event.target.value })
+            }
           />
           <div className="instruction-editor-actions">
             {pageId && (
@@ -211,14 +238,21 @@ export function InstructionFiles({
                 value={editor.scope}
                 aria-label="Instruction file scope"
                 onChange={(event) =>
-                  setEditor({ ...editor, scope: event.target.value as "user" | "page" })
+                  setEditor({
+                    ...editor,
+                    scope: event.target.value as "user" | "page",
+                  })
                 }
               >
                 <option value="user">All chats</option>
                 <option value="page">This page only</option>
               </select>
             )}
-            <button className="secondary-button small-button" type="submit" disabled={saving}>
+            <button
+              className="secondary-button small-button"
+              type="submit"
+              disabled={saving}
+            >
               Save
             </button>
             <button

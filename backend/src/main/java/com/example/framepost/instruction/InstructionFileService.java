@@ -19,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class InstructionFileService {
 
     static final int MAX_NAME_LENGTH = 100;
-    static final int MAX_CONTENT_LENGTH = 20_000;
+    static final int MAX_CONTENT_LENGTH = 30_000;
     public static final int MAX_SELECTED_FILES = 10;
 
     private final InstructionFileRepository files;

@@ -35,6 +35,32 @@ class InstructionFileServiceTest {
         assertEquals(409, exception.getStatusCode().value());
     }
 
+        @Test
+        void acceptsContentAtMaximumLengthAndRejectsContentAboveIt() {
+        String maxLengthContent = "x".repeat(30_000);
+        when(files.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        InstructionFile created = service.create(
+            user,
+            null,
+            new InstructionFileService.InstructionFileRequest("Tone", maxLengthContent)
+        );
+
+        assertEquals(30_000, created.content().length());
+
+        ResponseStatusException exception = assertThrows(
+            ResponseStatusException.class,
+            () -> service.create(
+                user,
+                null,
+                new InstructionFileService.InstructionFileRequest("Too long", maxLengthContent + "x")
+            )
+        );
+
+        assertEquals(400, exception.getStatusCode().value());
+        assertEquals("Content must be at most 30000 characters", exception.getReason());
+        }
+
     @Test
     void rejectsSelectionOfAnotherPagesFile() {
         InstructionFile other = new InstructionFile("f1", "user-id", "page-b", "A", "x", now, now);

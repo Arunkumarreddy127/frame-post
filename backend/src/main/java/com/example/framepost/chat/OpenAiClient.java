@@ -192,7 +192,7 @@ public class OpenAiClient {
             createParams.put("type", "object");
             ObjectNode createProps = createParams.putObject("properties");
             createProps.putObject("name").put("type", "string").put("description", "The name of the instruction file (1-100 characters)");
-            createProps.putObject("content").put("type", "string").put("description", "The complete file content (1-20000 characters)");
+            createProps.putObject("content").put("type", "string").put("description", "The complete file content (1-30000 characters)");
             createParams.putArray("required").add("name").add("content");
             createParams.put("additionalProperties", false);
         }
