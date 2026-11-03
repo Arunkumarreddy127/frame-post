@@ -1,0 +1,106 @@
+{
+    "key": "qwen-image-2-1",
+    "label": "Qwen Image 2.1",
+    "description": "Generate an image with Qwen Image 2.1.",
+    "group": "RH",
+    "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_QWEN_IMAGE_2_1",
+    "inputs": [
+        {
+            "name": "prompt",
+            "type": "textarea",
+            "label": "Prompt",
+            "required": true,
+            "maxLength": 7000
+        },
+        {
+            "name": "negativePrompt",
+            "type": "textarea",
+            "label": "Negative prompt",
+            "required": false,
+            "maxLength": 7000
+        },
+        {
+            "name": "aspectRatio",
+            "type": "select",
+            "label": "Aspect ratio",
+            "default": "9:16 (Portrait Widescreen)",
+            "options": [
+                "1:1 (Square)",
+                "3:2 (Landscape)",
+                "2:3 (Portrait)",
+                "4:3 (Landscape)",
+                "3:4 (Portrait)",
+                "16:9 (Widescreen)",
+                "9:16 (Portrait Widescreen)",
+                "21:9 (Ultrawide)"
+            ]
+        },
+        {
+            "name": "megapixels",
+            "type": "number",
+            "label": "Megapixels",
+            "required": true,
+            "default": "1",
+            "min": 0.25,
+            "max": 4
+        },
+        {
+            "name": "steps",
+            "type": "number",
+            "label": "Steps",
+            "required": true,
+            "default": "25",
+            "min": 1,
+            "max": 100
+        },
+        {
+            "name": "cfg",
+            "type": "number",
+            "label": "CFG",
+            "required": true,
+            "default": "1",
+            "min": 0,
+            "max": 20
+        }
+    ],
+    "nodeMappings": [
+        {
+            "input": "aspectRatio",
+            "nodeId": "13",
+            "fieldName": "aspect_ratio"
+        },
+        {
+            "input": "megapixels",
+            "nodeId": "13",
+            "fieldName": "megapixels"
+        },
+        {
+            "input": "prompt",
+            "nodeId": "459:452",
+            "fieldName": "prompt"
+        },
+        {
+            "input": "negativePrompt",
+            "nodeId": "459:452",
+            "fieldName": "negative_prompt"
+        },
+        {
+            "input": "steps",
+            "nodeId": "459:458",
+            "fieldName": "steps"
+        },
+        {
+            "input": "cfg",
+            "nodeId": "459:458",
+            "fieldName": "cfg"
+        }
+    ],
+    "transforms": [],
+    "output": {
+        "type": "image",
+        "contentType": "image/png",
+        "extensions": [
+            "png"
+        ]
+    }
+}

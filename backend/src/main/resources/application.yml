@@ -8,8 +8,8 @@ spring:
     name: framepost-backend
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 25MB
+      max-file-size: 20MB
+      max-request-size: 50MB
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/framepost}
     database: ${MONGODB_DATABASE:framepost}
@@ -47,6 +47,6 @@ framepost:
     base-url: ${RUNNINGHUB_BASE_URL:https://www.runninghub.ai}
     request-timeout-seconds: ${RUNNINGHUB_REQUEST_TIMEOUT_SECONDS:60}
     poll-interval-seconds: ${RUNNINGHUB_POLL_INTERVAL_SECONDS:5}
-    max-wait-seconds: ${RUNNINGHUB_MAX_WAIT_SECONDS:1800}
+    max-wait-seconds: ${RUNNINGHUB_MAX_WAIT_SECONDS:3600}
     webhook-base-url: ${RUNNINGHUB_WEBHOOK_BASE_URL:}
     webhook-secret: ${RUNNINGHUB_WEBHOOK_SECRET:}

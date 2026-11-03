@@ -49,7 +49,7 @@ type ChatPageProps = ShellRouteProps & {
 
 const CHAT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_CHAT_ATTACHMENTS = 4;
-const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_CHAT_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
@@ -386,7 +386,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       ),
     );
     if (valid.length !== selected.length) {
-      setError("Choose PNG, JPEG, or WebP images up to 10 MB each.");
+      setError("Choose PNG, JPEG, or WebP images up to 20 MB each.");
     }
   }
 

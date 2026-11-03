@@ -42,8 +42,8 @@ public class ChatService {
     private static final int MAX_CONTEXT_CHARACTERS = 60_000;
     private static final long STREAM_TIMEOUT_MILLIS = 130_000L;
     private static final int MAX_ATTACHMENTS = 4;
-    private static final long MAX_ATTACHMENT_BYTES = 10L * 1024 * 1024;
-    private static final long MAX_TOTAL_ATTACHMENT_BYTES = 20L * 1024 * 1024;
+    private static final long MAX_ATTACHMENT_BYTES = 20L * 1024 * 1024;
+    private static final long MAX_TOTAL_ATTACHMENT_BYTES = 40L * 1024 * 1024;
     private static final Set<String> IMAGE_TYPES = Set.of("image/png", "image/jpeg", "image/webp");
 
     private final ChatConversationRepository conversations;
@@ -253,7 +253,7 @@ public class ChatService {
         List<AttachmentSource> sources = new ArrayList<>();
         for (MultipartFile upload : nonEmptyUploads) {
             if (upload.getSize() > MAX_ATTACHMENT_BYTES) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be 10 MB or smaller");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be 20 MB or smaller");
             }
             byte[] bytes;
             try {
