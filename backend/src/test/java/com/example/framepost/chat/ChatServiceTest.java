@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -111,6 +112,36 @@ class ChatServiceTest {
                 assertEquals(400, exception.getStatusCode().value());
                 verify(storage, never()).store(any(), any(), org.mockito.ArgumentMatchers.anyLong(), any());
                 verifyNoInteractions(openAiClient);
+        }
+
+        @Test
+        void storesPdfUploadsAsApplicationPdfAttachments() {
+                Instant now = Instant.now();
+                ChatConversation conversation = new ChatConversation(
+                        "conversation-id", user.id(), null, "Chat", "gpt-6-luna", now, now);
+                byte[] pdf = "%PDF-1.7\nPDF content".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                MockMultipartFile upload = new MockMultipartFile(
+                        "attachments", "document.pdf", "application/pdf", pdf);
+                when(conversations.findByIdAndUserIdAndPageIdIsNull(conversation.id(), user.id()))
+                        .thenReturn(Optional.of(conversation));
+                when(instructionService.resolveSelected(user.id(), null, List.of())).thenReturn(List.of());
+                when(conversations.save(any(ChatConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                when(messages.findByConversationIdOrderByCreatedAtAsc(conversation.id())).thenReturn(List.of(
+                        new ChatMessage(
+                                "message-id", conversation.id(), ChatRole.USER, "Review this", null,
+                                ChatMessageStatus.COMPLETED, now,
+                                List.of(new ChatAttachment(
+                                        "document.pdf", "application/pdf", pdf.length, "chats/user-id/document.pdf")))));
+
+                service.streamMessage(
+                        user,
+                        null,
+                        conversation.id(),
+                        new ChatService.SendMessageRequest("Review this", "gpt-6-luna"),
+                        List.of(upload),
+                        List.of());
+
+                verify(storage).store(any(), any(), eq((long) pdf.length), eq("application/pdf"));
         }
 
             @Test

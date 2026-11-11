@@ -19,6 +19,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.example.framepost.storage.StorageService;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -140,9 +143,17 @@ public class OpenAiClient {
                         if (storage == null) {
                             throw new OpenAiRequestException("Chat attachments are not available");
                         }
-                        String encoded = Base64.getEncoder().encodeToString(storage.read(attachment.storageKey()));
-                        content.addObject().put("type", "input_image").put("image_url",
-                                "data:" + attachment.contentType() + ";base64," + encoded);
+                            if ("application/pdf".equals(attachment.contentType())) {
+                                content.addObject()
+                                        .put("type", "input_text")
+                                        .put("text", "PDF attachment \"" + attachment.name() + "\":\n\n"
+                                                + extractPdfText(attachment, storage.read(attachment.storageKey())));
+                            } else {
+                                String encoded = Base64.getEncoder()
+                                        .encodeToString(storage.read(attachment.storageKey()));
+                                content.addObject().put("type", "input_image").put("image_url",
+                                        "data:" + attachment.contentType() + ";base64," + encoded);
+                        }
                     }
                 }
             }
@@ -201,6 +212,19 @@ public class OpenAiClient {
             return objectMapper.writeValueAsString(payload);
         } catch (IOException exception) {
             throw new IllegalStateException("Unable to create OpenAI request", exception);
+        }
+    }
+
+    private String extractPdfText(ChatAttachment attachment, byte[] bytes) {
+        try (PDDocument document = Loader.loadPDF(bytes)) {
+            String text = new PDFTextStripper().getText(document).strip();
+            if (text.isBlank()) {
+                throw new OpenAiRequestException(
+                        "No selectable text found in PDF \"" + attachment.name() + "\". Scanned PDFs require OCR.");
+            }
+            return text;
+        } catch (IOException exception) {
+            throw new OpenAiRequestException("Unable to extract text from PDF \"" + attachment.name() + "\"", exception);
         }
     }
 

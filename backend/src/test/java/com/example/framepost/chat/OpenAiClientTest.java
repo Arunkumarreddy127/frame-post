@@ -1,8 +1,11 @@
 package com.example.framepost.chat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -16,12 +19,17 @@ import com.example.framepost.config.OpenAiProperties;
 import com.example.framepost.storage.StorageService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
 
 class OpenAiClientTest {
 
     @Test
-    void sendsTextAndStoredImagesTogetherInResponsesInput() throws Exception {
+    void sendsTextAndStoredImagesAndPdfsInResponsesInput() throws Exception {
     List<String> requests = new ArrayList<>();
     AtomicInteger requestNumber = new AtomicInteger();
     HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
@@ -30,7 +38,9 @@ class OpenAiClientTest {
     try {
         StorageService storage = org.mockito.Mockito.mock(StorageService.class);
         byte[] image = new byte[]{1, 2, 3};
+        byte[] pdf = createPdf("Extracted PDF content");
         org.mockito.Mockito.when(storage.read("chats/user-id/image.png")).thenReturn(image);
+        org.mockito.Mockito.when(storage.read("chats/user-id/document.pdf")).thenReturn(pdf);
         OpenAiClient client = new OpenAiClient(
             new OpenAiProperties("test-key", List.of("test-model"), 10),
             URI.create("http://localhost:" + server.getAddress().getPort() + "/responses"),
@@ -42,7 +52,9 @@ class OpenAiClientTest {
             List.of(new ChatMessage(
                 "message-id", "conversation-id", ChatRole.USER, "Describe this", null,
                 ChatMessageStatus.COMPLETED, java.time.Instant.now(),
-                List.of(new ChatAttachment("image.png", "image/png", image.length, "chats/user-id/image.png")))),
+            List.of(
+                new ChatAttachment("image.png", "image/png", image.length, "chats/user-id/image.png"),
+                new ChatAttachment("document.pdf", "application/pdf", pdf.length, "chats/user-id/document.pdf")))),
             false,
             ignored -> {},
             ignored -> ""
@@ -56,9 +68,55 @@ class OpenAiClientTest {
         assertEquals("input_image", content.get(1).path("type").asText());
         assertEquals("data:image/png;base64," + Base64.getEncoder().encodeToString(image),
             content.get(1).path("image_url").asText());
+        assertEquals("input_text", content.get(2).path("type").asText());
+        assertEquals("PDF attachment \"document.pdf\":\n\nExtracted PDF content",
+            content.get(2).path("text").asText());
+        assertFalse(requests.getFirst().contains("input_file"));
+        assertFalse(requests.getFirst().contains("file_data"));
     } finally {
         server.stop(0);
     }
+    }
+
+    @Test
+    void rejectsPdfAttachmentsWithoutExtractableText() throws Exception {
+        StorageService storage = org.mockito.Mockito.mock(StorageService.class);
+        byte[] pdf = createPdf("");
+        org.mockito.Mockito.when(storage.read("chats/user-id/scanned.pdf")).thenReturn(pdf);
+        OpenAiClient client = new OpenAiClient(
+                new OpenAiProperties("test-key", List.of("test-model"), 10),
+                URI.create("http://localhost:1/responses"),
+                storage);
+        ChatMessage message = new ChatMessage(
+                "message-id", "conversation-id", ChatRole.USER, "Summarize this", null,
+                ChatMessageStatus.COMPLETED, java.time.Instant.now(),
+                List.of(new ChatAttachment(
+                        "scanned.pdf", "application/pdf", pdf.length, "chats/user-id/scanned.pdf")));
+
+        OpenAiClient.OpenAiRequestException exception = assertThrows(
+                OpenAiClient.OpenAiRequestException.class,
+                () -> client.streamResponse(
+                        "test-model", "Developer context", List.of(message), false, ignored -> {}, ignored -> ""));
+
+        assertTrue(exception.getMessage().contains("Scanned PDFs require OCR"));
+    }
+
+    private static byte[] createPdf(String text) throws IOException {
+        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            if (!text.isBlank()) {
+                try (PDPageContentStream content = new PDPageContentStream(document, page)) {
+                    content.beginText();
+                    content.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA), 12);
+                    content.newLineAtOffset(25, 700);
+                    content.showText(text);
+                    content.endText();
+                }
+            }
+            document.save(output);
+            return output.toByteArray();
+        }
     }
 
     @Test

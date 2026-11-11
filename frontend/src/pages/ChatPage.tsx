@@ -9,7 +9,9 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowUp,
   ChevronDown,
+  FileText,
   FolderOpen,
+  LoaderCircle,
   Paperclip,
   Pencil,
   Plus,
@@ -47,9 +49,14 @@ type ChatPageProps = ShellRouteProps & {
   pageId?: string;
 };
 
-const CHAT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const CHAT_ATTACHMENT_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "application/pdf",
+];
 const MAX_CHAT_ATTACHMENTS = 4;
-const MAX_CHAT_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_CHAT_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
 export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
@@ -66,7 +73,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const [titleDraft, setTitleDraft] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
   const [draft, setDraft] = useState("");
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [libraryImages, setLibraryImages] = useState<MediaItem[]>([]);
   const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
   const [streamingText, setStreamingText] = useState("");
@@ -83,7 +90,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const requestedConversationId = searchParams.get("conversation");
 
   const isPageChat = Boolean(activePageId);
-  const attachmentCount = imageFiles.length + libraryImages.length;
+  const attachmentCount = attachmentFiles.length + libraryImages.length;
 
   useEffect(() => {
     let active = true;
@@ -370,23 +377,33 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     }
   }
 
-  function addImages(files: FileList | null) {
+  function addAttachments(files: FileList | null) {
     if (!files) return;
     const selected = Array.from(files);
     if (fileInput.current) fileInput.current.value = "";
     const valid = selected.filter(
-      (file) =>
-        CHAT_IMAGE_TYPES.includes(file.type) &&
-        file.size <= MAX_CHAT_IMAGE_BYTES,
+      (file) => {
+        const type = file.type.toLowerCase();
+        const isPdf =
+          type === "application/pdf" ||
+          ((type === "" || type === "application/octet-stream") &&
+            file.name.toLowerCase().endsWith(".pdf"));
+        return (
+          (CHAT_ATTACHMENT_TYPES.includes(type) || isPdf) &&
+          file.size <= MAX_CHAT_ATTACHMENT_BYTES
+        );
+      },
     );
-    setImageFiles((current) =>
+    setAttachmentFiles((current) =>
       [...current, ...valid].slice(
         0,
         Math.max(0, MAX_CHAT_ATTACHMENTS - libraryImages.length),
       ),
     );
     if (valid.length !== selected.length) {
-      setError("Choose PNG, JPEG, or WebP images up to 20 MB each.");
+      setError(
+        "Choose PNG, JPEG, or WebP images, or PDF files up to 20 MB each.",
+      );
     }
   }
 
@@ -440,10 +457,10 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           }
         },
         activePageId,
-        imageFiles,
+        attachmentFiles,
         libraryImages.map((item) => item.key),
       );
-      setImageFiles([]);
+      setAttachmentFiles([]);
       setLibraryImages([]);
       await Promise.all([
         loadConversation(selectedConversation.id),
@@ -607,14 +624,28 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                     {message.content && <p>{message.content}</p>}
                     {message.attachments?.length > 0 && (
                       <div className="chat-message-attachments">
-                        {message.attachments.map((attachment) => (
-                          <img
-                            key={attachment.index}
-                            src={`${API_BASE_URL}${activePageId ? `/api/pages/${activePageId}` : "/api"}/chats/${conversation?.id}/attachments/${message.id}/${attachment.index}`}
-                            alt={attachment.name}
-                            loading="lazy"
-                          />
-                        ))}
+                        {message.attachments.map((attachment) => {
+                          const url = `${API_BASE_URL}${activePageId ? `/api/pages/${activePageId}` : "/api"}/chats/${conversation?.id}/attachments/${message.id}/${attachment.index}`;
+                          return attachment.contentType === "application/pdf" ? (
+                            <a
+                              className="chat-pdf-attachment"
+                              key={attachment.index}
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <FileText size={18} aria-hidden="true" />
+                              {attachment.name}
+                            </a>
+                          ) : (
+                            <img
+                              key={attachment.index}
+                              src={url}
+                              alt={attachment.name}
+                              loading="lazy"
+                            />
+                          );
+                        })}
                       </div>
                     )}
                     {message.status === "failed" && (
@@ -698,18 +729,19 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           <form
             className={`chat-composer${attachmentCount > 0 ? " has-attachments" : ""}`}
             onSubmit={submit}
+            aria-busy={sending}
           >
             {attachmentCount > 0 && (
               <div
                 className="chat-attachment-tray"
                 aria-label="Message attachments"
               >
-                {imageFiles.map((file, index) => (
-                  <LocalImagePreview
+                {attachmentFiles.map((file, index) => (
+                  <LocalAttachmentPreview
                     key={`${file.name}-${file.size}-${index}`}
                     file={file}
                     onRemove={() =>
-                      setImageFiles((current) =>
+                      setAttachmentFiles((current) =>
                         current.filter((_, itemIndex) => itemIndex !== index),
                       )
                     }
@@ -753,16 +785,16 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                   ref={fileInput}
                   className="sr-only"
                   type="file"
-                  accept={CHAT_IMAGE_TYPES.join(",")}
+                  accept={`${CHAT_ATTACHMENT_TYPES.join(",")},.pdf`}
                   multiple
-                  onChange={(event) => addImages(event.target.files)}
-                  aria-label="Attach images"
+                  onChange={(event) => addAttachments(event.target.files)}
+                  aria-label="Attach images or PDFs"
                 />
                 <button
                   type="button"
                   className="chat-attachment-button"
-                  aria-label="Attach images"
-                  title="Attach images"
+                  aria-label="Attach images or PDFs"
+                  title="Attach images or PDFs"
                   disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
                   onClick={() => fileInput.current?.click()}
                 >
@@ -807,12 +839,20 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                 </span>
               </label>
               <button
-                className="chat-composer-submit"
+                className={`chat-composer-submit${sending ? " is-loading" : ""}`}
                 type="submit"
                 aria-label={sending ? "Responding" : "Send message"}
                 disabled={sending || (!draft.trim() && attachmentCount === 0)}
               >
-                <ArrowUp size={19} strokeWidth={2} aria-hidden="true" />
+                {sending ? (
+                  <LoaderCircle
+                    className="chat-composer-loader"
+                    size={18}
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <ArrowUp size={19} strokeWidth={2} aria-hidden="true" />
+                )}
               </button>
             </div>
           </form>
@@ -821,13 +861,15 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       {libraryPickerOpen && (
         <LibraryPicker
           pageId={activePageId}
-          accept={CHAT_IMAGE_TYPES}
-          limit={MAX_CHAT_ATTACHMENTS - imageFiles.length}
+          accept={CHAT_ATTACHMENT_TYPES.filter((type) =>
+            type.startsWith("image/"),
+          )}
+          limit={MAX_CHAT_ATTACHMENTS - attachmentFiles.length}
           onSelect={(items) => {
             setLibraryImages(
               items.slice(
                 0,
-                Math.max(0, MAX_CHAT_ATTACHMENTS - imageFiles.length),
+                Math.max(0, MAX_CHAT_ATTACHMENTS - attachmentFiles.length),
               ),
             );
             setLibraryPickerOpen(false);
@@ -839,7 +881,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   );
 }
 
-function LocalImagePreview({
+function LocalAttachmentPreview({
   file,
   onRemove,
 }: {
@@ -848,13 +890,21 @@ function LocalImagePreview({
 }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
+    if (file.type === "application/pdf") return;
     const objectUrl = URL.createObjectURL(file);
     setUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
   return (
     <div className="chat-attachment-preview">
-      {url && <img src={url} alt={file.name} />}
+      {file.type === "application/pdf" ? (
+        <div className="chat-pdf-preview">
+          <FileText size={22} aria-hidden="true" />
+          <span>{file.name}</span>
+        </div>
+      ) : (
+        url && <img src={url} alt={file.name} />
+      )}
       <button
         type="button"
         className="chat-attachment-remove"

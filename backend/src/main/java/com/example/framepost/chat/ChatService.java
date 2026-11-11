@@ -248,12 +248,12 @@ public class ChatService {
                 .distinct()
                 .toList();
         if (nonEmptyUploads.size() + nonBlankKeys.size() > MAX_ATTACHMENTS) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach up to 4 images per message");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach up to 4 images or PDFs per message");
         }
         List<AttachmentSource> sources = new ArrayList<>();
         for (MultipartFile upload : nonEmptyUploads) {
             if (upload.getSize() > MAX_ATTACHMENT_BYTES) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be 20 MB or smaller");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each attachment must be 20 MB or smaller");
             }
             byte[] bytes;
             try {
@@ -261,13 +261,13 @@ public class ChatService {
             } catch (IOException exception) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to read an attached image");
             }
-            String contentType = normalizedImageType(upload.getContentType(), bytes);
+            String contentType = normalizedAttachmentType(upload.getContentType(), upload.getOriginalFilename(), bytes);
             sources.add(new AttachmentSource(safeName(upload.getOriginalFilename(), contentType), contentType, bytes));
             validateAttachmentLimits(sources);
         }
         for (String key : nonBlankKeys) {
             LibraryFile file = libraryFiles.resolve(user, conversation.pageId(), key);
-            String contentType = normalizedImageType(file.contentType(), file.bytes());
+            String contentType = normalizedAttachmentType(file.contentType(), file.name(), file.bytes());
             sources.add(new AttachmentSource(safeName(file.name(), contentType), contentType, file.bytes()));
             validateAttachmentLimits(sources);
         }
@@ -290,30 +290,44 @@ public class ChatService {
 
     private void validateAttachmentLimits(List<AttachmentSource> sources) {
         if (sources.size() > MAX_ATTACHMENTS) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach up to 4 images per message");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attach up to 4 images or PDFs per message");
         }
         long total = 0;
         for (AttachmentSource source : sources) {
             if (source.bytes().length == 0 || source.bytes().length > MAX_ATTACHMENT_BYTES) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be 10 MB or smaller");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each attachment must be 20 MB or smaller");
             }
             total += source.bytes().length;
         }
         if (total > MAX_TOTAL_ATTACHMENT_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Images must total 20 MB or less");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Attachments must total 40 MB or less");
         }
     }
 
-    private String normalizedImageType(String declaredType, byte[] bytes) {
+    private String normalizedAttachmentType(String declaredType, String fileName, byte[] bytes) {
         String type = declaredType == null ? "" : declaredType.toLowerCase(Locale.ROOT).split(";")[0].trim();
-        String detected = detectImageType(bytes);
-        if (!IMAGE_TYPES.contains(type) || !type.equals(detected)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only PNG, JPEG, and WebP images are supported");
+        String detected = detectAttachmentType(bytes);
+        if (IMAGE_TYPES.contains(type) && type.equals(detected)) {
+            return type;
         }
-        return type;
+        boolean pdfName = fileName != null && fileName.toLowerCase(Locale.ROOT).endsWith(".pdf");
+        if (detected.equals("application/pdf")
+                && (type.equals("application/pdf")
+                        || ((type.isBlank() || type.equals("application/octet-stream")) && pdfName))) {
+            return "application/pdf";
+        }
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST, "Only PNG, JPEG, WebP images, and PDF files are supported");
     }
 
-    private String detectImageType(byte[] bytes) {
+    private String detectAttachmentType(byte[] bytes) {
+        int headerLimit = Math.min(bytes.length - 4, 1024);
+        for (int index = 0; index <= headerLimit; index++) {
+            if (bytes[index] == '%' && bytes[index + 1] == 'P' && bytes[index + 2] == 'D'
+                    && bytes[index + 3] == 'F' && bytes[index + 4] == '-') {
+                return "application/pdf";
+            }
+        }
         if (bytes.length >= 8 && (bytes[0] & 0xff) == 0x89 && "PNG\r\n\u001a\n".equals(
                 new String(bytes, 1, 7, StandardCharsets.ISO_8859_1))) {
             return "image/png";
@@ -334,6 +348,9 @@ public class ChatService {
         if (name.isBlank() || name.equals(".")) {
             name = "image" + extension(contentType);
         }
+        if ("application/pdf".equals(contentType) && !name.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            name += ".pdf";
+        }
         return name.length() > 120 ? name.substring(name.length() - 120) : name;
     }
 
@@ -342,6 +359,7 @@ public class ChatService {
             case "image/png" -> ".png";
             case "image/jpeg" -> ".jpg";
             case "image/webp" -> ".webp";
+            case "application/pdf" -> ".pdf";
             default -> "";
         };
     }
