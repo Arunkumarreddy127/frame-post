@@ -143,21 +143,6 @@ function RenderedAppShell({
         username={user.username}
         pageTitle={pageTitle}
         onLogout={onLogout}
-        actions={
-          chatPanel ? (
-            <button
-              type="button"
-              className={`chat-toggle${chatOpen ? " active" : ""}`}
-              aria-pressed={chatOpen}
-              aria-label={chatOpen ? "Hide chat" : "Show chat"}
-              title={chatOpen ? "Hide chat" : "Show chat"}
-              onClick={() => setChatOpen((current) => !current)}
-            >
-              <MessageSquare size={17} strokeWidth={2} aria-hidden="true" />
-              <span>Chat</span>
-            </button>
-          ) : undefined
-        }
       />
       <div
         className={`app-body${showChat ? " has-chat" : ""}`}
@@ -167,7 +152,24 @@ function RenderedAppShell({
         ) : (
           <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
         )}
-        <main className="app-main">{children}</main>
+        <main className="app-main">
+          {chatPanel && (
+            <div className="app-main-toolbar">
+              <button
+                type="button"
+                className={`chat-toggle${chatOpen ? " active" : ""}`}
+                aria-pressed={chatOpen}
+                aria-label={chatOpen ? "Hide chat" : "Show chat"}
+                title={chatOpen ? "Hide chat" : "Show chat"}
+                onClick={() => setChatOpen((current) => !current)}
+              >
+                <MessageSquare size={17} strokeWidth={2} aria-hidden="true" />
+                <span>Chat</span>
+              </button>
+            </div>
+          )}
+          {children}
+        </main>
         {chatPanel && (
           <aside className="app-chat" hidden={!chatOpen}>
             <ChatPanel pageId={pageId} />

@@ -255,6 +255,12 @@ a:hover {
   padding-bottom: 3rem;
 }
 
+.app-main-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
 .auth-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 25rem);
