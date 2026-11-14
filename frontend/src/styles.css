@@ -71,12 +71,25 @@ a:hover {
 
 .app-header-inner {
   display: grid;
-  grid-template-columns: minmax(11rem, 1fr) minmax(0, 2fr) minmax(11rem, 1fr);
+  grid-template-columns: 11.5rem minmax(0, 1fr);
   align-items: center;
   width: min(100%, 76rem);
   min-height: inherit;
   margin: 0 auto;
   padding: 0 1.5rem;
+  gap: 1.5rem;
+}
+
+.app-header-inner.has-chat {
+  grid-template-columns: 11.5rem minmax(0, 1fr) clamp(22rem, 26vw, 27rem);
+  width: min(100%, 100rem);
+}
+
+.app-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
   gap: 1rem;
 }
 
@@ -108,9 +121,18 @@ a:hover {
   color: #1f2328;
   font-size: 0.95rem;
   font-weight: 600;
-  text-align: center;
+  text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app-header-inner.has-chat .app-header-main {
+  display: contents;
+}
+
+.app-header-inner.has-chat .app-header-title {
+  grid-column: 2;
+  justify-self: start;
 }
 
 .user-info {
@@ -966,6 +988,11 @@ textarea {
   justify-content: flex-end;
   min-width: 0;
   gap: 0.75rem;
+}
+
+.app-header-inner.has-chat .app-header-right {
+  grid-column: 3;
+  justify-self: end;
 }
 
 .chat-instruction-picker {
@@ -2124,14 +2151,21 @@ h2 {
     padding: 0.6rem 1rem;
   }
 
+  .app-header-main,
+  .app-header-inner.has-chat .app-header-main {
+    display: contents;
+  }
+
   .app-header-title {
     grid-column: 1 / -1;
     grid-row: 2;
     text-align: left;
   }
 
-  .user-info-label {
-    display: none;
+  .app-header-right,
+  .app-header-inner.has-chat .app-header-right {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .app-body {
@@ -3000,6 +3034,16 @@ h2 {
 }
 
 @media (max-width: 1100px) {
+  .app-header-inner.has-chat {
+    grid-template-columns: 11.5rem minmax(0, 1fr);
+    width: min(100%, 76rem);
+  }
+
+  .app-header-inner.has-chat .app-header-main {
+    display: flex;
+    grid-column: 2;
+  }
+
   .app-body.has-chat {
     grid-template-columns: 11.5rem minmax(0, 1fr);
   }
@@ -3600,5 +3644,34 @@ h2 {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-header-inner.has-chat {
+    grid-template-columns: 1fr auto;
+    width: min(100%, 76rem);
+  }
+
+  .app-header-main,
+  .app-header-inner.has-chat .app-header-main {
+    display: contents;
+  }
+
+  .app-header-title {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .app-header-inner.has-chat .app-header-title {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+  }
+
+  .app-header-right,
+  .app-header-inner.has-chat .app-header-right {
+    grid-column: 2;
+    grid-row: 1;
   }
 }

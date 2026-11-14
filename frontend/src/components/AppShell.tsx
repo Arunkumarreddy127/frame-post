@@ -144,6 +144,7 @@ function RenderedAppShell({
       <Header
         username={user.username}
         pageTitle={pageTitle}
+        chatOpen={showChat}
         onLogout={onLogout}
       />
       <div
