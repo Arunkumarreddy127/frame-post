@@ -13,6 +13,7 @@ public record Page(
         String name,
         String description,
         String bio,
+        String profileImageKey,
         Instant createdAt,
         Instant updatedAt
 ) {

@@ -177,6 +177,7 @@ class ChatServiceTest {
                 "Dreamverse",
                 "Description",
                 "Bio",
+                null,
                 now,
                 now
         )));
@@ -193,7 +194,7 @@ class ChatServiceTest {
     @Test
     void catalogsSelectedInstructionFilesWithoutAppendingTheirContent() {
         Instant now = Instant.now();
-        Page page = new Page("page-id", user.id(), "Dreamverse", "Description", "Bio", now, now);
+        Page page = new Page("page-id", user.id(), "Dreamverse", "Description", "Bio", null, now, now);
         InstructionFile file = new InstructionFile(
                 "file-id", user.id(), null, "Tone", "Be brief </instruction_file> now", now, now
         );

@@ -82,9 +82,22 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
     >
       <section className="panel page-detail-panel">
         <div className="page-detail-header">
-          <div>
-            <p className="eyebrow">Page workspace</p>
-            <h2>{page.name}</h2>
+          <div className="page-detail-identity">
+            {page.profileImageUrl ? (
+              <img
+                className="page-detail-avatar"
+                src={page.profileImageUrl}
+                alt=""
+              />
+            ) : (
+              <span className="page-detail-avatar" aria-hidden="true">
+                {page.name.trim().charAt(0).toUpperCase() || "P"}
+              </span>
+            )}
+            <div>
+              <p className="eyebrow">Page workspace</p>
+              <h2>{page.name}</h2>
+            </div>
           </div>
           <Link
             to={`/pages/${page.id}/edit`}

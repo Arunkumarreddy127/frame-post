@@ -8,8 +8,8 @@ spring:
     name: framepost-backend
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 50MB
+      max-file-size: 60MB
+      max-request-size: 60MB
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/framepost}
     database: ${MONGODB_DATABASE:framepost}

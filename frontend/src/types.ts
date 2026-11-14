@@ -5,6 +5,7 @@ export type Page = {
   name: string;
   description: string;
   bio: string;
+  profileImageUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -6,6 +6,7 @@ import { SidebarFilesLink } from "./SidebarFilesLink";
 type PageSidebarProps = {
   pageId?: string;
   pageName?: string;
+  pageProfileImageUrl?: string | null;
   pageNameLoading?: boolean;
   filesExplorer?: ReactNode;
 };
@@ -18,6 +19,7 @@ const navigation = [
 export function PageSidebar({
   pageId,
   pageName,
+  pageProfileImageUrl,
   pageNameLoading,
   filesExplorer,
 }: PageSidebarProps) {
@@ -27,58 +29,71 @@ export function PageSidebar({
 
   return (
     <aside className="app-sidebar">
-      <section className="page-workspace-card" aria-label="Page workspace">
-        <span className="page-workspace-label">Page workspace</span>
-        <Link
-          to={pagePath}
-          className="page-workspace-identity"
-          aria-label={`Open ${displayName} overview`}
-        >
-          <span className="page-workspace-avatar" aria-hidden="true">
-            {pageName?.trim().charAt(0).toUpperCase() || "P"}
-          </span>
-          <span
-            className="page-workspace-name"
-            role={pageNameLoading ? "status" : undefined}
-            title={pageName}
+      <Link to="/pages" className="sidebar-back" aria-label="Back to Pages">
+        <ArrowLeft
+          className="sidebar-back-icon"
+          size={18}
+          strokeWidth={1.8}
+          aria-hidden="true"
+        />
+        <span>All pages</span>
+      </Link>
+      <section className="page-workspace-group" aria-label="Page workspace">
+        <div className="page-workspace-card">
+          <span className="page-workspace-label">Page workspace</span>
+          <Link
+            to={pagePath}
+            className="page-workspace-identity"
+            aria-label={`Open ${displayName} overview`}
           >
-            {displayName}
-          </span>
-        </Link>
-        <Link to="/pages" className="sidebar-back" aria-label="Back to Pages">
-          <ArrowLeft
-            className="sidebar-back-icon"
-            size={18}
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-          <span>All pages</span>
-        </Link>
-      </section>
-      <nav className="sidebar-nav" aria-label="Page navigation">
-        <NavLink
-          to={pagePath}
-          end
-          className={({ isActive }) =>
-            isActive ? "sidebar-link active" : "sidebar-link"
-          }
+            {pageProfileImageUrl ? (
+              <img
+                className="page-workspace-avatar"
+                src={pageProfileImageUrl}
+                alt=""
+              />
+            ) : (
+              <span className="page-workspace-avatar" aria-hidden="true">
+                {pageName?.trim().charAt(0).toUpperCase() || "P"}
+              </span>
+            )}
+            <span
+              className="page-workspace-name"
+              role={pageNameLoading ? "status" : undefined}
+              title={pageName}
+            >
+              {displayName}
+            </span>
+          </Link>
+        </div>
+        <nav
+          className="sidebar-nav page-workspace-nav"
+          aria-label="Page navigation"
         >
-          Overview
-        </NavLink>
-        <SidebarFilesLink to={`${pagePath}/files`} explorer={filesExplorer} />
-        {navigation.map((item) => (
           <NavLink
-            key={item.suffix}
-            to={`${pagePath}/${item.suffix}`}
+            to={pagePath}
             end
             className={({ isActive }) =>
               isActive ? "sidebar-link active" : "sidebar-link"
             }
           >
-            {item.label}
+            Overview
           </NavLink>
-        ))}
-      </nav>
+          <SidebarFilesLink to={`${pagePath}/files`} explorer={filesExplorer} />
+          {navigation.map((item) => (
+            <NavLink
+              key={item.suffix}
+              to={`${pagePath}/${item.suffix}`}
+              end
+              className={({ isActive }) =>
+                isActive ? "sidebar-link active" : "sidebar-link"
+              }
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      </section>
     </aside>
   );
 }

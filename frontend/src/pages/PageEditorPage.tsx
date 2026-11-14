@@ -1,7 +1,8 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { API_BASE_URL, buildPageForm } from "../api";
 import { AppShell } from "../components/AppShell";
+import { PageWorkspaceUpdateContext } from "../components/PageWorkspaceLayout";
 import type { Page, PageFormState, ShellRouteProps } from "../types";
 
 type PageEditorPageProps = ShellRouteProps & {
@@ -11,6 +12,7 @@ type PageEditorPageProps = ShellRouteProps & {
 export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
   const navigate = useNavigate();
   const { pageId } = useParams();
+  const updatePageIdentity = useContext(PageWorkspaceUpdateContext);
   const [form, setForm] = useState<PageFormState>(buildPageForm());
   const [pageTitle, setPageTitle] = useState(
     mode === "new" ? "New page" : "Loading...",
@@ -18,6 +20,20 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<File | null>(null);
+  const [removeProfileImage, setRemoveProfileImage] = useState(false);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profileImage) {
+      setImagePreviewUrl(removeProfileImage ? null : profileImageUrl);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(profileImage);
+    setImagePreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [profileImage, profileImageUrl, removeProfileImage]);
 
   useEffect(() => {
     if (mode !== "edit" || !pageId) return;
@@ -33,6 +49,7 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
         const page: Page = await response.json();
         setForm(buildPageForm(page));
         setPageTitle(page.name);
+        setProfileImageUrl(page.profileImageUrl);
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -58,17 +75,23 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
           ? `${API_BASE_URL}/api/pages/${pageId}`
           : `${API_BASE_URL}/api/pages`;
       const method = mode === "edit" ? "PUT" : "POST";
+      const body = new FormData();
+      body.set("name", form.name);
+      body.set("description", form.description);
+      body.set("bio", form.bio);
+      if (profileImage) body.set("profileImage", profileImage);
+      if (removeProfileImage) body.set("removeProfileImage", "true");
       const response = await fetch(endpoint, {
         method,
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(form),
+        body,
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
         throw new Error(body?.message ?? "Unable to save page");
       }
       const page: Page = await response.json();
+      updatePageIdentity?.(page);
       navigate(`/pages/${page.id}`);
     } catch (requestError) {
       setError(
@@ -158,6 +181,55 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
                 maxLength={2000}
               />
             </label>
+            <div className="page-profile-image-field">
+              <span className="field-label-row">Profile picture</span>
+              <div className="page-profile-image-control">
+                {imagePreviewUrl ? (
+                  <img
+                    className="page-profile-image-preview"
+                    src={imagePreviewUrl}
+                    alt="Page profile preview"
+                  />
+                ) : (
+                  <span className="page-profile-image-placeholder" aria-hidden="true">
+                    {form.name.trim().charAt(0).toUpperCase() || "P"}
+                  </span>
+                )}
+                <div className="page-profile-image-actions">
+                  <label className="secondary-button page-profile-image-picker">
+                    Choose image
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={(event) => {
+                        const selected = event.currentTarget.files?.[0] ?? null;
+                        if (selected && selected.size > 5 * 1024 * 1024) {
+                          setError("Profile image must be 5 MB or smaller");
+                          event.currentTarget.value = "";
+                          return;
+                        }
+                        setError("");
+                        setProfileImage(selected);
+                        setRemoveProfileImage(false);
+                      }}
+                    />
+                  </label>
+                  {imagePreviewUrl ? (
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => {
+                        setProfileImage(null);
+                        setRemoveProfileImage(true);
+                      }}
+                    >
+                      Remove image
+                    </button>
+                  ) : null}
+                  <small>JPEG, PNG, WebP or GIF. Maximum 5 MB.</small>
+                </div>
+              </div>
+            </div>
             {error && (
               <p className="error" role="alert">
                 {error}

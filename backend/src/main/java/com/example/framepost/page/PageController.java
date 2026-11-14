@@ -6,6 +6,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,8 +14,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.framepost.auth.AuthService;
@@ -39,23 +43,54 @@ public class PageController {
     @GetMapping
     public List<PageResponse> list(HttpServletRequest request) {
         return pageService.list(currentUser(request)).stream()
-                .map(PageResponse::from)
+                .map(pageService::toResponse)
                 .toList();
     }
 
     @GetMapping("/{id}")
     public PageResponse get(@PathVariable String id, HttpServletRequest request) {
-        return PageResponse.from(pageService.get(currentUser(request), id));
+        return pageService.toResponse(pageService.get(currentUser(request), id));
     }
 
     @PostMapping
     public PageResponse create(@RequestBody PageRequest request, HttpServletRequest servletRequest) {
-        return PageResponse.from(pageService.create(currentUser(servletRequest), request));
+        return pageService.toResponse(pageService.create(currentUser(servletRequest), request));
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public PageResponse createWithProfileImage(
+            @RequestParam String name,
+            @RequestParam String description,
+            @RequestParam String bio,
+            @RequestPart(name = "profileImage", required = false) MultipartFile profileImage,
+            HttpServletRequest servletRequest
+    ) {
+        return pageService.toResponse(pageService.create(
+                currentUser(servletRequest), new PageRequest(name, description, bio), profileImage));
     }
 
     @PutMapping("/{id}")
     public PageResponse update(@PathVariable String id, @RequestBody PageRequest request, HttpServletRequest servletRequest) {
-        return PageResponse.from(pageService.update(currentUser(servletRequest), id, request));
+        return pageService.toResponse(pageService.update(currentUser(servletRequest), id, request));
+    }
+
+    @PutMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public PageResponse updateWithProfileImage(
+            @PathVariable String id,
+            @RequestParam String name,
+            @RequestParam String description,
+            @RequestParam String bio,
+            @RequestPart(name = "profileImage", required = false) MultipartFile profileImage,
+            @RequestParam(defaultValue = "false") boolean removeProfileImage,
+            HttpServletRequest servletRequest
+    ) {
+        return pageService.toResponse(pageService.update(
+                currentUser(servletRequest),
+                id,
+                new PageRequest(name, description, bio),
+                profileImage,
+                removeProfileImage
+        ));
     }
 
     @DeleteMapping("/{id}")

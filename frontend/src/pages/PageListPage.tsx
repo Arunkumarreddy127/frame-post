@@ -108,9 +108,13 @@ export function PageListPage({ user, onLogout }: ShellRouteProps) {
           {pages.map((page) => (
             <div className="page-card" key={page.id}>
               <Link to={`/pages/${page.id}`} className="page-card-link">
-                <span className="page-avatar" aria-hidden="true">
-                  {page.name.trim().charAt(0).toUpperCase() || "P"}
-                </span>
+                {page.profileImageUrl ? (
+                  <img className="page-avatar" src={page.profileImageUrl} alt="" />
+                ) : (
+                  <span className="page-avatar" aria-hidden="true">
+                    {page.name.trim().charAt(0).toUpperCase() || "P"}
+                  </span>
+                )}
                 <span className="page-card-text">
                   <strong>{page.name}</strong>
                   <span>{page.description}</span>

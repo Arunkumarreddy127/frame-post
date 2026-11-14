@@ -24,6 +24,7 @@ type AppShellProps = {
   sidebar?: "global" | "page";
   pageId?: string;
   pageName?: string;
+  pageProfileImageUrl?: string | null;
   pageNameLoading?: boolean;
   pageNameError?: string;
   filesExplorer?: React.ReactNode;
@@ -45,6 +46,7 @@ export function WorkspaceAppShell({
   onLogout,
   pageId,
   pageName,
+  pageProfileImageUrl,
   pageNameLoading,
   pageNameError,
 }: Pick<
@@ -54,6 +56,7 @@ export function WorkspaceAppShell({
   | "onLogout"
   | "pageId"
   | "pageName"
+  | "pageProfileImageUrl"
   | "pageNameLoading"
   | "pageNameError"
 >) {
@@ -77,6 +80,7 @@ export function WorkspaceAppShell({
       {...shellConfig}
       pageId={pageId}
       pageName={pageName}
+      pageProfileImageUrl={pageProfileImageUrl}
       pageNameLoading={pageNameLoading}
       pageNameError={pageNameError}
     >
@@ -143,11 +147,11 @@ function RenderedAppShell({
   children,
   user,
   onLogout,
-  pageTitle,
   backTo = "/home",
   sidebar = "global",
   pageId,
   pageName,
+  pageProfileImageUrl,
   pageNameLoading,
   pageNameError,
   filesExplorer,
@@ -169,7 +173,6 @@ function RenderedAppShell({
     <div className="shell app-shell">
       <Header
         username={user.username}
-        pageTitle={pageTitle}
         chatOpen={showChat}
         onLogout={onLogout}
       />
@@ -180,6 +183,7 @@ function RenderedAppShell({
           <PageSidebar
             pageId={pageId}
             pageName={pageName}
+            pageProfileImageUrl={pageProfileImageUrl}
             pageNameLoading={pageNameLoading}
             filesExplorer={filesExplorer}
           />

@@ -3,18 +3,16 @@ import { UserInfo } from "./UserInfo";
 
 type HeaderProps = {
   username: string;
-  pageTitle: string;
   chatOpen: boolean;
   onLogout: () => Promise<void>;
 };
 
-export function Header({ username, pageTitle, chatOpen, onLogout }: HeaderProps) {
+export function Header({ username, chatOpen, onLogout }: HeaderProps) {
   return (
     <header className="app-header">
       <div className={`app-header-inner${chatOpen ? " has-chat" : ""}`}>
         <LinkBrand />
         <div className="app-header-main">
-          <div className="app-header-title">{pageTitle}</div>
           <div className="app-header-right">
             <UserInfo username={username} onLogout={onLogout} />
           </div>

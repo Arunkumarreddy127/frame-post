@@ -1,21 +1,38 @@
-import { useEffect, useState } from "react";
+import { createContext, useCallback, useEffect, useState } from "react";
 import { Outlet, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../api";
 import { WorkspaceAppShell } from "./AppShell";
 import type { Page, ShellRouteProps } from "../types";
+
+export const PageWorkspaceUpdateContext = createContext<
+  ((page: Page) => void) | null
+>(null);
 
 export function PageWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
   const { pageId } = useParams<{ pageId: string }>();
   const [pageIdentity, setPageIdentity] = useState<{
     pageId: string;
     name?: string;
+    profileImageUrl?: string | null;
     error?: string;
   } | null>(null);
   const currentIdentity =
     pageIdentity?.pageId === pageId ? pageIdentity : null;
   const pageName = currentIdentity?.name;
+  const pageProfileImageUrl = currentIdentity?.profileImageUrl;
   const pageNameError = currentIdentity?.error;
   const pageNameLoading = Boolean(pageId) && !pageName && !pageNameError;
+  const updatePageIdentity = useCallback(
+    (page: Page) => {
+      if (page.id !== pageId) return;
+      setPageIdentity({
+        pageId: page.id,
+        name: page.name,
+        profileImageUrl: page.profileImageUrl,
+      });
+    },
+    [pageId],
+  );
 
   useEffect(() => {
     if (!pageId) return;
@@ -39,7 +56,11 @@ export function PageWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
           throw new Error("Page name is unavailable");
         }
         if (active) {
-          setPageIdentity({ pageId: activePageId, name });
+          setPageIdentity({
+            pageId: activePageId,
+            name,
+            profileImageUrl: page.profileImageUrl,
+          });
         }
       } catch (caught) {
         if (!active) return;
@@ -65,10 +86,13 @@ export function PageWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
       onLogout={onLogout}
       pageId={pageId}
       pageName={pageName}
+      pageProfileImageUrl={pageProfileImageUrl}
       pageNameLoading={pageNameLoading}
       pageNameError={pageNameError}
     >
-      <Outlet />
+      <PageWorkspaceUpdateContext.Provider value={updatePageIdentity}>
+        <Outlet />
+      </PageWorkspaceUpdateContext.Provider>
     </WorkspaceAppShell>
   );
 }
