@@ -54,6 +54,7 @@ public class ChatService {
     private final InstructionFileService instructionService;
     private final StorageService storage;
     private final LibraryFileResolver libraryFiles;
+    private final GlobalRulesProvider globalRules;
 
     public ChatService(
             ChatConversationRepository conversations,
@@ -64,7 +65,8 @@ public class ChatService {
             OpenAiClient openAiClient,
             InstructionFileService instructionService,
             StorageService storage,
-            LibraryFileResolver libraryFiles
+            LibraryFileResolver libraryFiles,
+            GlobalRulesProvider globalRules
     ) {
         this.conversations = conversations;
         this.messages = messages;
@@ -75,6 +77,7 @@ public class ChatService {
         this.instructionService = instructionService;
         this.storage = storage;
         this.libraryFiles = libraryFiles;
+        this.globalRules = globalRules;
     }
 
     public List<ChatConversationSummary> list(User user, String pageId) {
@@ -695,6 +698,16 @@ public class ChatService {
 
     String developerInstructions(Page page, List<InstructionFile> instructionFiles) {
         StringBuilder text = new StringBuilder();
+        if (!globalRules.text().isEmpty()) {
+            text.append("""
+                    Global rules that always apply in this application. They take precedence over
+                    selected instruction files and page metadata:
+                    <global_rules>
+                    %s
+                    </global_rules>
+
+                    """.formatted(globalRules.text()));
+        }
         if (page == null) {
             text.append("You are a helpful assistant in the user's private Framepost workspace.\n");
         } else {

@@ -1,0 +1,3 @@
+- Format every code snippet, command, JSON/YAML payload, prompt template, and file content in a fenced Markdown code block with a language tag (for example ```json or ```text).
+- Never put code, commands, or file contents inline in prose when they span more than one short token; use a fenced block instead.
+- When you propose complete text meant to be copied (such as a prompt or an instruction file), wrap it in a single fenced block with nothing else inside it.

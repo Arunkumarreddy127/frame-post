@@ -51,7 +51,8 @@ class ChatServiceTest {
             openAiClient,
             instructionService,
             storage,
-            libraryFiles
+            libraryFiles,
+            new GlobalRulesProvider("")
     );
     private final User user = new User("user-id", "framepost", "hash", Instant.now());
 
@@ -290,6 +291,35 @@ class ChatServiceTest {
         assertTrue(text.contains("propose_instruction_update"));
         assertTrue(!text.contains(file.content()));
         assertTrue(text.indexOf("</page>") < text.indexOf("<selected_instruction_files>"));
+    }
+
+    @Test
+    void prependsGlobalRulesBeforePageMetadataAndInstructionCatalog() {
+        ChatService withRules = new ChatService(
+                conversations,
+                messages,
+                pageService,
+                pages,
+                new OpenAiProperties("test-key", List.of("gpt-6-luna"), 120),
+                openAiClient,
+                instructionService,
+                storage,
+                libraryFiles,
+                new GlobalRulesProvider("  Use fenced code blocks.  ")
+        );
+        Instant now = Instant.now();
+        Page page = new Page("page-id", user.id(), "Dreamverse", "Description", "Bio", null, now, now);
+
+        String text = withRules.developerInstructions(page, List.of());
+
+        assertTrue(text.startsWith("Global rules"));
+        assertTrue(text.contains("<global_rules>\nUse fenced code blocks.\n</global_rules>"));
+        assertTrue(text.indexOf("</global_rules>") < text.indexOf("<page>"));
+    }
+
+    @Test
+    void loadsBundledGlobalRulesFromTheClasspath() {
+        assertTrue(new GlobalRulesProvider().text().contains("fenced Markdown code block"));
     }
 
     @Test
