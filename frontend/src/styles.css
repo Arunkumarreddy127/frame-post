@@ -203,6 +203,59 @@ a:hover {
   border-right: 1px solid #d0d7de;
 }
 
+.page-workspace-card {
+  display: grid;
+  min-width: 0;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid #d8dee4;
+  border-radius: 0.55rem;
+  background: #fff;
+}
+
+.page-workspace-label {
+  color: #57606a;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-workspace-identity {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.6rem;
+  color: #1f2328;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.page-workspace-identity:hover {
+  color: #1f6feb;
+}
+
+.page-workspace-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.45rem;
+  background: rgb(31 111 235 / 10%);
+  color: #1f6feb;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.page-workspace-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sidebar-back {
   display: inline-flex;
   align-items: center;
@@ -282,6 +335,10 @@ a:hover {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 0.75rem;
+}
+
+.page-workspace-error {
+  margin: 0 0 0.75rem;
 }
 
 .auth-shell {
@@ -3622,6 +3679,7 @@ h2 {
   .chat-toggle,
   .sidebar-link,
   .sidebar-back,
+  .page-workspace-identity,
   .icon-button {
     min-height: 2.75rem;
   }

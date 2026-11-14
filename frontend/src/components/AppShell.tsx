@@ -23,6 +23,9 @@ type AppShellProps = {
   backTo?: string;
   sidebar?: "global" | "page";
   pageId?: string;
+  pageName?: string;
+  pageNameLoading?: boolean;
+  pageNameError?: string;
   filesExplorer?: React.ReactNode;
   chatPanel?: boolean;
 };
@@ -41,7 +44,19 @@ export function WorkspaceAppShell({
   user,
   onLogout,
   pageId,
-}: Pick<AppShellProps, "children" | "user" | "onLogout" | "pageId">) {
+  pageName,
+  pageNameLoading,
+  pageNameError,
+}: Pick<
+  AppShellProps,
+  | "children"
+  | "user"
+  | "onLogout"
+  | "pageId"
+  | "pageName"
+  | "pageNameLoading"
+  | "pageNameError"
+>) {
   const [shellConfig, setShellConfig] = useState<AppShellConfig>({
     pageTitle: "Page workspace",
     backTo: "/pages",
@@ -56,7 +71,15 @@ export function WorkspaceAppShell({
   }, []);
 
   return (
-    <AppShell user={user} onLogout={onLogout} {...shellConfig} pageId={pageId}>
+    <AppShell
+      user={user}
+      onLogout={onLogout}
+      {...shellConfig}
+      pageId={pageId}
+      pageName={pageName}
+      pageNameLoading={pageNameLoading}
+      pageNameError={pageNameError}
+    >
       <WorkspaceShellConfigContext.Provider value={reportShellConfig}>
         {children}
       </WorkspaceShellConfigContext.Provider>
@@ -124,6 +147,9 @@ function RenderedAppShell({
   backTo = "/home",
   sidebar = "global",
   pageId,
+  pageName,
+  pageNameLoading,
+  pageNameError,
   filesExplorer,
   chatPanel = true,
 }: AppShellProps) {
@@ -151,7 +177,12 @@ function RenderedAppShell({
         className={`app-body${showChat ? " has-chat" : ""}`}
       >
         {sidebar === "page" ? (
-          <PageSidebar pageId={pageId} filesExplorer={filesExplorer} />
+          <PageSidebar
+            pageId={pageId}
+            pageName={pageName}
+            pageNameLoading={pageNameLoading}
+            filesExplorer={filesExplorer}
+          />
         ) : (
           <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
         )}
@@ -170,6 +201,11 @@ function RenderedAppShell({
                 <span>Chat</span>
               </button>
             </div>
+          )}
+          {pageNameError && sidebar === "page" && (
+            <p className="page-workspace-error error" role="alert">
+              Unable to load page name: {pageNameError}
+            </p>
           )}
           {children}
         </main>
