@@ -7,7 +7,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { LibraryPicker } from "../components/library/LibraryPicker";
 import { GenerationFeed } from "../components/generations/GenerationFeed";
@@ -15,6 +15,7 @@ import {
   createImageGeneration,
   downloadFile,
   getCatalog,
+  getGeneration,
 } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
 import type { Generation, MediaItem, ShellRouteProps } from "../types";
@@ -50,6 +51,7 @@ export function GptImageGenPage({
   pageId,
 }: GptImageGenPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
+  const [searchParams] = useSearchParams();
   const activePageId = pageId ?? routePageId;
   const createPath = activePageId ? `/pages/${activePageId}/create` : "/create";
 
@@ -86,6 +88,7 @@ export function GptImageGenPage({
   } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const promptInput = useRef<HTMLTextAreaElement>(null);
+  const restoredFrom = useRef("");
   const [fullView, setFullView] = useState<{ url: string; alt: string } | null>(
     null,
   );
@@ -130,7 +133,10 @@ export function GptImageGenPage({
   async function startEdit(item: Generation, result: MediaItem) {
     setError("");
     setPrompt(item.inputs.prompt ?? "");
-    if (item.inputs.model && models.includes(item.inputs.model)) {
+    if (item.inputs.model) {
+      if (!models.includes(item.inputs.model)) {
+        setModels((current) => [...current, item.inputs.model]);
+      }
       setModel(item.inputs.model);
     }
     setSize(item.inputs.size ?? "auto");
@@ -165,6 +171,75 @@ export function GptImageGenPage({
       );
     }
   }
+
+  async function startFromInput(item: Generation, input: MediaItem) {
+    setError("");
+    setPrompt(item.inputs.prompt ?? "");
+    if (item.inputs.model) {
+      if (!models.includes(item.inputs.model)) {
+        setModels((current) => [...current, item.inputs.model]);
+      }
+      setModel(item.inputs.model);
+    }
+    setSize(item.inputs.size ?? "auto");
+    setQuality(item.inputs.quality ?? "auto");
+    setCount(Number(item.inputs.count) || 1);
+    setParent(null);
+    setAttachments([]);
+    setLibraryItems([]);
+    if (fileInput.current) fileInput.current.value = "";
+    try {
+      const blob = await downloadFile(input.key);
+      const extension = blob.type.split("/")[1] ?? "png";
+      setAttachments([
+        new File([blob], input.name || `input.${extension}`, { type: blob.type }),
+      ]);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The selected source image could not be loaded; add it again if needed.",
+      );
+      return;
+    }
+    promptInput.current?.focus();
+    promptInput.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }
+
+  useEffect(() => {
+    const generationId = searchParams.get("from");
+    const resultKey = searchParams.get("result");
+    const restoreKey = `${generationId ?? ""}:${resultKey ?? ""}`;
+    if (!generationId || !resultKey || restoredFrom.current === restoreKey) return;
+    restoredFrom.current = restoreKey;
+    let cancelled = false;
+    getGeneration(generationId, activePageId)
+      .then(async (generation) => {
+        if (cancelled) return;
+        if (generation.provider !== "OPENAI") {
+          throw new Error("This result cannot be opened in the image generator.");
+        }
+        const output = generation.outputs.find((item) => item.key === resultKey);
+        if (output) {
+          await startEdit(generation, output);
+          return;
+        }
+        const input = generation.inputFiles.find((item) => item.key === resultKey);
+        if (!input) throw new Error("The selected result is no longer available.");
+        await startFromInput(generation, input);
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : "Unable to restore this generation");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePageId, searchParams]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

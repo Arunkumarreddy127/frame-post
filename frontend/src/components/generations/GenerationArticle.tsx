@@ -1,39 +1,22 @@
 import type { Generation, MediaItem } from "../../types";
 import { GenerationTile } from "./GenerationTile";
 
-const PROMPT_PREVIEW_LENGTH = 120;
-
-function truncatePrompt(prompt: string) {
-  return prompt.length > PROMPT_PREVIEW_LENGTH
-    ? `${prompt.slice(0, PROMPT_PREVIEW_LENGTH).trimEnd()}…`
-    : prompt;
-}
-
 type GenerationArticleProps = {
   generation: Generation;
   onFullView: (item: MediaItem, alt: string) => void;
   onDownload: (item: MediaItem) => void;
   onDelete: (generation: Generation) => void;
-  onShowPrompt: (text: string, anchor: HTMLElement) => void;
+  onShowParent: (generation: Generation) => void;
   onEdit?: (generation: Generation, output: MediaItem) => void;
 };
 
-function settingsLine(generation: Generation) {
-  if (generation.provider === "OPENAI") {
-    const { model, size, quality, count } = generation.inputs;
-    return [model, size, quality, count].filter(Boolean).join(" · ");
-  }
-  const { prompt: _prompt, ...settings } = generation.inputs;
-  return [generation.workflowKey ?? "Workflow", ...Object.values(settings)].join(" · ");
-}
-
-/** One generation: its outputs, or its progress or failure, plus settings and prompt. */
+/** One generation: its outputs, progress, failure, and source navigation. */
 export function GenerationArticle({
   generation,
   onFullView,
   onDownload,
   onDelete,
-  onShowPrompt,
+  onShowParent,
   onEdit,
 }: GenerationArticleProps) {
   const prompt = generation.inputs.prompt ?? "";
@@ -72,27 +55,28 @@ export function GenerationArticle({
           ))}
         </div>
       )}
-      <div className="image-gen-meta">
-        <p className="status">{settingsLine(generation)}</p>
-        {generation.parentGenerationId && (
-          <p className="status">Edited from a previous image</p>
-        )}
-        {!prompt && generation.inputFiles.length > 0 && (
-          <p className="status">
-            {generation.inputFiles.map((file) => file.name).join(", ")}
-          </p>
-        )}
-        {prompt && (
-          <button
-            type="button"
-            className="image-gen-result-prompt"
-            title="View full prompt"
-            onClick={(event) => onShowPrompt(prompt, event.currentTarget)}
-          >
-            {truncatePrompt(prompt)}
-          </button>
-        )}
-      </div>
+      {(generation.parentGenerationId ||
+        (!prompt && generation.inputFiles.length > 0)) && (
+        <div className="image-gen-meta">
+          {generation.parentGenerationId &&
+            (generation.parentResultKey ? (
+              <button
+                type="button"
+                className="image-gen-parent-link"
+                onClick={() => onShowParent(generation)}
+              >
+                View original image
+              </button>
+            ) : (
+              <p className="status">Original image is unavailable.</p>
+            ))}
+          {!prompt && generation.inputFiles.length > 0 && (
+            <p className="status">
+              {generation.inputFiles.map((file) => file.name).join(", ")}
+            </p>
+          )}
+        </div>
+      )}
     </article>
   );
 }

@@ -1,7 +1,9 @@
 import type { MediaItem } from "../../types";
+import { MediaTile, mediaLineageLabel } from "../media/MediaTile";
 
 type LibraryMediaGridProps = {
   items: MediaItem[];
+  onOpen: (item: MediaItem) => void;
   onDownload: (item: MediaItem) => void;
   onDelete: (item: MediaItem) => void;
   onEdit: (item: MediaItem) => void;
@@ -10,6 +12,7 @@ type LibraryMediaGridProps = {
 /** Stored files shown as plain tiles, without the generation they came from. */
 export function LibraryMediaGrid({
   items,
+  onOpen,
   onDownload,
   onDelete,
   onEdit,
@@ -17,42 +20,24 @@ export function LibraryMediaGrid({
   return (
     <div className="library-grid">
       {items.map((item) => (
-        <figure className="library-card" key={item.id}>
-          <div className="library-preview">
-            {item.mediaType === "video" ? (
-              <video src={item.url} controls preload="metadata" />
-            ) : (
-              <img src={item.url} alt={item.name} loading="lazy" />
-            )}
-          </div>
-          <figcaption>
-            <span className="library-name" title={item.name}>
-              {item.name}
+        <article className="library-card" key={item.id}>
+          <MediaTile
+            item={item}
+            alt={item.name}
+            className="library-media-tile"
+            lineageLabel={mediaLineageLabel(item)}
+            onOpen={() => onOpen(item)}
+            onDownload={() => onDownload(item)}
+            onEdit={() => onEdit(item)}
+            onDelete={() => onDelete(item)}
+          />
+          <div className="library-card-caption">
+            <span className="library-name" title={item.name}>{item.name}</span>
+            <span className="library-kind">
+              {item.slot ? "Input" : "Output"} · {item.mediaType}
             </span>
-            <button
-              type="button"
-              className="library-download"
-              onClick={() => onDownload(item)}
-            >
-              <span aria-hidden="true">↓</span>
-              Download
-            </button>
-            <button
-              type="button"
-              className="library-download"
-              onClick={() => onEdit(item)}
-            >
-              Open in generator
-            </button>
-            <button
-              type="button"
-              className="library-download"
-              onClick={() => onDelete(item)}
-            >
-              Delete
-            </button>
-          </figcaption>
-        </figure>
+          </div>
+        </article>
       ))}
     </div>
   );

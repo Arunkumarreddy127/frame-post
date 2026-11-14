@@ -1,8 +1,10 @@
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useState } from "react";
 import { useInfiniteScroll } from "../../hooks/useInfiniteScroll";
 import { useMediaPages } from "../../hooks/useGenerationPages";
 import type { MediaItem } from "../../types";
+import { MediaTile, mediaLineageLabel } from "../media/MediaTile";
+import { MediaViewer } from "../media/MediaViewer";
 
 type LibraryPickerProps = {
   pageId?: string;
@@ -28,6 +30,7 @@ export function LibraryPicker({
 }: LibraryPickerProps) {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("outputs");
   const [selected, setSelected] = useState<MediaItem[]>([]);
+  const [viewing, setViewing] = useState<MediaItem | null>(null);
   const { items, hasMore, loading, error, loadMore } = useMediaPages(
     tab,
     pageId,
@@ -94,25 +97,16 @@ export function LibraryPicker({
             {visible.map((item) => {
               const chosen = selected.some((entry) => entry.key === item.key);
               return (
-                <button
+                <MediaTile
                   key={item.id}
-                  type="button"
-                  className={`library-picker-tile${chosen ? " selected" : ""}`}
-                  aria-pressed={chosen}
-                  title={item.name}
-                  onClick={() => toggle(item)}
-                >
-                  {item.mediaType === "video" ? (
-                    <video src={item.url} preload="metadata" muted />
-                  ) : (
-                    <img src={item.url} alt={item.name} loading="lazy" />
-                  )}
-                  {chosen && (
-                    <span className="library-picker-check">
-                      <Check size={14} aria-hidden="true" />
-                    </span>
-                  )}
-                </button>
+                  item={item}
+                  alt={item.name}
+                  className="library-picker-tile"
+                  lineageLabel={mediaLineageLabel(item)}
+                  selected={chosen}
+                  onSelect={() => toggle(item)}
+                  onOpen={() => setViewing(item)}
+                />
               );
             })}
           </div>
@@ -133,6 +127,14 @@ export function LibraryPicker({
           </button>
         </footer>
       </div>
+      {viewing && (
+        <MediaViewer
+          item={viewing}
+          items={visible}
+          onSelect={setViewing}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </div>
   );
 }

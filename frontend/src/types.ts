@@ -103,6 +103,8 @@ export type MediaItem = {
   height: number | null;
   durationSeconds: number | null;
   createdAt: string;
+  parentGenerationId: string | null;
+  sourceCount: number;
 };
 
 export type Generation = {
@@ -111,6 +113,7 @@ export type Generation = {
   provider: GenerationProvider;
   mediaType: "IMAGE" | "VIDEO";
   workflowKey: string | null;
+  instanceType: string | null;
   inputs: Record<string, string>;
   status: GenerationStatus;
   error: string | null;

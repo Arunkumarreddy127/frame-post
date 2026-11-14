@@ -95,6 +95,25 @@ public class ContentGenerationStore {
         return generationRepository.findById(generationId).map(generation -> hydrate(List.of(generation)).getFirst());
     }
 
+    public List<ContentGeneration> findGenerationsByIds(
+            String userId, String pageId, boolean globalOnly, List<String> generationIds
+    ) {
+        if (generationIds.isEmpty()) {
+            return List.of();
+        }
+        List<Criteria> criteria = scope(userId, pageId, globalOnly);
+        criteria.add(Criteria.where("id").in(generationIds));
+        return mongo.find(new Query(new Criteria().andOperator(criteria)), ContentGeneration.class);
+    }
+
+    public List<ContentGeneration> queryChildren(
+            String userId, String pageId, String parentGenerationId, Cursor cursor, int limit
+    ) {
+        List<Criteria> criteria = scope(userId, pageId, pageId == null);
+        criteria.add(Criteria.where("parentGenerationId").is(parentGenerationId));
+        return mongo.find(build(criteria, cursor, limit), ContentGeneration.class);
+    }
+
     /** Attaches files with two batch queries, however many generations there are. */
     public List<Hydrated> hydrate(List<ContentGeneration> generations) {
         if (generations.isEmpty()) {

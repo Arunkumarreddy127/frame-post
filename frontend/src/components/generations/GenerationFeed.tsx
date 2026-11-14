@@ -1,7 +1,8 @@
-import { X } from "lucide-react";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   deleteGeneration,
+  getGeneration,
   saveFile,
   subscribeToGeneration,
 } from "../../generationApi";
@@ -9,36 +10,7 @@ import { useInfiniteScroll } from "../../hooks/useInfiniteScroll";
 import type { Generation, MediaItem } from "../../types";
 import { useConfirm } from "../ConfirmDialog";
 import { GenerationArticle } from "./GenerationArticle";
-
-const POPOVER_WIDTH = 480;
-const POPOVER_GAP = 8;
-
-function popoverPosition(anchor: HTMLElement): CSSProperties {
-  const rect = anchor.getBoundingClientRect();
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const width = Math.min(POPOVER_WIDTH, viewportWidth - POPOVER_GAP * 2);
-  const left = Math.min(
-    Math.max(rect.left, POPOVER_GAP),
-    viewportWidth - width - POPOVER_GAP,
-  );
-  const spaceBelow = viewportHeight - rect.bottom;
-  const spaceAbove = rect.top;
-  if (spaceBelow >= 200 || spaceBelow >= spaceAbove) {
-    return {
-      top: rect.bottom + POPOVER_GAP,
-      left,
-      width,
-      maxHeight: spaceBelow - POPOVER_GAP * 2,
-    };
-  }
-  return {
-    bottom: viewportHeight - rect.top + POPOVER_GAP,
-    left,
-    width,
-    maxHeight: spaceAbove - POPOVER_GAP * 2,
-  };
-}
+import { MediaViewer } from "../media/MediaViewer";
 
 type GenerationFeedProps = {
   items: Generation[];
@@ -53,8 +25,8 @@ type GenerationFeedProps = {
 };
 
 /**
- * Renders generations of any provider as newest-first articles. Owns the full-size viewer, the prompt
- * popover, live updates for processing items and loading of further pages as the end scrolls into view.
+ * Renders generations of any provider as newest-first articles. Owns the full-size viewer,
+ * live updates for processing items, and loading further pages as the end scrolls into view.
  */
 export function GenerationFeed({
   items,
@@ -69,19 +41,72 @@ export function GenerationFeed({
 }: GenerationFeedProps) {
   const [error, setError] = useState("");
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [fullView, setFullView] = useState<{
-    item: MediaItem;
-    alt: string;
-  } | null>(null);
-  const [promptPopover, setPromptPopover] = useState<{
-    text: string;
-    anchor: HTMLElement;
-  } | null>(null);
-  const [, setLayoutTick] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const restoredMediaId = useRef("");
+  const [fullView, setFullView] = useState<MediaItem | null>(null);
   const sentinel = useInfiniteScroll<HTMLDivElement>(
     onLoadMore,
     hasMore && !loading,
   );
+  const viewerItems = useMemo(
+    () => items.flatMap((generation) => generation.outputs),
+    [items],
+  );
+  const mediaId = searchParams.get("media");
+  const viewerAlt =
+    items.find((generation) =>
+      generation.outputs.some((output) => output.id === fullView?.id),
+    )?.inputs.prompt ?? fullView?.name;
+
+  function showMedia(item: MediaItem, replace = true) {
+    setFullView(item);
+    const next = new URLSearchParams(searchParams);
+    next.set("media", item.id);
+    setSearchParams(next, { replace });
+  }
+
+  function closeMediaViewer() {
+    setFullView(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("media");
+    setSearchParams(next, { replace: true });
+  }
+
+  useEffect(() => {
+    if (!mediaId) {
+      restoredMediaId.current = "";
+      setFullView(null);
+      return;
+    }
+    const visible = viewerItems.find((item) => item.id === mediaId);
+    if (visible) {
+      restoredMediaId.current = mediaId;
+      setFullView(visible);
+      return;
+    }
+    if (restoredMediaId.current === mediaId) return;
+    const match = mediaId.match(/:(?:in|out):/);
+    if (!match || match.index === undefined) return;
+    restoredMediaId.current = mediaId;
+    let cancelled = false;
+    getGeneration(mediaId.slice(0, match.index))
+      .then((generation) => {
+        if (cancelled) return;
+        const selected = [...generation.inputFiles, ...generation.outputs].find(
+          (item) => item.id === mediaId,
+        );
+        if (selected) setFullView(selected);
+        else setError("That media item is no longer available.");
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : "Unable to open media");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaId, viewerItems]);
 
   const processingIds = items
     .filter((item) => item.status === "PROCESSING")
@@ -96,26 +121,6 @@ export function GenerationFeed({
     return () => closers.forEach((close) => close());
   }, [processingIds, onUpdate]);
 
-  useEffect(() => {
-    if (!fullView && !promptPopover) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      setFullView(null);
-      setPromptPopover(null);
-    }
-    function onLayoutChange() {
-      setLayoutTick((tick) => tick + 1);
-    }
-    document.addEventListener("keydown", onKeyDown);
-    window.addEventListener("scroll", onLayoutChange, true);
-    window.addEventListener("resize", onLayoutChange);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", onLayoutChange, true);
-      window.removeEventListener("resize", onLayoutChange);
-    };
-  }, [fullView, promptPopover]);
-
   async function download(item: MediaItem) {
     setError("");
     try {
@@ -129,18 +134,37 @@ export function GenerationFeed({
     }
   }
 
+  async function showParent(generation: Generation) {
+    if (!generation.parentGenerationId || !generation.parentResultKey) return;
+    setError("");
+    try {
+      const parent = await getGeneration(generation.parentGenerationId, generation.pageId ?? undefined);
+      const source = parent.outputs.find((item) => item.key === generation.parentResultKey);
+      if (!source) {
+        setError("The original image is no longer available.");
+        return;
+      }
+      showMedia(source, false);
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Unable to open the original image",
+      );
+    }
+  }
+
   async function remove(generation: Generation) {
+    const fileCount = generation.inputFiles.length + generation.outputs.length;
     const accepted = await confirm({
       title: "Delete this generation?",
-      message:
-        "The generation and all of its files will be permanently deleted. This cannot be undone.",
-      confirmLabel: "Delete",
+      message: `This removes the generation and its ${fileCount} associated file${fileCount === 1 ? "" : "s"}. Shared media files remain available to other generations. This cannot be undone.`,
+      confirmLabel: `Delete generation (${fileCount} file${fileCount === 1 ? "" : "s"})`,
       danger: true,
     });
     if (!accepted) return;
     setError("");
     try {
       await deleteGeneration(generation.id);
+      if (fullView?.generationId === generation.id) closeMediaViewer();
       onDeleted(generation);
     } catch (caught) {
       setError(
@@ -161,10 +185,10 @@ export function GenerationFeed({
           <GenerationArticle
             key={generation.id}
             generation={generation}
-            onFullView={(item, alt) => setFullView({ item, alt })}
+            onFullView={(item) => showMedia(item, false)}
             onDownload={download}
             onDelete={remove}
-            onShowPrompt={(text, anchor) => setPromptPopover({ text, anchor })}
+            onShowParent={showParent}
             onEdit={onEdit}
           />
         ))}
@@ -182,65 +206,13 @@ export function GenerationFeed({
       </section>
       {confirmDialog}
       {fullView && (
-        <div
-          className="image-gen-fullview-layer"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Full size view"
-          onMouseDown={() => setFullView(null)}
-        >
-          <button
-            type="button"
-            className="secondary-button image-gen-fullview-close"
-            aria-label="Close"
-            onClick={() => setFullView(null)}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
-          {fullView.item.mediaType === "video" ? (
-            <video
-              src={fullView.item.url}
-              controls
-              autoPlay
-              style={{ maxWidth: "90%", maxHeight: "90%" }}
-              onMouseDown={(event) => event.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={fullView.item.url}
-              alt={fullView.alt}
-              onMouseDown={(event) => event.stopPropagation()}
-            />
-          )}
-        </div>
-      )}
-      {promptPopover && (
-        <div
-          className="image-gen-popover-layer"
-          onMouseDown={() => setPromptPopover(null)}
-        >
-          <div
-            className="panel image-gen-popover"
-            role="dialog"
-            aria-modal="false"
-            aria-labelledby="image-gen-popover-title"
-            style={popoverPosition(promptPopover.anchor)}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header className="image-gen-popover-header">
-              <h3 id="image-gen-popover-title">Prompt</h3>
-              <button
-                type="button"
-                className="secondary-button"
-                aria-label="Close"
-                onClick={() => setPromptPopover(null)}
-              >
-                <X size={14} aria-hidden="true" />
-              </button>
-            </header>
-            <p className="image-gen-popover-body">{promptPopover.text}</p>
-          </div>
-        </div>
+        <MediaViewer
+          item={fullView}
+          items={viewerItems}
+          alt={viewerAlt}
+          onSelect={(item) => showMedia(item)}
+          onClose={closeMediaViewer}
+        />
       )}
     </>
   );

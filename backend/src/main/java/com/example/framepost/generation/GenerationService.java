@@ -4,6 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -90,6 +92,20 @@ public class GenerationService {
         return toResponse(load(user, pageId, id));
     }
 
+    public PagedResponse<GenerationResponse> children(
+            User user, String pageId, String id, String before, Integer limit
+    ) {
+        ContentGeneration parent = load(user, pageId, id).generation();
+        int size = pageSize(limit);
+        List<ContentGeneration> rows = store.queryChildren(
+                user.id(), parent.pageId(), id, parseCursor(before), size + 1);
+        boolean more = rows.size() > size;
+        List<ContentGeneration> pageRows = more ? rows.subList(0, size) : rows;
+        List<GenerationResponse> items = store.hydrate(pageRows).stream().map(this::toResponse).toList();
+        String next = more ? new Cursor(pageRows.getLast().createdAt(), pageRows.getLast().id()).encode() : null;
+        return new PagedResponse<>(items, next);
+    }
+
     public void delete(User user, String pageId, String id) {
         Hydrated hydrated = load(user, pageId, id);
         store.delete(id);
@@ -136,8 +152,18 @@ public class GenerationService {
         }
         List<ContentOutput> rows = store.queryOutputs(user.id(), pageId, globalOnly, cursor, size + 1);
         List<ContentOutput> pageRows = rows.size() > size ? rows.subList(0, size) : rows;
-        return new PagedResponse<>(pageRows.stream().map(this::toItem).toList(),
+        Map<String, Hydrated> generations = hydratedGenerationsForMedia(
+                user, pageId, globalOnly, pageRows.stream().map(ContentOutput::generationId).toList());
+        return new PagedResponse<>(pageRows.stream()
+                .map(row -> toItem(row, generations.get(row.generationId()))).toList(),
                 rows.size() > size ? new Cursor(pageRows.getLast().createdAt(), pageRows.getLast().id()).encode() : null);
+    }
+
+    private Map<String, Hydrated> hydratedGenerationsForMedia(
+            User user, String pageId, boolean globalOnly, List<String> generationIds
+    ) {
+        return store.hydrate(store.findGenerationsByIds(user.id(), pageId, globalOnly, generationIds)).stream()
+                .collect(Collectors.toMap(item -> item.generation().id(), Function.identity()));
     }
 
     private Hydrated load(User user, String pageId, String id) {
@@ -152,24 +178,36 @@ public class GenerationService {
         ContentGeneration generation = hydrated.generation();
         return new GenerationResponse(
                 generation.id(), generation.pageId(), generation.provider(), generation.generationType(),
-                generation.workflowKey(), generation.inputs(), generation.status(), generation.error(),
+                generation.workflowKey(),
+                generation.providerMetadata() == null ? null : generation.providerMetadata().instanceType(),
+                generation.inputs(), generation.status(), generation.error(),
                 generation.createdAt(), generation.parentGenerationId(), generation.parentResultKey(),
                 hydrated.inputs().stream().map(this::toItem).toList(),
-                hydrated.outputs().stream().map(this::toItem).toList());
+                hydrated.outputs().stream()
+                        .map(file -> toItem(file, generation, hydrated.inputs().size())).toList());
     }
 
     private MediaItemResponse toItem(ContentInput file) {
         return new MediaItemResponse(file.id(), file.generationId(), file.pageId(), file.slot(), null,
                 file.position(), file.key(), storage.publicUrl(file.key()), file.name(), file.contentType(),
                 file.mediaType(), file.sizeBytes(), file.width(), file.height(), file.durationSeconds(),
-                file.createdAt());
+                file.createdAt(), null, 0);
     }
 
-    private MediaItemResponse toItem(ContentOutput file) {
+    private MediaItemResponse toItem(ContentOutput file, Hydrated hydrated) {
+        return toItem(
+                file,
+                hydrated == null ? null : hydrated.generation(),
+                hydrated == null ? 0 : hydrated.inputs().size());
+    }
+
+    private MediaItemResponse toItem(ContentOutput file, ContentGeneration generation, int sourceCount) {
         return new MediaItemResponse(file.id(), file.generationId(), file.pageId(), null, file.type(),
                 file.position(), file.key(), storage.publicUrl(file.key()), file.name(), file.contentType(),
                 file.mediaType(), file.sizeBytes(), file.width(), file.height(), file.durationSeconds(),
-                file.createdAt());
+                file.createdAt(),
+                generation == null ? null : generation.parentGenerationId(),
+                sourceCount);
     }
 
     private void validateScope(User user, String pageId) {

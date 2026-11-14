@@ -71,6 +71,16 @@ export function getGeneration(id: string, pageId?: string) {
   return request<Generation>(scoped(pageId, `/generations/${id}`));
 }
 
+export function listGenerationChildren(
+  id: string,
+  pageId?: string,
+  { before, limit }: PageOptions = {},
+) {
+  return request<Paged<Generation>>(
+    scoped(pageId, `/generations/${id}/children`) + query({ before, limit }),
+  );
+}
+
 export function listMedia(
   kind: "inputs" | "outputs",
   filters: { pageId?: string },

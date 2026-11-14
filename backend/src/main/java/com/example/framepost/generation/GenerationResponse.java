@@ -11,6 +11,7 @@ public record GenerationResponse(
         ContentGeneration.Provider provider,
         ContentGeneration.MediaType mediaType,
         String workflowKey,
+        String instanceType,
         Map<String, String> inputs,
         ContentGeneration.Status status,
         String error,

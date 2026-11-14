@@ -115,6 +115,17 @@ public class GenerationController {
         return service.get(currentUser(request), pageId, id);
     }
 
+    @GetMapping({"/generations/{id}/children", "/pages/{pageId}/generations/{id}/children"})
+    public PagedResponse<GenerationResponse> children(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @RequestParam(required = false) String before,
+            @RequestParam(required = false) Integer limit,
+            HttpServletRequest request
+    ) {
+        return service.children(currentUser(request), pageId, id, before, limit);
+    }
+
     /** Streams the generation now and again on every change until it is no longer processing. */
     @GetMapping(
             value = {"/generations/{id}/events", "/pages/{pageId}/generations/{id}/events"},

@@ -7,12 +7,12 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { initialValueFor } from "../components/DynamicInputField";
 import { LibraryPicker } from "../components/library/LibraryPicker";
 import { GenerationFeed } from "../components/generations/GenerationFeed";
-import { getCatalog, startWorkflowGeneration } from "../generationApi";
+import { getCatalog, getGeneration, startWorkflowGeneration } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
 import type {
   InstanceType,
@@ -69,6 +69,7 @@ export function RunningHubWorkflowPage({
     pageId?: string;
     workflowKey?: string;
   }>();
+  const [searchParams] = useSearchParams();
   const activePageId = pageId ?? routePageId;
   const createPath = activePageId ? `/pages/${activePageId}/create` : "/create";
 
@@ -84,6 +85,7 @@ export function RunningHubWorkflowPage({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const restoredFrom = useRef("");
 
   const {
     items,
@@ -117,6 +119,61 @@ export function RunningHubWorkflowPage({
       })
       .catch((caught: Error) => setLoadError(caught.message));
   }, [workflowKey]);
+
+  useEffect(() => {
+    const generationId = searchParams.get("from");
+    const resultKey = searchParams.get("result");
+    const restoreKey = `${generationId ?? ""}:${resultKey ?? ""}`;
+    if (!workflow || !generationId || !resultKey || restoredFrom.current === restoreKey) {
+      return;
+    }
+    restoredFrom.current = restoreKey;
+    let cancelled = false;
+    getGeneration(generationId, activePageId)
+      .then((generation) => {
+        if (cancelled) return;
+        if (
+          generation.provider !== "RUNNINGHUB" ||
+          generation.workflowKey !== workflowKey
+        ) {
+          throw new Error("This result belongs to a different workflow.");
+        }
+        const output = generation.outputs.some((item) => item.key === resultKey);
+        const selectedInput = generation.inputFiles.find((item) => item.key === resultKey);
+        if (!output && !selectedInput) {
+          throw new Error("The selected result is no longer available.");
+        }
+        setValues((current) => ({ ...current, ...generation.inputs }));
+        const restoredInstanceType = INSTANCE_TYPES.find(
+          (item) => item.value === generation.instanceType,
+        )?.value;
+        if (restoredInstanceType) setInstanceType(restoredInstanceType);
+        setFiles({});
+        setLibraryFiles(
+          Object.fromEntries(
+            workflow.inputs
+              .filter(isFileInput)
+              .map((input) => [
+                input.name,
+                output
+                  ? generation.inputFiles.find((item) => item.slot === input.name) ?? null
+                  : input.name === selectedInput?.slot
+                    ? selectedInput
+                    : null,
+              ]),
+          ),
+        );
+        setError("");
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : "Unable to restore this generation");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePageId, searchParams, workflow, workflowKey]);
 
   const promptInput =
     workflow?.inputs.find((input) => input.type === "textarea") ?? null;

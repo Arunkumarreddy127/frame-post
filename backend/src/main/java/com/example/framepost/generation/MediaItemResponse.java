@@ -19,6 +19,8 @@ public record MediaItemResponse(
         Integer width,
         Integer height,
         Long durationSeconds,
-        Instant createdAt
+        Instant createdAt,
+        String parentGenerationId,
+        int sourceCount
 ) {
 }
