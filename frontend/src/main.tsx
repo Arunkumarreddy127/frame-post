@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
   Navigate,
+  useLocation,
   Route,
   Routes,
   useParams,
@@ -12,8 +13,8 @@ import { AuthPage } from "./components/AuthPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import {
-  ChatPage,
   CreatePage,
+  FilesPage,
   GenerationsPage,
   GptImageGenPage,
   HomePage,
@@ -39,6 +40,12 @@ function PageLibraryRoute({
 }) {
   const { pageId } = useParams<{ pageId: string }>();
   return <LibraryPage user={user} onLogout={onLogout} pageId={pageId} />;
+}
+
+function PageChatRedirect() {
+  const { pageId } = useParams<{ pageId: string }>();
+  const { search } = useLocation();
+  return <Navigate to={`/pages/${pageId}${search}`} replace />;
 }
 
 function LegacyMinimaxRedirect() {
@@ -149,11 +156,12 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/pages/:pageId/chat" element={<PageChatRedirect />} />
         <Route
-          path="/pages/:pageId/chat"
+          path="/pages/:pageId/files"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <ChatPage user={user as User} onLogout={logout} />
+              <FilesPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />
@@ -209,11 +217,12 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/chat" element={<Navigate to="/home" replace />} />
         <Route
-          path="/chat"
+          path="/files"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <ChatPage user={user as User} onLogout={logout} />
+              <FilesPage user={user as User} onLogout={logout} />
             </ProtectedRoute>
           }
         />

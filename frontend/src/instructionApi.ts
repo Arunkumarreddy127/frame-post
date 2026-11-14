@@ -54,3 +54,14 @@ export async function updateInstructionFile(
 export async function deleteInstructionFile(id: string) {
   await request<void>(`/api/instructions/${id}`, { method: "DELETE" });
 }
+
+const FILES_CHANGED_EVENT = "framepost:instruction-files-changed";
+
+export function notifyInstructionFilesChanged() {
+  window.dispatchEvent(new Event(FILES_CHANGED_EVENT));
+}
+
+export function onInstructionFilesChanged(listener: () => void) {
+  window.addEventListener(FILES_CHANGED_EVENT, listener);
+  return () => window.removeEventListener(FILES_CHANGED_EVENT, listener);
+}

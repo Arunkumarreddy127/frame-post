@@ -1,12 +1,14 @@
 import {
   FormEvent,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
 } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  ArrowLeft,
   ArrowUp,
   ChevronDown,
   FileText,
@@ -14,7 +16,6 @@ import {
   LoaderCircle,
   Paperclip,
   Pencil,
-  Plus,
   X,
 } from "lucide-react";
 import {
@@ -30,24 +31,28 @@ import {
   updateConversationTitle,
 } from "../chatApi";
 import { API_BASE_URL } from "../api";
-import { AppShell } from "../components/AppShell";
-import { InstructionFiles } from "../components/InstructionFiles";
-import { LibraryPicker } from "../components/library/LibraryPicker";
-import { updateInstructionFile } from "../instructionApi";
+import { ChatInstructionPicker } from "./ChatInstructionPicker";
+import { LibraryPicker } from "./library/LibraryPicker";
+import {
+  notifyInstructionFilesChanged,
+  updateInstructionFile,
+} from "../instructionApi";
 import type {
   ChatConversation,
   ChatConversationSummary,
   ChatMessage,
+  InstructionFile,
   InstructionFileProposal,
   InstructionProposal,
   InstructionCreationProposal,
   MediaItem,
-  ShellRouteProps,
 } from "../types";
 
-type ChatPageProps = ShellRouteProps & {
+type ChatPanelProps = {
   pageId?: string;
 };
+
+type ChatView = "list" | "conversation";
 
 const CHAT_ATTACHMENT_TYPES = [
   "image/png",
@@ -58,9 +63,9 @@ const CHAT_ATTACHMENT_TYPES = [
 const MAX_CHAT_ATTACHMENTS = 4;
 const MAX_CHAT_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 
-export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
-  const { pageId: routePageId } = useParams<{ pageId?: string }>();
-  const activePageId = pageId ?? routePageId;
+export function ChatPanel({ pageId }: ChatPanelProps) {
+  const activePageId = pageId;
+  const [view, setView] = useState<ChatView>("list");
   const [chatModels, setChatModels] = useState<ChatModel[]>([]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>(
     [],
@@ -82,15 +87,40 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
   const [error, setError] = useState("");
   const [showAllChats, setShowAllChats] = useState(false);
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
+  const [instructionFiles, setInstructionFiles] = useState<InstructionFile[]>([]);
   const [proposals, setProposals] = useState<InstructionFileProposal[]>([]);
-  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInput = useRef<HTMLInputElement>(null);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
   const requestedConversationId = searchParams.get("conversation");
 
   const isPageChat = Boolean(activePageId);
   const attachmentCount = attachmentFiles.length + libraryImages.length;
+  const selectedInstructionFiles = instructionFiles.filter((file) =>
+    selectedFileIds.includes(file.id),
+  );
+
+  useLayoutEffect(() => {
+    const textarea = messageInput.current;
+    if (!textarea) return;
+
+    const styles = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(styles.lineHeight);
+    const verticalPadding =
+      Number.parseFloat(styles.paddingTop) +
+      Number.parseFloat(styles.paddingBottom);
+    const minHeight = lineHeight * 2 + verticalPadding;
+    const maxHeight = lineHeight * 10 + verticalPadding;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.max(
+      minHeight,
+      Math.min(textarea.scrollHeight, maxHeight),
+    )}px`;
+    textarea.style.overflowY =
+      textarea.scrollHeight > textarea.clientHeight ? "auto" : "hidden";
+  }, [draft]);
 
   useEffect(() => {
     let active = true;
@@ -101,6 +131,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       setEditingTitle(false);
       setTitleDraft("");
       setConversations([]);
+      setView("list");
       setError("");
       setShowAllChats(false);
       try {
@@ -112,15 +143,16 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         setChatModels(availableModels);
         setModel(availableModels[0] ?? "");
         setConversations(loaded);
-        const selectedConversation =
-          loaded.find((item) => item.id === requestedConversationId) ??
-          loaded[0];
-        if (selectedConversation) {
+        const requestedConversation = loaded.find(
+          (item) => item.id === requestedConversationId,
+        );
+        if (requestedConversation) {
           await loadConversation(
-            selectedConversation.id,
+            requestedConversation.id,
             active,
             availableModels,
           );
+          if (active) setView("conversation");
         }
       } catch (requestError) {
         if (active)
@@ -206,7 +238,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         }
       }
       setProposals((current) => current.filter((item) => item !== proposal));
-      setFilesRefreshKey((current) => current + 1);
+      notifyInstructionFilesChanged();
     } catch (requestError) {
       setError(
         messageFrom(requestError, "Unable to apply the instruction proposal"),
@@ -222,7 +254,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     setError("");
     try {
       const loaded = await getConversation(conversationId, activePageId);
-      if (!active) return;
+      if (!active) return false;
       setConversation(loaded);
       setEditingTitle(false);
       setModel(
@@ -230,9 +262,11 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           ? loaded.model
           : (availableModels[0] ?? ""),
       );
+      return true;
     } catch (requestError) {
       if (active)
         setError(messageFrom(requestError, "Unable to load conversation"));
+      return false;
     }
   }
 
@@ -259,30 +293,20 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
 
   async function selectConversation(item: ChatConversationSummary) {
     if (showAllChats && item.pageId) {
-      navigate(`/pages/${item.pageId}/chat?conversation=${item.id}`);
+      navigate(`/pages/${item.pageId}?conversation=${item.id}`);
       return;
     }
-    await loadConversation(item.id);
+    if (await loadConversation(item.id)) setView("conversation");
   }
 
-  async function startConversation() {
+  function backToList() {
+    if (sending) return;
     setError("");
-    if (!model) {
-      setError("No chat models are available");
-      return;
-    }
-    try {
-      const created = await withSelection(
-        await createConversation(model, activePageId),
-      );
-      setConversations((current) => [created, ...current]);
-      setConversation(created);
-      setEditingTitle(false);
-      setTitleDraft("");
-      setStreamingText("");
-    } catch (requestError) {
-      setError(messageFrom(requestError, "Unable to create a conversation"));
-    }
+    setConversation(null);
+    setEditingTitle(false);
+    setTitleDraft("");
+    setStreamingText("");
+    setView("list");
   }
 
   async function removeConversation() {
@@ -297,9 +321,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
       setEditingTitle(false);
       setTitleDraft("");
       setStreamingText("");
-      if (remaining[0]) {
-        await loadConversation(remaining[0].id);
-      }
+      setView("list");
     } catch (requestError) {
       setError(messageFrom(requestError, "Unable to delete conversation"));
     }
@@ -425,6 +447,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
         selectedConversation = createdConversation;
         setConversations((current) => [createdConversation, ...current]);
         setConversation(createdConversation);
+        setView("conversation");
       }
 
       const temporaryMessage: ChatMessage = {
@@ -480,34 +503,184 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
     }
   }
 
-  return (
-    <AppShell
-      user={user}
-      onLogout={onLogout}
-      pageTitle="Chat"
-      sidebar={isPageChat ? "page" : "global"}
-      pageId={activePageId}
-      backTo={isPageChat ? "/pages" : undefined}
+  const composer = (
+    <form
+      className={`chat-composer${attachmentCount > 0 || selectedInstructionFiles.length > 0 ? " has-attachments" : ""}`}
+      onSubmit={submit}
+      aria-busy={sending}
     >
-      <section className="chat-page">
+      {(attachmentCount > 0 || selectedInstructionFiles.length > 0) && (
+        <div className="chat-attachment-tray">
+          {selectedInstructionFiles.length > 0 && (
+            <div
+              className="chat-instruction-attachments"
+              aria-label="Instruction files"
+            >
+              {selectedInstructionFiles.map((file) => (
+                <div
+                  className="chat-instruction-attachment"
+                  key={file.id}
+                  title={file.name}
+                >
+                  <FileText size={15} aria-hidden="true" />
+                  <span>{file.name}</span>
+                  <button
+                    type="button"
+                    className="chat-instruction-attachment-remove"
+                    aria-label={`Remove ${file.name}`}
+                    disabled={sending}
+                    onClick={() =>
+                      void changeSelection(
+                        selectedFileIds.filter((id) => id !== file.id),
+                      )
+                    }
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {attachmentCount > 0 && (
+            <div className="chat-media-attachments" aria-label="Message attachments">
+              {attachmentFiles.map((file, index) => (
+                <LocalAttachmentPreview
+                  key={`${file.name}-${file.size}-${index}`}
+                  file={file}
+                  onRemove={() =>
+                    setAttachmentFiles((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                />
+              ))}
+              {libraryImages.map((item) => (
+                <div className="chat-attachment-preview" key={item.key}>
+                  <img src={item.url} alt={item.name} />
+                  <button
+                    type="button"
+                    className="chat-attachment-remove"
+                    aria-label={`Remove ${item.name}`}
+                    onClick={() =>
+                      setLibraryImages((current) =>
+                        current.filter((entry) => entry.key !== item.key),
+                      )
+                    }
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <label className="sr-only" htmlFor="chat-message">
+        Message
+      </label>
+      <textarea
+        ref={messageInput}
+        id="chat-message"
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={handleComposerKeyDown}
+        placeholder="Pitch your idea"
+        rows={2}
+        maxLength={8000}
+        disabled={sending}
+      />
+      <div className="chat-composer-toolbar">
+        <div className="chat-attachment-actions">
+          <input
+            ref={fileInput}
+            className="sr-only"
+            type="file"
+            accept={`${CHAT_ATTACHMENT_TYPES.join(",")},.pdf`}
+            multiple
+            onChange={(event) => addAttachments(event.target.files)}
+            aria-label="Attach images or PDFs"
+          />
+          <button
+            type="button"
+            className="chat-attachment-button"
+            aria-label="Attach images or PDFs"
+            title="Attach images or PDFs"
+            disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
+            onClick={() => fileInput.current?.click()}
+          >
+            <Paperclip size={17} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="chat-attachment-button"
+            aria-label="Browse Library"
+            title="Browse Library"
+            disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
+            onClick={() => setLibraryPickerOpen(true)}
+          >
+            <FolderOpen size={17} aria-hidden="true" />
+          </button>
+          {attachmentCount > 0 && (
+            <span className="chat-attachment-count">
+              {attachmentCount}/{MAX_CHAT_ATTACHMENTS}
+            </span>
+          )}
+          <ChatInstructionPicker
+            pageId={activePageId}
+            selectedIds={selectedFileIds}
+            disabled={sending}
+            onSelectionChange={(ids) => void changeSelection(ids)}
+            onFilesChange={setInstructionFiles}
+            onError={setError}
+          />
+        </div>
+        <label className="chat-model-control">
+          <span className="sr-only">Model</span>
+          <span className="chat-model-select">
+            <select
+              value={model}
+              disabled={sending || chatModels.length === 0}
+              onChange={(event) => setModel(event.target.value)}
+            >
+              {chatModels.map((chatModel) => (
+                <option key={chatModel} value={chatModel}>
+                  {chatModel}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="chat-model-chevron"
+              size={14}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          </span>
+        </label>
+        <button
+          className={`chat-composer-submit${sending ? " is-loading" : ""}`}
+          type="submit"
+          aria-label={sending ? "Responding" : "Send message"}
+          disabled={sending || (!draft.trim() && attachmentCount === 0)}
+        >
+          {sending ? (
+            <LoaderCircle
+              className="chat-composer-loader"
+              size={18}
+              aria-hidden="true"
+            />
+          ) : (
+            <ArrowUp size={19} strokeWidth={2} aria-hidden="true" />
+          )}
+        </button>
+      </div>
+    </form>
+  );
+
+  return (
+    <section className="chat-panel" aria-label="Chat">
+      {view === "list" ? (
         <aside className="chat-sidebar" aria-label="Chat history">
           <div className="chat-history">
-            <div className="chat-history-header">
-              <button
-                className="secondary-button small-button"
-                type="button"
-                onClick={() => void startConversation()}
-                disabled={sending || !model}
-              >
-                <Plus
-                  className="chat-new-icon"
-                  size={17}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                />
-                <span>New chat</span>
-              </button>
-            </div>
             {!isPageChat && (
               <label className="secondary-button small-button chat-all-chats-toggle">
                 <input
@@ -536,6 +709,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
                     }
                     type="button"
                     disabled={sending}
+                    title={item.title}
                     onClick={() => void selectConversation(item)}
                   >
                     <span>{item.title}</span>
@@ -551,17 +725,20 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               </div>
             )}
           </div>
-          <InstructionFiles
-            pageId={activePageId}
-            selectedIds={selectedFileIds}
-            disabled={sending}
-            refreshKey={filesRefreshKey}
-            onSelectionChange={(ids) => void changeSelection(ids)}
-            onError={setError}
-          />
         </aside>
+      ) : (
         <div className="chat-workspace">
           <div className="chat-toolbar">
+            <button
+              className="chat-back-button"
+              type="button"
+              onClick={backToList}
+              disabled={sending}
+              aria-label="Back to chats"
+              title="Back to chats"
+            >
+              <ArrowLeft size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
             <div className="chat-title">
               {editingTitle ? (
                 <input
@@ -721,143 +898,16 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
               </>
             )}
           </div>
-          {error && (
-            <p className="error" role="alert">
-              {error}
-            </p>
-          )}
-          <form
-            className={`chat-composer${attachmentCount > 0 ? " has-attachments" : ""}`}
-            onSubmit={submit}
-            aria-busy={sending}
-          >
-            {attachmentCount > 0 && (
-              <div
-                className="chat-attachment-tray"
-                aria-label="Message attachments"
-              >
-                {attachmentFiles.map((file, index) => (
-                  <LocalAttachmentPreview
-                    key={`${file.name}-${file.size}-${index}`}
-                    file={file}
-                    onRemove={() =>
-                      setAttachmentFiles((current) =>
-                        current.filter((_, itemIndex) => itemIndex !== index),
-                      )
-                    }
-                  />
-                ))}
-                {libraryImages.map((item) => (
-                  <div className="chat-attachment-preview" key={item.key}>
-                    <img src={item.url} alt={item.name} />
-                    <button
-                      type="button"
-                      className="chat-attachment-remove"
-                      aria-label={`Remove ${item.name}`}
-                      onClick={() =>
-                        setLibraryImages((current) =>
-                          current.filter((entry) => entry.key !== item.key),
-                        )
-                      }
-                    >
-                      <X size={13} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <label className="sr-only" htmlFor="chat-message">
-              Message
-            </label>
-            <textarea
-              id="chat-message"
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              placeholder="Pitch your idea"
-              rows={2}
-              maxLength={8000}
-              disabled={sending}
-            />
-            <div className="chat-composer-toolbar">
-              <div className="chat-attachment-actions">
-                <input
-                  ref={fileInput}
-                  className="sr-only"
-                  type="file"
-                  accept={`${CHAT_ATTACHMENT_TYPES.join(",")},.pdf`}
-                  multiple
-                  onChange={(event) => addAttachments(event.target.files)}
-                  aria-label="Attach images or PDFs"
-                />
-                <button
-                  type="button"
-                  className="chat-attachment-button"
-                  aria-label="Attach images or PDFs"
-                  title="Attach images or PDFs"
-                  disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  <Paperclip size={17} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  className="chat-attachment-button"
-                  aria-label="Browse Library"
-                  title="Browse Library"
-                  disabled={sending || attachmentCount >= MAX_CHAT_ATTACHMENTS}
-                  onClick={() => setLibraryPickerOpen(true)}
-                >
-                  <FolderOpen size={17} aria-hidden="true" />
-                </button>
-                {attachmentCount > 0 && (
-                  <span className="chat-attachment-count">
-                    {attachmentCount}/{MAX_CHAT_ATTACHMENTS}
-                  </span>
-                )}
-              </div>
-              <label className="chat-model-control">
-                <span className="sr-only">Model</span>
-                <span className="chat-model-select">
-                  <select
-                    value={model}
-                    disabled={sending || chatModels.length === 0}
-                    onChange={(event) => setModel(event.target.value)}
-                  >
-                    {chatModels.map((chatModel) => (
-                      <option key={chatModel} value={chatModel}>
-                        {chatModel}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="chat-model-chevron"
-                    size={14}
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  />
-                </span>
-              </label>
-              <button
-                className={`chat-composer-submit${sending ? " is-loading" : ""}`}
-                type="submit"
-                aria-label={sending ? "Responding" : "Send message"}
-                disabled={sending || (!draft.trim() && attachmentCount === 0)}
-              >
-                {sending ? (
-                  <LoaderCircle
-                    className="chat-composer-loader"
-                    size={18}
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <ArrowUp size={19} strokeWidth={2} aria-hidden="true" />
-                )}
-              </button>
-            </div>
-          </form>
         </div>
-      </section>
+      )}
+      <div className="chat-composer-dock">
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
+        {composer}
+      </div>
       {libraryPickerOpen && (
         <LibraryPicker
           pageId={activePageId}
@@ -877,7 +927,7 @@ export function ChatPage({ user, onLogout, pageId }: ChatPageProps) {
           onClose={() => setLibraryPickerOpen(false)}
         />
       )}
-    </AppShell>
+    </section>
   );
 }
 

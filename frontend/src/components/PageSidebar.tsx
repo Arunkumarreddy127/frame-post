@@ -1,17 +1,19 @@
+import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { SidebarFilesLink } from "./SidebarFilesLink";
 
 type PageSidebarProps = {
   pageId?: string;
+  filesExplorer?: ReactNode;
 };
 
 const navigation = [
-  { label: "Chat", suffix: "chat" },
   { label: "Create", suffix: "create" },
   { label: "Library", suffix: "library" },
 ];
 
-export function PageSidebar({ pageId }: PageSidebarProps) {
+export function PageSidebar({ pageId, filesExplorer }: PageSidebarProps) {
   const pagePath = pageId ? `/pages/${pageId}` : "/pages";
 
   return (
@@ -30,6 +32,7 @@ export function PageSidebar({ pageId }: PageSidebarProps) {
         >
           Overview
         </NavLink>
+        <SidebarFilesLink to={`${pagePath}/files`} explorer={filesExplorer} />
         {navigation.map((item) => (
           <NavLink
             key={item.suffix}

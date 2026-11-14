@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../api";
 import { AppShell } from "../components/AppShell";
-import { InstructionFiles } from "../components/InstructionFiles";
 import type { Page, ShellRouteProps } from "../types";
 
 export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
@@ -10,7 +9,6 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filesRefreshKey, setFilesRefreshKey] = useState(0);
 
   useEffect(() => {
     async function loadPage() {
@@ -110,18 +108,15 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
       <section className="panel page-instructions-panel">
         <h3>Instruction Files</h3>
         <p>
-          Create and manage instruction files for conversations in this page. These appear as
-          selectable items during chat and can be edited by the assistant.
+          Create and manage instruction files for conversations in this page.
+          They can be selected per chat and edited by the assistant.
         </p>
-        <InstructionFiles
-          pageId={pageId}
-          variant="overview"
-          selectedIds={[]}
-          disabled={false}
-          refreshKey={filesRefreshKey}
-          onSelectionChange={() => undefined}
-          onError={setError}
-        />
+        <Link
+          to={`/pages/${pageId}/files`}
+          className="secondary-button small-button"
+        >
+          Open Files
+        </Link>
       </section>
     </AppShell>
   );
