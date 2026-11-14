@@ -101,6 +101,7 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
   const [searchParams] = useSearchParams();
   const fileInput = useRef<HTMLInputElement>(null);
   const messageInput = useRef<HTMLTextAreaElement>(null);
+  const transcript = useRef<HTMLDivElement>(null);
   const streamController = useRef<AbortController | null>(null);
   const requestedConversationId = searchParams.get("conversation");
 
@@ -138,6 +139,12 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
     textarea.style.overflowY =
       textarea.scrollHeight > textarea.clientHeight ? "auto" : "hidden";
   }, [draft]);
+
+  useLayoutEffect(() => {
+    if (view !== "conversation" || !conversation) return;
+    const element = transcript.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [view, conversation?.id]);
 
   useEffect(() => {
     let active = true;
@@ -970,7 +977,11 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
               )}
             </div>
           </div>
-          <div className="chat-transcript" aria-live="polite">
+          <div
+            className="chat-transcript"
+            aria-live="polite"
+            ref={transcript}
+          >
             {!conversation && !loading ? (
               <div className="chat-empty-state">
                 <p>Ask anything to start a new conversation.</p>
