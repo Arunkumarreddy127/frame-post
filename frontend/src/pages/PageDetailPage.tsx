@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { API_BASE_URL } from "../api";
 import { AppShell } from "../components/AppShell";
+import { formatDateTime } from "../format";
 import type { Page, ShellRouteProps } from "../types";
 
 export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
@@ -79,9 +80,12 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
       pageId={pageId}
       backTo="/pages"
     >
-      <div className="page-header-row"></div>
       <section className="panel page-detail-panel">
-        <div className="page-card-actions">
+        <div className="page-detail-header">
+          <div>
+            <p className="eyebrow">Page workspace</p>
+            <h2>{page.name}</h2>
+          </div>
           <Link
             to={`/pages/${page.id}/edit`}
             className="secondary-button small-button"
@@ -89,8 +93,6 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
             Edit page
           </Link>
         </div>
-        <p className="eyebrow">Page workspace</p>
-        <h2>{page.name}</h2>
         <p className="page-detail-copy">{page.description}</p>
         <div className="detail-block">
           <h3>Bio</h3>
@@ -99,16 +101,16 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
         <div className="meta-grid">
           <div>
             <span className="meta-label">Created</span>
-            <strong>{new Date(page.createdAt).toLocaleString()}</strong>
+            <strong>{formatDateTime(page.createdAt)}</strong>
           </div>
           <div>
             <span className="meta-label">Updated</span>
-            <strong>{new Date(page.updatedAt).toLocaleString()}</strong>
+            <strong>{formatDateTime(page.updatedAt)}</strong>
           </div>
         </div>
       </section>
       <section className="panel page-instructions-panel">
-        <h3>Instruction Files</h3>
+        <h3>Instruction files</h3>
         <p>
           Create and manage instruction files for conversations in this page.
           They can be selected per chat and edited by the assistant.
@@ -117,7 +119,7 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
           to={`/pages/${pageId}/files`}
           className="secondary-button small-button"
         >
-          Open Files
+          Open files
         </Link>
       </section>
     </AppShell>

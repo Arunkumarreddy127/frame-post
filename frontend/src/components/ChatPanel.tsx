@@ -32,6 +32,7 @@ import {
 } from "../chatApi";
 import { API_BASE_URL } from "../api";
 import { ChatInstructionPicker } from "./ChatInstructionPicker";
+import { useConfirm } from "./ConfirmDialog";
 import { LibraryPicker } from "./library/LibraryPicker";
 import {
   notifyInstructionFilesChanged,
@@ -89,6 +90,7 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([]);
   const [instructionFiles, setInstructionFiles] = useState<InstructionFile[]>([]);
   const [proposals, setProposals] = useState<InstructionFileProposal[]>([]);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -311,8 +313,13 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
 
   async function removeConversation() {
     if (!conversation || sending) return;
-    if (!window.confirm("Delete this conversation? This cannot be undone."))
-      return;
+    const accepted = await confirm({
+      title: `Delete “${conversation.title}”?`,
+      message: "This conversation will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete conversation",
+      danger: true,
+    });
+    if (!accepted) return;
     try {
       await deleteConversation(conversation.id, activePageId);
       const remaining = conversations.filter(
@@ -929,6 +936,7 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
           onClose={() => setLibraryPickerOpen(false)}
         />
       )}
+      {confirmDialog}
     </section>
   );
 }

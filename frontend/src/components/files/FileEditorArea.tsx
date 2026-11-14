@@ -51,7 +51,7 @@ export function FileEditorArea({ pageId, workspace }: FileEditorAreaProps) {
             <button
               type="button"
               className="files-icon-button files-tab-close"
-              onClick={() => closeTab(tab)}
+              onClick={() => void closeTab(tab)}
               aria-label={`Close ${tab.draft.name || "untitled"}`}
             >
               <X size={13} strokeWidth={2} aria-hidden="true" />

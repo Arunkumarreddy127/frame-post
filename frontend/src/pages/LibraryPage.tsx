@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { FolderInput, FolderOutput } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { useConfirm } from "../components/ConfirmDialog";
 import { LibraryMediaGrid } from "../components/library/LibraryMediaGrid";
 import { deleteGeneration, getGeneration, saveFile } from "../generationApi";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
@@ -51,7 +53,7 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
           <>
             <header className="library-heading">
               <div>
-                <p className="eyebrow">Framepost workspace</p>
+                <p className="eyebrow">Library</p>
                 <h2>Library</h2>
                 <p>Your generated work and source files, together.</p>
               </div>
@@ -65,7 +67,11 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
                   onClick={() => setFolder(entry.key)}
                 >
                   <span className="library-folder-mark" aria-hidden="true">
-                    {entry.key === "inputs" ? "IN" : "OUT"}
+                    {entry.key === "inputs" ? (
+                      <FolderInput size={20} strokeWidth={1.8} />
+                    ) : (
+                      <FolderOutput size={20} strokeWidth={1.8} />
+                    )}
                   </span>
                   <span className="library-folder-title">{entry.title}</span>
                   <span className="library-folder-description">
@@ -96,6 +102,7 @@ function LibraryFolder({
   const { items, hasMore, loading, error, loadMore, removeWhere } =
     useMediaPages(kind, pageId);
   const [actionError, setActionError] = useState<string | null>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const sentinel = useInfiniteScroll<HTMLDivElement>(
     loadMore,
     hasMore && !loading,
@@ -111,12 +118,13 @@ function LibraryFolder({
   }
 
   async function remove(item: MediaItem) {
-    if (
-      !window.confirm(
-        "Delete the generation this file belongs to, including all of its files? This cannot be undone.",
-      )
-    )
-      return;
+    const accepted = await confirm({
+      title: "Delete this generation?",
+      message: `“${item.name}” belongs to a generation. Deleting it removes the generation and all of its input and output files. This cannot be undone.`,
+      confirmLabel: "Delete generation",
+      danger: true,
+    });
+    if (!accepted) return;
     setActionError(null);
     try {
       await deleteGeneration(item.generationId);
@@ -167,8 +175,9 @@ function LibraryFolder({
         onDelete={remove}
         onEdit={open}
       />
-      {loading && <p className="status">Loading…</p>}
+      {loading && <p className="status" role="status">Loading…</p>}
       {hasMore && <div ref={sentinel} style={{ height: 1 }} />}
+      {confirmDialog}
     </>
   );
 }

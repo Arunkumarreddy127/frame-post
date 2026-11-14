@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { useConfirm } from "../components/ConfirmDialog";
 import { FileEditorArea } from "../components/files/FileEditorArea";
 import { FileExplorer } from "../components/files/FileExplorer";
 import { useFilesWorkspace } from "../components/files/useFilesWorkspace";
@@ -8,7 +9,8 @@ import type { ShellRouteProps } from "../types";
 
 export function FilesPage({ user, onLogout }: ShellRouteProps) {
   const { pageId } = useParams<{ pageId?: string }>();
-  const workspace = useFilesWorkspace(pageId);
+  const { confirm, dialog } = useConfirm();
+  const workspace = useFilesWorkspace(pageId, confirm);
   const filesExplorer = useMemo(
     () => <FileExplorer workspace={workspace} />,
     [
@@ -17,6 +19,7 @@ export function FilesPage({ user, onLogout }: ShellRouteProps) {
       workspace.tabs,
       workspace.activeTab,
       workspace.saving,
+      workspace.remove,
     ],
   );
 
@@ -30,7 +33,10 @@ export function FilesPage({ user, onLogout }: ShellRouteProps) {
       backTo={pageId ? "/pages" : undefined}
       filesExplorer={filesExplorer}
     >
-      <FileEditorArea pageId={pageId} workspace={workspace} />
+      <>
+        <FileEditorArea pageId={pageId} workspace={workspace} />
+        {dialog}
+      </>
     </AppShell>
   );
 }

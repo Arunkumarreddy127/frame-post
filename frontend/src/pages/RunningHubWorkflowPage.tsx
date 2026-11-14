@@ -319,6 +319,15 @@ export function RunningHubWorkflowPage({
                         [promptInput.name]: event.target.value,
                       }))
                     }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" &&
+                        (event.metaKey || event.ctrlKey)
+                      ) {
+                        event.preventDefault();
+                        event.currentTarget.form?.requestSubmit();
+                      }
+                    }}
                     placeholder={`${promptInput.label}...`}
                     rows={6}
                     maxLength={promptInput.maxLength ?? MAX_PROMPT_LENGTH}
@@ -394,20 +403,37 @@ export function RunningHubWorkflowPage({
                     type="submit"
                     className="primary-button"
                     aria-label="Generate"
-                    disabled={submitting || !workflow.configured}
+                    disabled={
+                      submitting || !workflow.configured || !activePageId
+                    }
+                    title="Generate (Ctrl/⌘ + Enter)"
                   >
                     <ArrowUp size={16} aria-hidden="true" />
                   </button>
                 </div>
               </div>
             </section>
+            {!activePageId && (
+              <p className="status form-notice" role="note">
+                Open this workflow from a page to generate. Choose a page, then
+                Create → {workflow.label}.
+              </p>
+            )}
             {!workflow.configured && (
               <p className="error">
                 This workflow is not configured on the server yet.
               </p>
             )}
-            {error && <p className="error">{error}</p>}
-            {submitting && <p className="status">Starting generation...</p>}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
+            {submitting && (
+              <p className="status" role="status">
+                Starting generation...
+              </p>
+            )}
           </form>
 
           {activePageId ? (

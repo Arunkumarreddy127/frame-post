@@ -180,6 +180,8 @@ export function GptImageGenPage({
       parentGenerationId: parent?.generationId,
       parentResultKey: parent?.resultKey,
     };
+    const previousLibraryItems = libraryItems;
+    const previousParent = parent;
     setPrompt("");
     setModel(models[0] ?? FALLBACK_MODELS[0]);
     setSize("auto");
@@ -195,6 +197,17 @@ export function GptImageGenPage({
       const generation = await createImageGeneration(input, activePageId);
       prepend(generation);
     } catch (requestError) {
+      // Give the user their work back unless they have already started a new prompt.
+      if (!(promptInput.current?.value ?? "").trim()) {
+        setPrompt(input.prompt);
+        setModel(input.model);
+        setSize(input.size);
+        setQuality(input.quality);
+        setCount(input.count);
+        setAttachments(input.attachments);
+        setLibraryItems(previousLibraryItems);
+        setParent(previousParent);
+      }
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -292,6 +305,12 @@ export function GptImageGenPage({
                 ref={promptInput}
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
                 placeholder="Describe what you want to see..."
                 rows={6}
                 maxLength={32000}
@@ -417,6 +436,7 @@ export function GptImageGenPage({
                   type="submit"
                   className="primary-button"
                   aria-label="Generate"
+                  title="Generate (Ctrl/⌘ + Enter)"
                   disabled={generating || !prompt.trim()}
                 >
                   <ArrowUp size={16} aria-hidden="true" />
@@ -425,8 +445,16 @@ export function GptImageGenPage({
             </div>
           </section>
 
-          {error && <p className="error">{error}</p>}
-          {generating && <p className="status">Generating images...</p>}
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          {generating && (
+            <p className="status" role="status">
+              Generating images...
+            </p>
+          )}
         </form>
 
         <GenerationFeed

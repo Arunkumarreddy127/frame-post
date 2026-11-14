@@ -7,6 +7,7 @@ import {
 } from "../../generationApi";
 import { useInfiniteScroll } from "../../hooks/useInfiniteScroll";
 import type { Generation, MediaItem } from "../../types";
+import { useConfirm } from "../ConfirmDialog";
 import { GenerationArticle } from "./GenerationArticle";
 
 const POPOVER_WIDTH = 480;
@@ -67,6 +68,7 @@ export function GenerationFeed({
   onEdit,
 }: GenerationFeedProps) {
   const [error, setError] = useState("");
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [fullView, setFullView] = useState<{
     item: MediaItem;
     alt: string;
@@ -128,8 +130,14 @@ export function GenerationFeed({
   }
 
   async function remove(generation: Generation) {
-    if (!window.confirm("Delete this generation? This cannot be undone."))
-      return;
+    const accepted = await confirm({
+      title: "Delete this generation?",
+      message:
+        "The generation and all of its files will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!accepted) return;
     setError("");
     try {
       await deleteGeneration(generation.id);
@@ -160,10 +168,19 @@ export function GenerationFeed({
             onEdit={onEdit}
           />
         ))}
-        {(error || loadError) && <p className="error">{error || loadError}</p>}
-        {loading && <p className="status">Loading…</p>}
+        {(error || loadError) && (
+          <p className="error" role="alert">
+            {error || loadError}
+          </p>
+        )}
+        {loading && (
+          <p className="status" role="status">
+            Loading…
+          </p>
+        )}
         {hasMore && <div ref={sentinel} style={{ height: 1 }} />}
       </section>
+      {confirmDialog}
       {fullView && (
         <div
           className="image-gen-fullview-layer"

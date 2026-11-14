@@ -13,10 +13,11 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
   const { pageId } = useParams();
   const [form, setForm] = useState<PageFormState>(buildPageForm());
   const [pageTitle, setPageTitle] = useState(
-    mode === "new" ? "Create" : "Loading...",
+    mode === "new" ? "New page" : "Loading...",
   );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(mode === "edit");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (mode !== "edit" || !pageId) return;
@@ -48,7 +49,9 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     setError("");
+    setSaving(true);
     try {
       const endpoint =
         mode === "edit" && pageId
@@ -73,6 +76,7 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
           ? requestError.message
           : "Unable to save page",
       );
+      setSaving(false);
     }
   }
 
@@ -85,15 +89,26 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
       pageId={pageId}
       backTo="/pages"
     >
-      <div className="page-header-row"></div>
       <section className="panel form-panel">
-        <h2>{mode === "edit" ? "Edit page" : "Create page"}</h2>
+        <div>
+          <p className="eyebrow">Page</p>
+          <h2>{mode === "edit" ? "Edit page" : "Create a page"}</h2>
+          <p className="status form-intro">
+            A page groups your chats, files and generations around one idea.
+            All fields are required.
+          </p>
+        </div>
         {loading ? (
-          <p className="status">Loading page...</p>
+          <p className="status" role="status">
+            Loading page...
+          </p>
         ) : (
           <form onSubmit={submit} className="page-form">
             <label>
-              Name
+              <span className="field-label-row">
+                Name
+                <small>{form.name.length}/120</small>
+              </span>
               <input
                 value={form.name}
                 onChange={(event) =>
@@ -104,10 +119,14 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
                 }
                 required
                 maxLength={120}
+                autoFocus={mode === "new"}
               />
             </label>
             <label>
-              Description
+              <span className="field-label-row">
+                Description
+                <small>{form.description.length}/2000</small>
+              </span>
               <textarea
                 value={form.description}
                 onChange={(event) =>
@@ -122,7 +141,10 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
               />
             </label>
             <label>
-              Bio
+              <span className="field-label-row">
+                Bio
+                <small>{form.bio.length}/2000</small>
+              </span>
               <textarea
                 value={form.bio}
                 onChange={(event) =>
@@ -136,18 +158,28 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
                 maxLength={2000}
               />
             </label>
-            {error && <p className="error">{error}</p>}
+            {error && (
+              <p className="error" role="alert">
+                {error}
+              </p>
+            )}
             <div className="page-form-actions">
-              {mode === "edit" && pageId && (
-                <Link
-                  className="secondary-button"
-                  to={`/pages/${pageId}`}
-                >
-                  Cancel
-                </Link>
-              )}
-              <button className="primary-button" type="submit">
-                {mode === "edit" ? "Save changes" : "Create page"}
+              <Link
+                className="secondary-button"
+                to={mode === "edit" && pageId ? `/pages/${pageId}` : "/pages"}
+              >
+                Cancel
+              </Link>
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={saving}
+              >
+                {saving
+                  ? "Saving..."
+                  : mode === "edit"
+                    ? "Save changes"
+                    : "Create page"}
               </button>
             </div>
           </form>

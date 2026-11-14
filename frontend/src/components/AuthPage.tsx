@@ -1,4 +1,5 @@
 import { FormEvent, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import type { User } from "../types";
 
@@ -14,6 +15,7 @@ export function AuthPage({ user, onSubmit }: AuthPageProps) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -76,30 +78,62 @@ export function AuthPage({ user, onSubmit }: AuthPageProps) {
             minLength={3}
             maxLength={30}
             pattern="[a-zA-Z0-9_]+"
+            autoFocus
           />
+          {mode === "register" && (
+            <small className="field-hint">
+              3–30 characters: letters, numbers and underscores.
+            </small>
+          )}
         </label>
         <label>
           Password
-          <input
-            name="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete={
-              mode === "login" ? "current-password" : "new-password"
-            }
-            required
-            minLength={8}
-            maxLength={128}
-          />
+          <span className="password-field">
+            <input
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
+              required
+              minLength={8}
+              maxLength={128}
+            />
+            <button
+              type="button"
+              className="password-toggle"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((current) => !current)}
+            >
+              {showPassword ? (
+                <EyeOff size={16} aria-hidden="true" />
+              ) : (
+                <Eye size={16} aria-hidden="true" />
+              )}
+            </button>
+          </span>
+          {mode === "register" && (
+            <small className="field-hint">Use at least 8 characters.</small>
+          )}
         </label>
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
-        <button className="primary-button" type="submit" disabled={loading}>
-          {mode === "login" ? "Enter Framepost" : "Create account"}
+        <button
+          className="primary-button auth-submit"
+          type="submit"
+          disabled={loading}
+        >
+          {loading
+            ? "Please wait..."
+            : mode === "login"
+              ? "Enter Framepost"
+              : "Create account"}
         </button>
       </form>
     </main>

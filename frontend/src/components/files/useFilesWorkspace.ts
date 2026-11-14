@@ -8,6 +8,7 @@ import {
   updateInstructionFile,
 } from "../../instructionApi";
 import type { InstructionFile } from "../../types";
+import type { Confirm } from "../ConfirmDialog";
 
 export type Scope = "user" | "page";
 
@@ -41,7 +42,7 @@ function messageFrom(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
 
-export function useFilesWorkspace(pageId?: string) {
+export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) {
   const [files, setFiles] = useState<InstructionFile[] | null>(null);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
@@ -158,14 +159,15 @@ export function useFilesWorkspace(pageId?: string) {
     );
   }
 
-  function closeTab(tab: Tab) {
-    if (
-      isDirty(tab) &&
-      !window.confirm(
-        `Discard unsaved changes to "${tab.draft.name || "untitled"}"?`,
-      )
-    ) {
-      return;
+  async function closeTab(tab: Tab) {
+    if (isDirty(tab)) {
+      const accepted = await confirm({
+        title: "Discard unsaved changes?",
+        message: `Changes to “${tab.draft.name || "untitled"}” will be lost.`,
+        confirmLabel: "Discard changes",
+        danger: true,
+      });
+      if (!accepted) return;
     }
     setTabs((current) => current.filter((item) => item.key !== tab.key));
   }
@@ -224,7 +226,14 @@ export function useFilesWorkspace(pageId?: string) {
   }
 
   async function remove(file: InstructionFile) {
-    if (saving || !window.confirm(`Delete "${file.name}"?`)) return;
+    if (saving) return;
+    const accepted = await confirm({
+      title: `Delete “${file.name}”?`,
+      message: "This instruction file will be permanently deleted. This cannot be undone.",
+      confirmLabel: "Delete file",
+      danger: true,
+    });
+    if (!accepted) return;
     setSaving(true);
     setError("");
     try {

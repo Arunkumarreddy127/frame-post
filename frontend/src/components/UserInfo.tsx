@@ -7,7 +7,9 @@ export function UserInfo({ username, onLogout }: UserInfoProps) {
   return (
     <div className="user-info">
       <div>
-        <span className="user-info-label">User Info</span>
+        <span className="user-avatar" aria-hidden="true">
+          {username.charAt(0).toUpperCase()}
+        </span>
         <strong>{username}</strong>
       </div>
       <button

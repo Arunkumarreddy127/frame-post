@@ -46,6 +46,7 @@ export function FileExplorer({ workspace }: FileExplorerProps) {
                   <button
                     type="button"
                     className="files-explorer-open"
+                    title={file.name}
                     onClick={() => openFile(file)}
                   >
                     <FileText size={14} strokeWidth={2} aria-hidden="true" />

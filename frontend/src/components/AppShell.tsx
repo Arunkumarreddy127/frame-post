@@ -127,9 +127,11 @@ function RenderedAppShell({
   filesExplorer,
   chatPanel = true,
 }: AppShellProps) {
-  const [chatOpen, setChatOpen] = useState(
-    () => window.localStorage.getItem(CHAT_OPEN_KEY) !== "false",
-  );
+  const [chatOpen, setChatOpen] = useState(() => {
+    const stored = window.localStorage.getItem(CHAT_OPEN_KEY);
+    // First visit: keep the content area roomy on narrower screens.
+    return stored === null ? window.innerWidth >= 1280 : stored !== "false";
+  });
 
   useEffect(() => {
     window.localStorage.setItem(CHAT_OPEN_KEY, String(chatOpen));

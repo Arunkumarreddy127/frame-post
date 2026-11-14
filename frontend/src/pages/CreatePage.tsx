@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronRight, Clapperboard, Image, Sparkles } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import type { ShellRouteProps, Workflow } from "../types";
@@ -12,6 +13,7 @@ type CreateItem = {
   label: string;
   description: string;
   to: string;
+  icon: ReactNode;
 };
 
 const copilotItems: CreateItem[] = [
@@ -19,6 +21,7 @@ const copilotItems: CreateItem[] = [
     label: "Image",
     description: "Generate images with GPT image models.",
     to: "/create/gpt-image-gen",
+    icon: <Image size={20} strokeWidth={1.8} aria-hidden="true" />,
   },
 ];
 
@@ -38,11 +41,17 @@ export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
     label: workflow.label,
     description: workflow.description,
     to: `/create/rh/${workflow.key}`,
+    icon:
+      workflow.outputType === "video" ? (
+        <Clapperboard size={20} strokeWidth={1.8} aria-hidden="true" />
+      ) : (
+        <Sparkles size={20} strokeWidth={1.8} aria-hidden="true" />
+      ),
   }));
 
   const sections: { heading: string; items: CreateItem[] }[] = [
-    { heading: "Copilot", items: copilotItems },
-    { heading: "RH", items: rhItems },
+    { heading: "Image generation", items: copilotItems },
+    { heading: "Workflows", items: rhItems },
   ];
 
   return (
@@ -55,28 +64,43 @@ export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
       backTo={activePageId ? "/pages" : "/home"}
     >
       <div className="create-sections">
-        {loadError ? <p className="status error">{loadError}</p> : null}
-        {sections.map((section) => (
-          <section className="panel create-section" key={section.heading}>
-            <h3>{section.heading}</h3>
-            <ul className="create-list">
-              {section.items.map((item) => (
-                <li key={item.to}>
-                  <Link
-                    className="create-item"
-                    to={activePageId ? `/pages/${activePageId}${item.to}` : item.to}
-                  >
-                    <span className="create-item-text">
-                      <strong>{item.label}</strong>
-                      <span>{item.description}</span>
-                    </span>
-                    <span className="create-item-action">Open</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+        {loadError ? (
+          <p className="error" role="alert">
+            {loadError}
+          </p>
+        ) : null}
+        {sections
+          .filter((section) => section.items.length > 0)
+          .map((section) => (
+            <section className="create-section" key={section.heading}>
+              <h3>{section.heading}</h3>
+              <ul className="create-list">
+                {section.items.map((item) => (
+                  <li key={item.to}>
+                    <Link
+                      className="create-item"
+                      to={
+                        activePageId
+                          ? `/pages/${activePageId}${item.to}`
+                          : item.to
+                      }
+                    >
+                      <span className="create-item-icon">{item.icon}</span>
+                      <span className="create-item-text">
+                        <strong>{item.label}</strong>
+                        <span>{item.description}</span>
+                      </span>
+                      <ChevronRight
+                        className="create-item-chevron"
+                        size={18}
+                        aria-hidden="true"
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
       </div>
     </AppShell>
   );
