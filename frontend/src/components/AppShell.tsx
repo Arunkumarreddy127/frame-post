@@ -1,4 +1,11 @@
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { MessageSquare } from "lucide-react";
 import { ChatPanel } from "./ChatPanel";
 import { Header } from "./Header";
@@ -20,7 +27,96 @@ type AppShellProps = {
   chatPanel?: boolean;
 };
 
-export function AppShell({
+type AppShellConfig = Pick<
+  AppShellProps,
+  "pageTitle" | "backTo" | "sidebar" | "pageId" | "filesExplorer" | "chatPanel"
+>;
+
+const WorkspaceShellConfigContext = createContext<
+  ((config: AppShellConfig) => void) | null
+>(null);
+
+export function WorkspaceAppShell({
+  children,
+  user,
+  onLogout,
+  pageId,
+}: Pick<AppShellProps, "children" | "user" | "onLogout" | "pageId">) {
+  const [shellConfig, setShellConfig] = useState<AppShellConfig>({
+    pageTitle: "Page workspace",
+    backTo: "/pages",
+    sidebar: "page",
+    pageId,
+    chatPanel: true,
+  });
+  const reportShellConfig = useCallback((config: AppShellConfig) => {
+    setShellConfig((current) =>
+      sameShellConfig(current, config) ? current : config,
+    );
+  }, []);
+
+  return (
+    <AppShell user={user} onLogout={onLogout} {...shellConfig} pageId={pageId}>
+      <WorkspaceShellConfigContext.Provider value={reportShellConfig}>
+        {children}
+      </WorkspaceShellConfigContext.Provider>
+    </AppShell>
+  );
+}
+
+export function AppShell(props: AppShellProps) {
+  const parentShellConfig = useContext(WorkspaceShellConfigContext);
+  const config: AppShellConfig = {
+    pageTitle: props.pageTitle,
+    backTo: props.backTo ?? "/home",
+    sidebar: props.sidebar ?? "global",
+    pageId: props.pageId,
+    filesExplorer: props.filesExplorer,
+    chatPanel: props.chatPanel ?? true,
+  };
+
+  if (parentShellConfig) {
+    return (
+      <NestedAppShell
+        config={config}
+        reportShellConfig={parentShellConfig}
+      >
+        {props.children}
+      </NestedAppShell>
+    );
+  }
+
+  return <RenderedAppShell {...props} {...config} />;
+}
+
+function NestedAppShell({
+  children,
+  config,
+  reportShellConfig,
+}: {
+  children: React.ReactNode;
+  config: AppShellConfig;
+  reportShellConfig: (config: AppShellConfig) => void;
+}) {
+  useLayoutEffect(() => {
+    reportShellConfig(config);
+  }, [config.pageTitle, config.backTo, config.sidebar, config.pageId, config.filesExplorer, config.chatPanel, reportShellConfig]);
+
+  return <>{children}</>;
+}
+
+function sameShellConfig(left: AppShellConfig, right: AppShellConfig) {
+  return (
+    left.pageTitle === right.pageTitle &&
+    left.backTo === right.backTo &&
+    left.sidebar === right.sidebar &&
+    left.pageId === right.pageId &&
+    left.filesExplorer === right.filesExplorer &&
+    left.chatPanel === right.chatPanel
+  );
+}
+
+function RenderedAppShell({
   children,
   user,
   onLogout,

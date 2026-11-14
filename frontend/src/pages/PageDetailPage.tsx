@@ -81,12 +81,14 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
     >
       <div className="page-header-row"></div>
       <section className="panel page-detail-panel">
-        <Link
-          to={`/pages/${page.id}/edit`}
-          className="secondary-button small-button"
-        >
-          Edit page
-        </Link>
+        <div className="page-card-actions">
+          <Link
+            to={`/pages/${page.id}/edit`}
+            className="secondary-button small-button"
+          >
+            Edit page
+          </Link>
+        </div>
         <p className="eyebrow">Page workspace</p>
         <h2>{page.name}</h2>
         <p className="page-detail-copy">{page.description}</p>

@@ -255,7 +255,6 @@ export function RunningHubWorkflowPage({
       onLogout={onLogout}
       pageTitle={workflow?.label ?? "RunningHub workflow"}
       sidebar={activePageId ? "page" : "global"}
-      chatPanel={false}
       pageId={activePageId}
       backTo={createPath}
     >

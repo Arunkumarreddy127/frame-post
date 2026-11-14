@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { FileEditorArea } from "../components/files/FileEditorArea";
@@ -8,6 +9,16 @@ import type { ShellRouteProps } from "../types";
 export function FilesPage({ user, onLogout }: ShellRouteProps) {
   const { pageId } = useParams<{ pageId?: string }>();
   const workspace = useFilesWorkspace(pageId);
+  const filesExplorer = useMemo(
+    () => <FileExplorer workspace={workspace} />,
+    [
+      workspace.files,
+      workspace.groups,
+      workspace.tabs,
+      workspace.activeTab,
+      workspace.saving,
+    ],
+  );
 
   return (
     <AppShell
@@ -17,7 +28,7 @@ export function FilesPage({ user, onLogout }: ShellRouteProps) {
       sidebar={pageId ? "page" : "global"}
       pageId={pageId}
       backTo={pageId ? "/pages" : undefined}
-      filesExplorer={<FileExplorer workspace={workspace} />}
+      filesExplorer={filesExplorer}
     >
       <FileEditorArea pageId={pageId} workspace={workspace} />
     </AppShell>

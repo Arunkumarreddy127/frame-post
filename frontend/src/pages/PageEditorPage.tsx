@@ -138,6 +138,14 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
             </label>
             {error && <p className="error">{error}</p>}
             <div className="page-form-actions">
+              {mode === "edit" && pageId && (
+                <Link
+                  className="secondary-button"
+                  to={`/pages/${pageId}`}
+                >
+                  Cancel
+                </Link>
+              )}
               <button className="primary-button" type="submit">
                 {mode === "edit" ? "Save changes" : "Create page"}
               </button>

@@ -57,7 +57,7 @@ export function PageListPage({ user, onLogout }: ShellRouteProps) {
   }
 
   return (
-    <AppShell user={user} onLogout={onLogout} pageTitle="DREAMVERSE">
+    <AppShell user={user} onLogout={onLogout} pageTitle="All Pages">
       <div className="page-list-header">
         <div>
           <p className="eyebrow">Pages</p>
@@ -94,12 +94,6 @@ export function PageListPage({ user, onLogout }: ShellRouteProps) {
                 <span>{page.description}</span>
               </Link>
               <div className="page-card-actions">
-                <Link
-                  to={`/pages/${page.id}/edit`}
-                  className="secondary-button small-button"
-                >
-                  Edit
-                </Link>
                 <button
                   type="button"
                   className="secondary-button small-button danger-button"

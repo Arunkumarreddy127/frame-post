@@ -211,7 +211,6 @@ export function GptImageGenPage({
       onLogout={onLogout}
       pageTitle="Image"
       sidebar={activePageId ? "page" : "global"}
-      chatPanel={false}
       pageId={activePageId}
       backTo={createPath}
     >

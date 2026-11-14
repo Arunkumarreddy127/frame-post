@@ -10,6 +10,7 @@ import {
   useParams,
 } from "react-router-dom";
 import { AuthPage } from "./components/AuthPage";
+import { PageWorkspaceLayout } from "./components/PageWorkspaceLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import {
@@ -136,79 +137,65 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/pages/:pageId/chat" element={<PageChatRedirect />} />
         <Route
           path="/pages/:pageId"
           element={
             <ProtectedRoute user={user} loading={loading}>
-              <PageDetailPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pages/:pageId/edit"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <PageEditorPage
-                mode="edit"
+              <PageWorkspaceLayout
                 user={user as User}
                 onLogout={logout}
               />
             </ProtectedRoute>
           }
-        />
-        <Route path="/pages/:pageId/chat" element={<PageChatRedirect />} />
+        >
         <Route
-          path="/pages/:pageId/files"
+          index
+          element={<PageDetailPage user={user as User} onLogout={logout} />}
+        />
+        <Route
+          path="edit"
           element={
-            <ProtectedRoute user={user} loading={loading}>
-              <FilesPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
+            <PageEditorPage
+              mode="edit"
+              user={user as User}
+              onLogout={logout}
+            />
           }
         />
         <Route
-          path="/pages/:pageId/create"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <CreatePage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
+          path="files"
+          element={<FilesPage user={user as User} onLogout={logout} />}
         />
         <Route
-          path="/pages/:pageId/create/gpt-image-gen"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <GptImageGenPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
+          path="create"
+          element={<CreatePage user={user as User} onLogout={logout} />}
         />
         <Route
-          path="/pages/:pageId/create/rh-minimax-h3-ff-image-to-video"
+          path="create/gpt-image-gen"
+          element={<GptImageGenPage user={user as User} onLogout={logout} />}
+        />
+        <Route
+          path="create/rh-minimax-h3-ff-image-to-video"
           element={<LegacyMinimaxRedirect />}
         />
         <Route
-          path="/pages/:pageId/create/rh/:workflowKey"
+          path="create/rh/:workflowKey"
           element={
-            <ProtectedRoute user={user} loading={loading}>
-              <RunningHubWorkflowPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
+            <RunningHubWorkflowPage user={user as User} onLogout={logout} />
           }
         />
         <Route
-          path="/pages/:pageId/library"
+          path="library"
           element={
-            <ProtectedRoute user={user} loading={loading}>
-              <PageLibraryRoute user={user as User} onLogout={logout} />
-            </ProtectedRoute>
+            <PageLibraryRoute user={user as User} onLogout={logout} />
           }
         />
         <Route
-          path="/pages/:pageId/generations"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <GenerationsPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
+          path="generations"
+          element={<GenerationsPage user={user as User} onLogout={logout} />}
         />
+        </Route>
         <Route
           path="/generations"
           element={

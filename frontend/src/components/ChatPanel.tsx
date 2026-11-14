@@ -311,6 +311,8 @@ export function ChatPanel({ pageId }: ChatPanelProps) {
 
   async function removeConversation() {
     if (!conversation || sending) return;
+    if (!window.confirm("Delete this conversation? This cannot be undone."))
+      return;
     try {
       await deleteConversation(conversation.id, activePageId);
       const remaining = conversations.filter(
