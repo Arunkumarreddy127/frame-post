@@ -166,6 +166,34 @@ public class ChatController {
                 new SendMessageRequest(content, model), attachments, attachmentKeys);
     }
 
+    @PutMapping(
+            value = "/chats/{conversationId}/messages/{messageId}/stream",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public SseEmitter editGlobalMessage(
+            @PathVariable String conversationId,
+            @PathVariable String messageId,
+            @RequestBody SendMessageRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.editMessageAndStream(
+                currentUser(servletRequest), null, conversationId, messageId, request);
+    }
+
+    @PostMapping(
+            value = "/chats/{conversationId}/messages/{messageId}/retry",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public SseEmitter retryGlobalMessage(
+            @PathVariable String conversationId,
+            @PathVariable String messageId,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.retryAssistantResponse(
+                currentUser(servletRequest), null, conversationId, messageId);
+    }
+
     @GetMapping("/chats/{conversationId}/attachments/{messageId}/{index}")
     public ResponseEntity<byte[]> globalAttachment(
             @PathVariable String conversationId,
@@ -247,6 +275,36 @@ public class ChatController {
     ) {
         return chatService.streamMessage(currentUser(servletRequest), pageId, conversationId,
                 new SendMessageRequest(content, model), attachments, attachmentKeys);
+    }
+
+    @PutMapping(
+            value = "/pages/{pageId}/chats/{conversationId}/messages/{messageId}/stream",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public SseEmitter editPageMessage(
+            @PathVariable String pageId,
+            @PathVariable String conversationId,
+            @PathVariable String messageId,
+            @RequestBody SendMessageRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.editMessageAndStream(
+                currentUser(servletRequest), pageId, conversationId, messageId, request);
+    }
+
+    @PostMapping(
+            value = "/pages/{pageId}/chats/{conversationId}/messages/{messageId}/retry",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public SseEmitter retryPageMessage(
+            @PathVariable String pageId,
+            @PathVariable String conversationId,
+            @PathVariable String messageId,
+            HttpServletRequest servletRequest
+    ) {
+        return chatService.retryAssistantResponse(
+                currentUser(servletRequest), pageId, conversationId, messageId);
     }
 
     @GetMapping("/pages/{pageId}/chats/{conversationId}/attachments/{messageId}/{index}")

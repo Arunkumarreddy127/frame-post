@@ -11,7 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import com.example.framepost.auth.User;
@@ -222,15 +221,131 @@ public class ChatService {
         List<ChatMessage> context = contextForConversation(updatedConversation.id());
         SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
 
-        CompletableFuture.runAsync(() -> streamAssistantResponse(
+        startAssistantResponse(emitter, updatedConversation, page, instructionFiles, context, model, null);
+        return emitter;
+    }
+
+    public SseEmitter editMessageAndStream(
+            User user,
+            String pageId,
+            String conversationId,
+            String messageId,
+            SendMessageRequest request
+    ) {
+        validateScope(user, pageId);
+        ChatConversation conversation = findConversation(user, pageId, conversationId);
+        String model = validateModel(request.model());
+        List<ChatMessage> history = messages.findByConversationIdOrderByCreatedAtAsc(conversation.id());
+        int messageIndex = messageIndex(history, messageId);
+        ChatMessage original = history.get(messageIndex);
+        if (original.role() != ChatRole.USER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only user messages can be edited");
+        }
+        String content = validateEditedContent(request.content(), original.attachments());
+
+        deleteMessages(history.subList(messageIndex + 1, history.size()));
+        messages.save(new ChatMessage(
+                original.id(),
+                original.conversationId(),
+                original.role(),
+                content,
+                original.model(),
+                ChatMessageStatus.COMPLETED,
+                original.createdAt(),
+                original.attachments()
+        ));
+
+        ChatConversation updatedConversation = updateConversationForPrompt(
+                conversation, model, content, Instant.now());
+        return startAssistantResponseForConversation(user, pageId, updatedConversation, model, null);
+    }
+
+    public SseEmitter retryAssistantResponse(User user, String pageId, String conversationId, String messageId) {
+        validateScope(user, pageId);
+        ChatConversation conversation = findConversation(user, pageId, conversationId);
+        List<ChatMessage> history = messages.findByConversationIdOrderByCreatedAtAsc(conversation.id());
+        int messageIndex = messageIndex(history, messageId);
+        ChatMessage failedMessage = history.get(messageIndex);
+        if (failedMessage.role() != ChatRole.ASSISTANT || failedMessage.status() != ChatMessageStatus.FAILED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only failed assistant responses can be retried");
+        }
+        if (history.subList(0, messageIndex).stream().noneMatch(message -> message.role() == ChatRole.USER)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "There is no user message to retry");
+        }
+
+        String model = validateModel(failedMessage.model());
+        deleteMessages(history.subList(messageIndex + 1, history.size()));
+        ChatConversation updatedConversation = conversations.save(
+                conversation.with(conversation.title(), model, Instant.now()));
+        return startAssistantResponseForConversation(
+                user, pageId, updatedConversation, model, failedMessage.id());
+    }
+
+    private SseEmitter startAssistantResponseForConversation(
+            User user,
+            String pageId,
+            ChatConversation conversation,
+            String model,
+            String retryMessageId
+    ) {
+        Page page = pageId == null ? null : pageService.get(user, pageId);
+        List<InstructionFile> instructionFiles = instructionService.resolveSelected(
+                user.id(),
+                pageId,
+                conversation.instructionFileIds()
+        );
+        SseEmitter emitter = new SseEmitter(STREAM_TIMEOUT_MILLIS);
+        startAssistantResponse(
                 emitter,
-                updatedConversation,
+                conversation,
                 page,
                 instructionFiles,
-                context,
-                model
-        ));
+                contextForConversation(conversation.id()),
+                model,
+                retryMessageId
+        );
         return emitter;
+    }
+
+    private int messageIndex(List<ChatMessage> history, String messageId) {
+        for (int index = 0; index < history.size(); index++) {
+            if (history.get(index).id().equals(messageId)) {
+                return index;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found");
+    }
+
+    private void deleteMessages(List<ChatMessage> messagesToDelete) {
+        messagesToDelete.stream()
+                .flatMap(message -> message.attachments().stream())
+                .forEach(attachment -> storage.delete(attachment.storageKey()));
+        if (!messagesToDelete.isEmpty()) {
+            messages.deleteAll(messagesToDelete);
+        }
+    }
+
+    private void startAssistantResponse(
+            SseEmitter emitter,
+            ChatConversation conversation,
+            Page page,
+            List<InstructionFile> instructionFiles,
+            List<ChatMessage> context,
+            String model,
+            String retryMessageId
+    ) {
+        Thread worker = Thread.ofVirtual().name("chat-stream-" + conversation.id()).unstarted(
+                () -> streamAssistantResponse(
+                        emitter, conversation, page, instructionFiles, context, model, retryMessageId));
+        Runnable cancel = () -> {
+            if (worker.isAlive()) {
+                worker.interrupt();
+            }
+        };
+        emitter.onCompletion(cancel);
+        emitter.onTimeout(cancel);
+        emitter.onError(ignored -> cancel.run());
+        worker.start();
     }
 
     private List<ChatAttachment> persistAttachments(
@@ -391,7 +506,8 @@ public class ChatService {
             Page page,
             List<InstructionFile> instructionFiles,
             List<ChatMessage> context,
-            String model
+            String model,
+            String retryMessageId
     ) {
         StringBuilder reply = new StringBuilder();
         List<InstructionFileProposal> proposals = new ArrayList<>();
@@ -435,6 +551,9 @@ public class ChatService {
                     ChatMessageStatus.COMPLETED,
                     Instant.now()
             ));
+            if (retryMessageId != null) {
+                messages.deleteById(retryMessageId);
+            }
             ChatConversation completedConversation = conversations.save(
                     conversation.with(conversation.title(), model, Instant.now())
             );
@@ -444,15 +563,32 @@ public class ChatService {
             ));
             emitter.complete();
         } catch (Exception exception) {
-            messages.save(new ChatMessage(
-                    null,
-                    conversation.id(),
-                    ChatRole.ASSISTANT,
-                    "Unable to complete the response.",
-                    model,
-                    ChatMessageStatus.FAILED,
-                    Instant.now()
-            ));
+            if (Thread.currentThread().isInterrupted()) {
+                return;
+            }
+            if (retryMessageId == null) {
+                messages.save(new ChatMessage(
+                        null,
+                        conversation.id(),
+                        ChatRole.ASSISTANT,
+                        "Unable to complete the response.",
+                        model,
+                        ChatMessageStatus.FAILED,
+                        Instant.now()
+                ));
+            } else {
+                ChatMessage retryMessage = messages.findById(retryMessageId).orElseThrow();
+                messages.save(new ChatMessage(
+                        retryMessage.id(),
+                        retryMessage.conversationId(),
+                        ChatRole.ASSISTANT,
+                        "Unable to complete the response.",
+                        model,
+                        ChatMessageStatus.FAILED,
+                        retryMessage.createdAt(),
+                        retryMessage.attachments()
+                ));
+            }
             send(emitter, "error", Map.of("message", errorMessage(exception)));
             emitter.complete();
         }
@@ -528,6 +664,17 @@ public class ChatService {
                     HttpStatus.BAD_REQUEST,
                     "Message content must be at most " + MAX_MESSAGE_LENGTH + " characters"
             );
+        }
+        return trimmed;
+    }
+
+    private String validateEditedContent(String content, List<ChatAttachment> attachments) {
+        String trimmed = content == null ? "" : content.trim();
+        if (trimmed.isEmpty() && attachments.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message or image attachment is required");
+        }
+        if (trimmed.length() > MAX_MESSAGE_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Message must be 8000 characters or fewer");
         }
         return trimmed;
     }

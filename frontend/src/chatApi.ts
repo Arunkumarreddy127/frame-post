@@ -108,6 +108,7 @@ export async function streamMessage(
   pageId?: string,
   attachments: File[] = [],
   attachmentKeys: string[] = [],
+  signal?: AbortSignal,
 ) {
   const form = new FormData();
   form.append("content", content);
@@ -120,8 +121,56 @@ export async function streamMessage(
       method: "POST",
       credentials: "include",
       body: form,
+      signal,
     },
   );
+  await consumeStream(response, onEvent);
+}
+
+export async function editMessageAndStream(
+  conversationId: string,
+  messageId: string,
+  content: string,
+  model: ChatModel,
+  onEvent: (event: ChatStreamEvent) => void,
+  pageId?: string,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}${chatPath(pageId)}/${conversationId}/messages/${encodeURIComponent(messageId)}/stream`,
+    {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, model }),
+      signal,
+    },
+  );
+  await consumeStream(response, onEvent);
+}
+
+export async function retryAssistantResponse(
+  conversationId: string,
+  messageId: string,
+  onEvent: (event: ChatStreamEvent) => void,
+  pageId?: string,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}${chatPath(pageId)}/${conversationId}/messages/${encodeURIComponent(messageId)}/retry`,
+    {
+      method: "POST",
+      credentials: "include",
+      signal,
+    },
+  );
+  await consumeStream(response, onEvent);
+}
+
+async function consumeStream(
+  response: Response,
+  onEvent: (event: ChatStreamEvent) => void,
+) {
   if (!response.ok) {
     throw new Error(await readError(response));
   }

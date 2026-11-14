@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseSseFrame, streamMessage } from "./chatApi";
+import {
+  editMessageAndStream,
+  parseSseFrame,
+  retryAssistantResponse,
+  streamMessage,
+} from "./chatApi";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -67,5 +72,62 @@ describe("parseSseFrame", () => {
     expect(request.body.get("model")).toBe("model");
     expect(request.body.get("attachments")).toBe(file);
     expect(request.body.get("attachmentKeys")).toBe("outputs/key.png");
+  });
+
+  it("edits a user message and starts a replacement response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("event: complete\ndata: {}\n\n", {
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    await editMessageAndStream(
+      "conversation",
+      "message-id",
+      "updated prompt",
+      "model",
+      () => undefined,
+      "page-id",
+      controller.signal,
+    );
+
+    const [requestUrl, request] = fetchMock.mock.calls[0];
+    expect(requestUrl).toContain(
+      "/api/pages/page-id/chats/conversation/messages/message-id/stream",
+    );
+    expect(request.method).toBe("PUT");
+    expect(request.credentials).toBe("include");
+    expect(request.signal).toBe(controller.signal);
+    expect(JSON.parse(request.body)).toEqual({
+      content: "updated prompt",
+      model: "model",
+    });
+  });
+
+  it("retries a failed assistant message with an abort signal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("event: complete\ndata: {}\n\n", {
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    await retryAssistantResponse(
+      "conversation",
+      "failed-message",
+      () => undefined,
+      undefined,
+      controller.signal,
+    );
+
+    const [requestUrl, request] = fetchMock.mock.calls[0];
+    expect(requestUrl).toContain(
+      "/api/chats/conversation/messages/failed-message/retry",
+    );
+    expect(request.method).toBe("POST");
+    expect(request.signal).toBe(controller.signal);
   });
 });

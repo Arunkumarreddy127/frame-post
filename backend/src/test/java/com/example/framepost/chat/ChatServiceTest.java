@@ -4,16 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.List;
+import java.util.function.Consumer;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.config.OpenAiProperties;
@@ -163,6 +165,87 @@ class ChatServiceTest {
                 verify(messages).deleteByConversationId(conversation.id());
                 verify(conversations).delete(conversation);
             }
+
+    @Test
+    void editingUserMessageDeletesFollowingMessagesAndPreservesItsAttachments() {
+        Instant now = Instant.now();
+        ChatConversation conversation = new ChatConversation(
+                "conversation-id", user.id(), null, "Chat", "gpt-6-luna", now, now);
+        ChatAttachment originalAttachment =
+                new ChatAttachment("reference.png", "image/png", 3, "chats/user/original.png");
+        ChatMessage original = new ChatMessage(
+                "user-message", conversation.id(), ChatRole.USER, "old prompt", null,
+                ChatMessageStatus.COMPLETED, now, List.of(originalAttachment));
+        ChatMessage following = new ChatMessage(
+                "later-message", conversation.id(), ChatRole.USER, "later prompt", null,
+                ChatMessageStatus.COMPLETED, now.plusSeconds(1), List.of(
+                        new ChatAttachment("later.png", "image/png", 3, "chats/user/later.png")));
+        ChatMessage edited = new ChatMessage(
+                original.id(), original.conversationId(), original.role(), "new prompt", original.model(),
+                ChatMessageStatus.COMPLETED, original.createdAt(), original.attachments());
+
+        when(conversations.findByIdAndUserIdAndPageIdIsNull(conversation.id(), user.id()))
+                .thenReturn(Optional.of(conversation));
+        when(messages.findByConversationIdOrderByCreatedAtAsc(conversation.id()))
+                .thenReturn(List.of(original, following), List.of(edited));
+        when(messages.save(any(ChatMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conversations.save(any(ChatConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(instructionService.resolveSelected(user.id(), null, List.of())).thenReturn(List.of());
+        Mockito.doAnswer(invocation -> {
+            Consumer<String> onDelta = invocation.getArgument(4);
+            onDelta.accept("replacement response");
+            return null;
+        }).when(openAiClient).streamResponse(any(), any(), any(), anyBoolean(), any(), any());
+
+        service.editMessageAndStream(
+                user,
+                null,
+                conversation.id(),
+                original.id(),
+                new ChatService.SendMessageRequest("new prompt", "gpt-6-luna"));
+
+        verify(storage).delete("chats/user/later.png");
+        verify(messages).deleteAll(List.of(following));
+        verify(messages).save(org.mockito.ArgumentMatchers.argThat(message ->
+                message.id().equals(original.id())
+                        && message.content().equals("new prompt")
+                        && message.attachments().equals(List.of(originalAttachment))));
+    }
+
+    @Test
+    void retryingAFailedResponseRemovesItOnlyAfterTheReplacementCompletes() {
+        Instant now = Instant.now();
+        ChatConversation conversation = new ChatConversation(
+                "conversation-id", user.id(), null, "Chat", "gpt-6-luna", now, now);
+        ChatMessage userMessage = new ChatMessage(
+                "user-message", conversation.id(), ChatRole.USER, "prompt", null,
+                ChatMessageStatus.COMPLETED, now);
+        ChatMessage failed = new ChatMessage(
+                "failed-message", conversation.id(), ChatRole.ASSISTANT, "Unable to complete the response.",
+                "gpt-6-luna", ChatMessageStatus.FAILED, now.plusSeconds(1));
+        ChatMessage following = new ChatMessage(
+                "later-message", conversation.id(), ChatRole.USER, "later prompt", null,
+                ChatMessageStatus.COMPLETED, now.plusSeconds(2));
+
+        when(conversations.findByIdAndUserIdAndPageIdIsNull(conversation.id(), user.id()))
+                .thenReturn(Optional.of(conversation));
+        when(messages.findByConversationIdOrderByCreatedAtAsc(conversation.id()))
+                .thenReturn(List.of(userMessage, failed, following), List.of(userMessage, failed));
+        when(messages.findById(failed.id())).thenReturn(Optional.of(failed));
+        when(messages.save(any(ChatMessage.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conversations.save(any(ChatConversation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(instructionService.resolveSelected(user.id(), null, List.of())).thenReturn(List.of());
+        Mockito.doAnswer(invocation -> {
+            Consumer<String> onDelta = invocation.getArgument(4);
+            onDelta.accept("replacement response");
+            return null;
+        }).when(openAiClient).streamResponse(any(), any(), any(), anyBoolean(), any(), any());
+
+        service.retryAssistantResponse(user, null, conversation.id(), failed.id());
+
+        verify(messages).deleteAll(List.of(following));
+        verify(messages, timeout(2_000)).deleteById(failed.id());
+    }
 
     @Test
     void listsGlobalAndPageConversationsForTheCurrentUser() {
