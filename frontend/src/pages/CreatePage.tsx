@@ -63,6 +63,15 @@ export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
       pageId={activePageId}
       backTo={activePageId ? "/pages" : "/home"}
     >
+      <header className="app-page-header">
+        <div>
+          <p className="eyebrow">Create</p>
+          <h1 className="app-page-title">Create</h1>
+          <p className="app-page-description">
+            Choose an image generator or workflow to create new work.
+          </p>
+        </div>
+      </header>
       <div className="create-sections">
         {loadError ? (
           <p className="error" role="alert">

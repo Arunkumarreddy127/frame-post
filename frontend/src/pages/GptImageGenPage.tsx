@@ -308,7 +308,10 @@ export function GptImageGenPage({
       </Link>
       <div className="image-gen-layout">
         <form className="panel image-gen-form" onSubmit={submit}>
-          <h2>Images</h2>
+          <h2 className="app-page-title">Images</h2>
+          <p className="app-page-description">
+            Generate images from a prompt with optional image references.
+          </p>
           <section className="image-gen-section">
             <h3>Prompt</h3>
             {/* GenerationComposer */}

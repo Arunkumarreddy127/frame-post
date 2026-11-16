@@ -36,8 +36,8 @@ export function Homepage({ user }: HomepageProps) {
     <section className="home-page">
       <div className="home-page-intro">
         <p className="eyebrow">Framepost home</p>
-        <h1>Hello, {user.username}</h1>
-        <p className="status">Where would you like to start?</p>
+        <h1 className="app-page-title">Hello, {user.username}</h1>
+        <p className="app-page-description">Where would you like to start?</p>
       </div>
       <ul className="home-shortcuts">
         {shortcuts.map(({ to, label, description, icon: Icon }) => (

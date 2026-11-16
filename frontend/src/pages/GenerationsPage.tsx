@@ -29,9 +29,18 @@ export function GenerationsPage({
       pageId={activePageId}
       backTo={createPath}
     >
-      <Link to={createPath} className="secondary-button">
-        ← Back to Create
-      </Link>
+      <header className="app-page-header">
+        <div>
+          <p className="eyebrow">Generations</p>
+          <h1 className="app-page-title">All generations</h1>
+          <p className="app-page-description">
+            Browse past generations and manage their inputs and outputs.
+          </p>
+        </div>
+        <Link to={createPath} className="secondary-button">
+          ← Back to Create
+        </Link>
+      </header>
       <GenerationFeed
         items={items}
         hasMore={hasMore}

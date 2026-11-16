@@ -68,10 +68,13 @@ export function PageListPage({ user, onLogout }: ShellRouteProps) {
 
   return (
     <AppShell user={user} onLogout={onLogout} pageTitle="All Pages">
-      <div className="page-list-header">
+      <header className="app-page-header page-list-header">
         <div>
           <p className="eyebrow">Pages</p>
-          <h2>All pages</h2>
+          <h2 className="app-page-title">All pages</h2>
+          <p className="app-page-description">
+            Organize chats, files, and generations by page.
+          </p>
         </div>
         <button
           className="primary-button"
@@ -80,7 +83,7 @@ export function PageListPage({ user, onLogout }: ShellRouteProps) {
         >
           New page
         </button>
-      </div>
+      </header>
       {error && (
         <p className="error" role="alert">
           {error}

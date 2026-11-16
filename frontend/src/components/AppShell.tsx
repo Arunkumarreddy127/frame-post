@@ -192,12 +192,18 @@ function RenderedAppShell({
           <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
         )}
         <main className="app-main">
-          {pageNameError && sidebar === "page" && (
-            <p className="page-workspace-error error" role="alert">
-              Unable to load page name: {pageNameError}
-            </p>
-          )}
-          {children}
+          <div
+            className={
+              filesExplorer ? "app-main-content" : "app-main-content app-main-surface"
+            }
+          >
+            {pageNameError && sidebar === "page" && (
+              <p className="page-workspace-error error" role="alert">
+                Unable to load page name: {pageNameError}
+              </p>
+            )}
+            {children}
+          </div>
         </main>
         {chatPanel && (
           <aside className="app-chat" hidden={!chatOpen}>

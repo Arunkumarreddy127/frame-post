@@ -323,7 +323,10 @@ export function RunningHubWorkflowPage({
       {workflow ? (
         <div className="image-gen-layout">
           <form className="panel image-gen-form" onSubmit={handleSubmit}>
-            <h2>{workflow.label}</h2>
+            <h2 className="app-page-title">{workflow.label}</h2>
+            <p className="app-page-description">
+              Configure inputs and settings to run this workflow.
+            </p>
             <section className="image-gen-section">
               <h3>{promptInput ? "Prompt" : "Source"}</h3>
               {/* GenerationComposer */}

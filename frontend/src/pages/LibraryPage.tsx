@@ -220,11 +220,13 @@ export function LibraryPage({ user, onLogout, pageId }: LibraryPageProps) {
       backTo={pageId ? `/pages/${pageId}` : "/home"}
     >
       <section className="library-panel">
-        <header className="library-heading">
+        <header className="app-page-header library-heading">
           <div>
             <p className="eyebrow">Library</p>
-            <h2>Library</h2>
-            <p>Browse your source files and generated work together.</p>
+            <h2 className="app-page-title">Library</h2>
+            <p className="app-page-description">
+              Browse your source files and generated work together.
+            </p>
           </div>
           <span className="library-total">{visibleItems.length} shown</span>
         </header>

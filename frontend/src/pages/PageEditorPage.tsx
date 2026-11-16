@@ -115,8 +115,10 @@ export function PageEditorPage({ mode, user, onLogout }: PageEditorPageProps) {
       <section className="panel form-panel">
         <div>
           <p className="eyebrow">Page</p>
-          <h2>{mode === "edit" ? "Edit page" : "Create a page"}</h2>
-          <p className="status form-intro">
+          <h2 className="app-page-title">
+            {mode === "edit" ? "Edit page" : "Create a page"}
+          </h2>
+          <p className="status form-intro app-page-description">
             A page groups your chats, files and generations around one idea.
             All fields are required.
           </p>

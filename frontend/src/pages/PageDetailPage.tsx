@@ -96,7 +96,7 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
             )}
             <div>
               <p className="eyebrow">Page workspace</p>
-              <h2>{page.name}</h2>
+              <h2 className="app-page-title">{page.name}</h2>
             </div>
           </div>
           <Link
@@ -106,7 +106,9 @@ export function PageDetailPage({ user, onLogout }: ShellRouteProps) {
             Edit page
           </Link>
         </div>
-        <p className="page-detail-copy">{page.description}</p>
+        <p className="page-detail-copy app-page-description">
+          {page.description}
+        </p>
         <div className="detail-block">
           <h3>Bio</h3>
           <p>{page.bio}</p>

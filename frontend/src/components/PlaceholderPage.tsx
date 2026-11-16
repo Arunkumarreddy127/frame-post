@@ -29,8 +29,8 @@ export function PlaceholderPage({
     >
       <section className="panel placeholder-panel">
         <p className="eyebrow">Framepost workspace</p>
-        <h2>{title}</h2>
-        <p className="status">{description}</p>
+        <h2 className="app-page-title">{title}</h2>
+        <p className="status app-page-description">{description}</p>
       </section>
     </AppShell>
   );
