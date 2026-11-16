@@ -6,10 +6,12 @@ import {
   useLayoutEffect,
   useState,
 } from "react";
+import { useMatch } from "react-router-dom";
 import { ChatPanel } from "./ChatPanel";
 import { Header } from "./Header";
 import { PageSidebar } from "./PageSidebar";
 import { Sidebar } from "./Sidebar";
+import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 import type { User } from "../types";
 
 const CHAT_OPEN_KEY = "framepost.chatPanelOpen";
@@ -26,13 +28,12 @@ type AppShellProps = {
   pageProfileImageUrl?: string | null;
   pageNameLoading?: boolean;
   pageNameError?: string;
-  filesExplorer?: React.ReactNode;
   chatPanel?: boolean;
 };
 
 type AppShellConfig = Pick<
   AppShellProps,
-  "pageTitle" | "backTo" | "sidebar" | "pageId" | "filesExplorer" | "chatPanel"
+  "pageTitle" | "backTo" | "sidebar" | "pageId" | "chatPanel"
 >;
 
 const WorkspaceShellConfigContext = createContext<
@@ -97,7 +98,6 @@ export function AppShell(props: AppShellProps) {
     backTo: props.backTo ?? "/home",
     sidebar: props.sidebar ?? "global",
     pageId: props.pageId,
-    filesExplorer: props.filesExplorer,
     chatPanel: props.chatPanel ?? true,
   };
 
@@ -126,7 +126,14 @@ function NestedAppShell({
 }) {
   useLayoutEffect(() => {
     reportShellConfig(config);
-  }, [config.pageTitle, config.backTo, config.sidebar, config.pageId, config.filesExplorer, config.chatPanel, reportShellConfig]);
+  }, [
+    config.pageTitle,
+    config.backTo,
+    config.sidebar,
+    config.pageId,
+    config.chatPanel,
+    reportShellConfig,
+  ]);
 
   return <>{children}</>;
 }
@@ -137,7 +144,6 @@ function sameShellConfig(left: AppShellConfig, right: AppShellConfig) {
     left.backTo === right.backTo &&
     left.sidebar === right.sidebar &&
     left.pageId === right.pageId &&
-    left.filesExplorer === right.filesExplorer &&
     left.chatPanel === right.chatPanel
   );
 }
@@ -153,9 +159,12 @@ function RenderedAppShell({
   pageProfileImageUrl,
   pageNameLoading,
   pageNameError,
-  filesExplorer,
   chatPanel = true,
 }: AppShellProps) {
+  const { filesExplorer } = useFilesWorkspaceContext();
+  const isFilesPage =
+    useMatch({ path: "/files", end: true }) !== null ||
+    useMatch({ path: "/pages/:pageId/files", end: true }) !== null;
   const [chatOpen, setChatOpen] = useState(() => {
     const stored = window.localStorage.getItem(CHAT_OPEN_KEY);
     // First visit: keep the content area roomy on narrower screens.
@@ -194,7 +203,9 @@ function RenderedAppShell({
         <main className="app-main">
           <div
             className={
-              filesExplorer ? "app-main-content" : "app-main-content app-main-surface"
+              isFilesPage
+                ? "app-main-content"
+                : "app-main-content app-main-surface"
             }
           >
             {pageNameError && sidebar === "page" && (

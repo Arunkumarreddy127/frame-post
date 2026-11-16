@@ -12,6 +12,7 @@ import {
 import { AuthPage } from "./components/AuthPage";
 import { PageWorkspaceLayout } from "./components/PageWorkspaceLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { FilesWorkspaceProvider } from "./components/files/FilesWorkspaceProvider";
 import { useAuth } from "./hooks/useAuth";
 import {
   CreatePage,
@@ -100,7 +101,8 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
+      <FilesWorkspaceProvider enabled={user !== null}>
+        <Routes>
         <Route
           path="/login"
           element={<AuthPage user={user} onSubmit={submit} />}
@@ -257,7 +259,8 @@ function App() {
           path="*"
           element={<Navigate to={user ? "/home" : "/login"} replace />}
         />
-      </Routes>
+        </Routes>
+      </FilesWorkspaceProvider>
     </BrowserRouter>
   );
 }

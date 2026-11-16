@@ -1,6 +1,8 @@
-import { useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { NavLink, useMatch } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+
+const FILES_EXPLORER_OPEN_KEY = "framepost.filesExplorerOpen";
 
 type SidebarFilesLinkProps = {
   to: string;
@@ -8,16 +10,22 @@ type SidebarFilesLinkProps = {
 };
 
 export function SidebarFilesLink({ to, explorer }: SidebarFilesLinkProps) {
-  const [expanded, setExpanded] = useState(true);
-  const onFilesRoute = explorer !== undefined;
-  const open = onFilesRoute && expanded;
+  const [expanded, setExpanded] = useState(
+    () => window.localStorage.getItem(FILES_EXPLORER_OPEN_KEY) !== "false",
+  );
+  const onFilesRoute = useMatch({ path: to, end: true }) !== null;
+  const open = expanded && explorer !== undefined;
+
+  useEffect(() => {
+    window.localStorage.setItem(FILES_EXPLORER_OPEN_KEY, String(expanded));
+  }, [expanded]);
 
   return (
     <>
       <NavLink
         to={to}
         end
-        aria-expanded={onFilesRoute ? open : false}
+        aria-expanded={open}
         className={({ isActive }) =>
           isActive ? "sidebar-link active" : "sidebar-link"
         }

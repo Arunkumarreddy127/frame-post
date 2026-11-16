@@ -1,13 +1,16 @@
 import { FileText, Plus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { isDirty, type FilesWorkspaceState } from "./useFilesWorkspace";
 
 type FileExplorerProps = {
   workspace: FilesWorkspaceState;
+  filesPath: string;
 };
 
-export function FileExplorer({ workspace }: FileExplorerProps) {
+export function FileExplorer({ workspace, filesPath }: FileExplorerProps) {
   const { files, groups, tabs, activeTab, saving, openFile, newFile, remove } =
     workspace;
+  const navigate = useNavigate();
 
   return (
     <div className="files-explorer" role="group" aria-label="Instruction files">
@@ -15,7 +18,10 @@ export function FileExplorer({ workspace }: FileExplorerProps) {
         <button
           type="button"
           className="files-icon-button files-new-button"
-          onClick={newFile}
+          onClick={() => {
+            newFile();
+            navigate(filesPath);
+          }}
           aria-label="New file"
           title="New file"
         >
@@ -47,7 +53,10 @@ export function FileExplorer({ workspace }: FileExplorerProps) {
                     type="button"
                     className="files-explorer-open"
                     title={file.name}
-                    onClick={() => openFile(file)}
+                    onClick={() => {
+                      openFile(file);
+                      navigate(filesPath);
+                    }}
                   >
                     <FileText size={14} strokeWidth={2} aria-hidden="true" />
                     <span>{file.name}</span>
