@@ -76,7 +76,7 @@ a:hover {
   width: min(100%, 76rem);
   min-height: inherit;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.3rem;
   gap: 1.5rem;
 }
 
@@ -173,7 +173,7 @@ a:hover {
   grid-template-columns: 11.5rem minmax(0, 1fr);
   width: min(100%, 76rem);
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 0.3rem;
   gap: 0.3rem;
   align-items: start;
 }
@@ -828,11 +828,6 @@ textarea {
   flex: 0 0 auto;
   align-items: center;
   gap: 0.5rem;
-}
-
-.form-panel,
-.page-detail-panel {
-  max-width: 48rem;
 }
 
 .page-form {
@@ -2488,7 +2483,7 @@ h2 {
 @media (max-width: 720px) {
   .app-header-inner {
     grid-template-columns: 1fr auto;
-    padding: 0.6rem 1rem;
+    padding: 0.6rem 0.3rem;
   }
 
   .app-header-main,
@@ -2504,7 +2499,7 @@ h2 {
 
   .app-body {
     grid-template-columns: 1fr;
-    padding: 1rem;
+    padding: 0.3rem;
   }
 
   .app-main-surface {
