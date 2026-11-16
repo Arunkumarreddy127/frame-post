@@ -329,12 +329,6 @@ a:hover {
   padding-bottom: 3rem;
 }
 
-.app-main-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.75rem;
-}
-
 .page-workspace-error {
   margin: 0 0 0.75rem;
 }

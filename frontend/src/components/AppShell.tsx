@@ -6,7 +6,6 @@ import {
   useLayoutEffect,
   useState,
 } from "react";
-import { MessageSquare } from "lucide-react";
 import { ChatPanel } from "./ChatPanel";
 import { Header } from "./Header";
 import { PageSidebar } from "./PageSidebar";
@@ -173,7 +172,9 @@ function RenderedAppShell({
     <div className="shell app-shell">
       <Header
         username={user.username}
+        chatPanel={chatPanel}
         chatOpen={showChat}
+        onToggleChat={() => setChatOpen((current) => !current)}
         onLogout={onLogout}
       />
       <div
@@ -191,21 +192,6 @@ function RenderedAppShell({
           <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
         )}
         <main className="app-main">
-          {chatPanel && (
-            <div className="app-main-toolbar">
-              <button
-                type="button"
-                className={`chat-toggle${chatOpen ? " active" : ""}`}
-                aria-pressed={chatOpen}
-                aria-label={chatOpen ? "Hide chat" : "Show chat"}
-                title={chatOpen ? "Hide chat" : "Show chat"}
-                onClick={() => setChatOpen((current) => !current)}
-              >
-                <MessageSquare size={17} strokeWidth={2} aria-hidden="true" />
-                <span>Chat</span>
-              </button>
-            </div>
-          )}
           {pageNameError && sidebar === "page" && (
             <p className="page-workspace-error error" role="alert">
               Unable to load page name: {pageNameError}
