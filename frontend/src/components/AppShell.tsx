@@ -121,7 +121,7 @@ function RenderedAppShell({
           <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
         )}
         <main className="app-main">
-          <div className="app-main-content">
+          <div className="app-main-surface">
             <WorkspaceTabs />
             {pageNameError && sidebar === "page" && (
               <p className="page-workspace-error error" role="alert">
