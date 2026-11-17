@@ -59,6 +59,14 @@ Both providers use `content_generations`, with each generation's files in `conte
 
 URLs and binary media are not stored in this document. Provider queries always include the provider discriminator. Global image history reads only `pageId=null`; global Library reads every owned page and global scope. Indexes are explicitly initialized at normal application startup and after migration, including a partial unique RunningHub task-ID index.
 
+## Creations
+
+A creation is a named group of generations owned by one user, either global (`pageId` null) or within one owned page. It stores only references: `creations` holds the group (`_id`, `userId`, `pageId`, `name`, `description`, `createdAt`, `updatedAt`), and `creation_items` links members (`creationId`, `generationId`, `position`, optional `laneId` and `parentItemId`). A unique index on `creation_items.generationId` allows each generation in at most one creation. Deleting a creation removes only its memberships; generations and their R2 files stay in the Library. Deleting a generation also removes its membership.
+
+API, each route also under `/api/pages/{pageId}`: `GET|POST /api/creations`, `GET|PUT|DELETE /api/creations/{id}`, `GET|POST /api/creations/{id}/items`, `DELETE /api/creations/{id}/items/{itemId}`, `PUT /api/creations/{id}/items/order`, and `GET /api/creations/grouped?generationIds=…` which returns the ids that already belong to a creation. Adding an item appends it at the end and returns `409` if the generation is already grouped. Reordering must list every current item id exactly once, or it returns `400`.
+
+The UI lives at `/creations` and `/creations/:creationId` (also under `/pages/{pageId}`). The sidebar's Creations dropdown lists creations and opens each detail view in a workspace tab, allowing multiple creations to stay open; the Creations list itself also has a separate workspace tab. The detail page offers Feed, Grouped by tool, and Storyboard views over the same items. **New** opens an in-place tool selector; choosing GPT Image or a RunningHub workflow shows its composer without the normal generation-history results. Successfully created generations are added to that creation. Existing ungrouped generations can still be added with the **Add** button.
+
 ### Migrate existing generations
 
 Use a maintenance window. Back up MongoDB, prevent new submissions, allow all image/RunningHub requests to finish, and stop the old backend. The script does not stop the application for you. Never run two migration processes simultaneously. A `PROCESSING` source record blocks migration; resolve stale jobs before continuing.

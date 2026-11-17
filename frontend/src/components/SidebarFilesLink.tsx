@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useMatch } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 
 const FILES_EXPLORER_OPEN_KEY = "framepost.filesExplorerOpen";
 
@@ -10,6 +11,7 @@ type SidebarFilesLinkProps = {
 };
 
 export function SidebarFilesLink({ to, explorer }: SidebarFilesLinkProps) {
+  const { workspace } = useFilesWorkspaceContext();
   const [expanded, setExpanded] = useState(
     () => window.localStorage.getItem(FILES_EXPLORER_OPEN_KEY) !== "false",
   );
@@ -27,12 +29,20 @@ export function SidebarFilesLink({ to, explorer }: SidebarFilesLinkProps) {
         end
         aria-expanded={open}
         className={({ isActive }) =>
-          isActive ? "sidebar-link active" : "sidebar-link"
+          isActive && !workspace.activeTab
+            ? "sidebar-link active"
+            : "sidebar-link"
         }
         onClick={(event) => {
           if (onFilesRoute) {
             event.preventDefault();
-            setExpanded((current) => !current);
+            if (workspace.activeTab) {
+              workspace.setActiveKey(null);
+            } else {
+              setExpanded((current) => !current);
+            }
+          } else {
+            workspace.setActiveKey(null);
           }
         }}
       >

@@ -2,6 +2,8 @@ import { Navigate, Route } from "react-router-dom";
 import { WorkspaceAppShell } from "./AppShell";
 import { WorkspaceRouteCache } from "./WorkspaceRouteCache";
 import { CreatePage } from "../pages/CreatePage";
+import { CreationDetailPage } from "../pages/CreationDetailPage";
+import { CreationsPage } from "../pages/CreationsPage";
 import { FilesPage } from "../pages/FilesPage";
 import { GenerationsPage } from "../pages/GenerationsPage";
 import { GptImageGenPage } from "../pages/GptImageGenPage";
@@ -50,6 +52,14 @@ export function GlobalWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
         <Route
           path="/create"
           element={<CreatePage user={user} onLogout={onLogout} />}
+        />
+        <Route
+          path="/creations"
+          element={<CreationsPage user={user} onLogout={onLogout} />}
+        />
+        <Route
+          path="/creations/:creationId"
+          element={<CreationDetailPage user={user} onLogout={onLogout} />}
         />
         <Route
           path="/create/gpt-image-gen"

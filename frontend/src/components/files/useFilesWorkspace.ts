@@ -50,7 +50,7 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
   const [error, setError] = useState("");
   const [untitledCount, setUntitledCount] = useState(0);
 
-  const activeTab = tabs.find((tab) => tab.key === activeKey) ?? tabs.at(-1);
+  const activeTab = tabs.find((tab) => tab.key === activeKey);
   const anyDirty = tabs.some(isDirty);
 
   useEffect(() => {
@@ -170,6 +170,24 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
       if (!accepted) return;
     }
     setTabs((current) => current.filter((item) => item.key !== tab.key));
+    if (activeKey === tab.key) {
+      setActiveKey(tabs.filter((item) => item.key !== tab.key).at(-1)?.key ?? null);
+    }
+  }
+
+  async function closeAllTabs() {
+    if (tabs.some(isDirty)) {
+      const accepted = await confirm({
+        title: "Close all files?",
+        message: "Unsaved changes in open files will be discarded.",
+        confirmLabel: "Close all",
+        danger: true,
+      });
+      if (!accepted) return false;
+    }
+    setTabs([]);
+    setActiveKey(null);
+    return true;
   }
 
   async function save(tab: Tab) {
@@ -239,7 +257,11 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
     try {
       await deleteInstructionFile(file.id);
       setFiles((current) => (current ?? []).filter((item) => item.id !== file.id));
+      const remaining = tabs.filter((tab) => tab.fileId !== file.id);
       setTabs((current) => current.filter((tab) => tab.fileId !== file.id));
+      if (tabs.some((tab) => tab.fileId === file.id && tab.key === activeKey)) {
+        setActiveKey(remaining.at(-1)?.key ?? null);
+      }
       notifyInstructionFilesChanged();
     } catch (requestError) {
       setError(messageFrom(requestError, "Unable to delete instruction file"));
@@ -259,6 +281,7 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
     newFile,
     updateDraft,
     closeTab,
+    closeAllTabs,
     setActiveKey,
     save,
     remove,

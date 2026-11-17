@@ -1,21 +1,28 @@
 import { Fragment, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { SidebarFilesLink } from "./SidebarFilesLink";
+import { SidebarCreationsLink } from "./SidebarCreationsLink";
 import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 
 type SidebarProps = {
   backTo?: string;
   filesExplorer?: ReactNode;
+  creationsExplorer?: ReactNode;
 };
 
 const navigation = [
   { label: "Home", to: "/home", end: true },
   { label: "Create", to: "/create", end: true },
   { label: "Library", to: "/library", end: true },
+  { label: "Creations", to: "/creations", end: false },
   { label: "Pages", to: "/pages", end: true },
 ];
 
-export function Sidebar({ backTo = "/home", filesExplorer }: SidebarProps) {
+export function Sidebar({
+  backTo = "/home",
+  filesExplorer,
+  creationsExplorer,
+}: SidebarProps) {
   const { pageTabs } = useFilesWorkspaceContext();
 
   return (
@@ -27,15 +34,22 @@ export function Sidebar({ backTo = "/home", filesExplorer }: SidebarProps) {
           );
           return (
             <Fragment key={item.to}>
-            <NavLink
-              to={pageTab?.to ?? item.to}
-              end={item.label === "Home" || item.label === "Pages"}
-              className={({ isActive }) =>
-                isActive ? "sidebar-link active" : "sidebar-link"
-              }
-            >
-              {item.label}
-            </NavLink>
+            {item.label === "Creations" ? (
+              <SidebarCreationsLink
+                to={pageTab?.to ?? item.to}
+                explorer={creationsExplorer}
+              />
+            ) : (
+              <NavLink
+                to={pageTab?.to ?? item.to}
+                end={item.label === "Home" || item.label === "Pages"}
+                className={({ isActive }) =>
+                  isActive ? "sidebar-link active" : "sidebar-link"
+                }
+              >
+                {item.label}
+              </NavLink>
+            )}
             {item.to === "/home" && (
               <SidebarFilesLink to="/files" explorer={filesExplorer} />
             )}

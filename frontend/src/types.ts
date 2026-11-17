@@ -168,3 +168,24 @@ export type Catalog = {
   imageModels: string[];
   runningHubWorkflows: Workflow[];
 };
+
+export type Creation = {
+  id: string;
+  pageId: string | null;
+  name: string;
+  description: string | null;
+  itemCount: number;
+  coverGenerationId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreationItem = {
+  id: string;
+  creationId: string;
+  position: number;
+  laneId: string | null;
+  parentItemId: string | null;
+  addedAt: string;
+  generation: Generation;
+};

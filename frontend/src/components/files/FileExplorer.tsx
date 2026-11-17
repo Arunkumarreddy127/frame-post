@@ -1,5 +1,5 @@
-import { FileText, Plus, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { FileText, Trash2 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { isDirty, type FilesWorkspaceState } from "./useFilesWorkspace";
 
 type FileExplorerProps = {
@@ -8,27 +8,14 @@ type FileExplorerProps = {
 };
 
 export function FileExplorer({ workspace, filesPath }: FileExplorerProps) {
-  const { files, groups, tabs, activeTab, saving, openFile, newFile, remove } =
+  const { files, groups, tabs, activeTab, saving, openFile, remove } =
     workspace;
   const navigate = useNavigate();
+  const location = useLocation();
+  const onFilesPage = location.pathname === filesPath;
 
   return (
     <div className="files-explorer" role="group" aria-label="Instruction files">
-      <div className="files-explorer-header">
-        <button
-          type="button"
-          className="files-icon-button files-new-button"
-          onClick={() => {
-            newFile();
-            navigate(filesPath);
-          }}
-          aria-label="New file"
-          title="New file"
-        >
-          <Plus size={16} strokeWidth={2} aria-hidden="true" />
-          <span>New File</span>
-        </button>
-      </div>
       {files === null ? (
         <p className="files-explorer-status">Loading files...</p>
       ) : (
@@ -44,7 +31,7 @@ export function FileExplorer({ workspace, filesPath }: FileExplorerProps) {
                 <div
                   key={file.id}
                   className={
-                    activeTab?.fileId === file.id
+                    onFilesPage && activeTab?.fileId === file.id
                       ? "files-explorer-item active"
                       : "files-explorer-item"
                   }

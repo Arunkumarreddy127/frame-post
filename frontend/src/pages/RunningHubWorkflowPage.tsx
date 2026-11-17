@@ -14,6 +14,11 @@ import { LibraryPicker } from "../components/library/LibraryPicker";
 import { GenerationFeed } from "../components/generations/GenerationFeed";
 import { getCatalog, getGeneration, startWorkflowGeneration } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
+import { addCreationItem, errorMessage } from "../creationApi";
+import {
+  CreationTargetBanner,
+  creationQuery,
+} from "../components/creations/CreationTargetBanner";
 import type {
   InstanceType,
   MediaItem,
@@ -24,6 +29,10 @@ import type {
 
 type RunningHubWorkflowPageProps = ShellRouteProps & {
   pageId?: string;
+  workflowKey?: string;
+  embedded?: boolean;
+  creationId?: string;
+  onCreationItemAdded?: () => void;
 };
 
 const INSTANCE_TYPES: { value: InstanceType; label: string }[] = [
@@ -64,14 +73,22 @@ export function RunningHubWorkflowPage({
   user,
   onLogout,
   pageId,
+  workflowKey: workflowKeyProp,
+  embedded = false,
+  creationId: creationIdProp,
+  onCreationItemAdded,
 }: RunningHubWorkflowPageProps) {
-  const { pageId: routePageId, workflowKey = "" } = useParams<{
+  const { pageId: routePageId, workflowKey: routeWorkflowKey = "" } = useParams<{
     pageId?: string;
     workflowKey?: string;
   }>();
   const [searchParams] = useSearchParams();
   const activePageId = pageId ?? routePageId;
-  const createPath = activePageId ? `/pages/${activePageId}/create` : "/create";
+  const workflowKey = workflowKeyProp ?? routeWorkflowKey;
+  const creationId = creationIdProp ?? searchParams.get("creationId");
+  const createPath =
+    (activePageId ? `/pages/${activePageId}/create` : "/create") +
+    creationQuery(creationId);
 
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -98,7 +115,7 @@ export function RunningHubWorkflowPage({
     removeWhere,
   } = useGenerationPages(
     { pageId: activePageId, provider: "RUNNINGHUB", workflowKey },
-    Boolean(activePageId && workflow),
+    Boolean(activePageId && workflow && !embedded),
   );
 
   useEffect(() => {
@@ -245,6 +262,18 @@ export function RunningHubWorkflowPage({
         },
       );
       prepend(created);
+      if (creationId && activePageId) {
+        try {
+          await addCreationItem(activePageId, creationId, {
+            generationId: created.id,
+          });
+          onCreationItemAdded?.();
+        } catch (attachError) {
+          setError(
+            `Started, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`,
+          );
+        }
+      }
       fileInputs.forEach((input) => {
         setFile(input, null);
         setLibraryFile(input, null);
@@ -306,19 +335,22 @@ export function RunningHubWorkflowPage({
     );
   }
 
-  return (
-    <AppShell
-      user={user}
-      onLogout={onLogout}
-      pageTitle={workflow?.label ?? "RunningHub workflow"}
-      sidebar={activePageId ? "page" : "global"}
-      pageId={activePageId}
-      backTo={createPath}
-    >
-      <Link to={createPath} className="secondary-button">
-        <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-        Back to Create
-      </Link>
+  const composer = (
+    <>
+      {!embedded && (
+        <>
+          <Link to={createPath} className="secondary-button">
+            <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+            Back to Create
+          </Link>
+          {creationId && (
+            <CreationTargetBanner
+              pageId={activePageId}
+              creationId={creationId}
+            />
+          )}
+        </>
+      )}
       {loadError ? <p className="status error">{loadError}</p> : null}
       {workflow ? (
         <div className="image-gen-layout">
@@ -496,7 +528,7 @@ export function RunningHubWorkflowPage({
             )}
           </form>
 
-          {activePageId ? (
+          {activePageId && !embedded ? (
             <GenerationFeed
               items={items}
               hasMore={hasMore}
@@ -524,6 +556,20 @@ export function RunningHubWorkflowPage({
           }}
         />
       )}
+    </>
+  );
+  return embedded ? (
+    <div className="creation-generator">{composer}</div>
+  ) : (
+    <AppShell
+      user={user}
+      onLogout={onLogout}
+      pageTitle={workflow?.label ?? "RunningHub workflow"}
+      sidebar={activePageId ? "page" : "global"}
+      pageId={activePageId}
+      backTo={createPath}
+    >
+      {composer}
     </AppShell>
   );
 }

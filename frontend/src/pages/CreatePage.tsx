@@ -1,9 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight, Clapperboard, Image, Sparkles } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import type { ShellRouteProps, Workflow } from "../types";
 import { getCatalog } from "../generationApi";
+import { CreationTargetBanner, creationQuery } from "../components/creations/CreationTargetBanner";
 
 type CreatePageProps = ShellRouteProps & {
   pageId?: string;
@@ -28,6 +29,9 @@ const copilotItems: CreateItem[] = [
 export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const activePageId = pageId ?? routePageId;
+  const [searchParams] = useSearchParams();
+  const creationId = searchParams.get("creationId");
+  const query = creationQuery(creationId);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -72,6 +76,9 @@ export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
           </p>
         </div>
       </header>
+      {creationId && (
+        <CreationTargetBanner pageId={activePageId} creationId={creationId} />
+      )}
       <div className="create-sections">
         {loadError ? (
           <p className="error" role="alert">
@@ -89,9 +96,9 @@ export function CreatePage({ user, onLogout, pageId }: CreatePageProps) {
                     <Link
                       className="create-item"
                       to={
-                        activePageId
+                        (activePageId
                           ? `/pages/${activePageId}${item.to}`
-                          : item.to
+                          : item.to) + query
                       }
                     >
                       <span className="create-item-icon">{item.icon}</span>

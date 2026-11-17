@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.framepost.auth.User;
+import com.example.framepost.creation.CreationItemRepository;
 import com.example.framepost.generation.ContentGenerationStore.Hydrated;
 import com.example.framepost.image.ImageGenerationService;
 import com.example.framepost.page.PageService;
@@ -34,7 +35,8 @@ class GenerationServiceTest {
             storage,
             mock(ImageGenerationService.class),
             mock(RunningHubGenerationService.class),
-            mock(LibraryFileResolver.class));
+            mock(LibraryFileResolver.class),
+            mock(CreationItemRepository.class));
 
     @BeforeEach
     void resetMocks() {

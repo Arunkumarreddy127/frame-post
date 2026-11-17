@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { SidebarFilesLink } from "./SidebarFilesLink";
+import { SidebarCreationsLink } from "./SidebarCreationsLink";
 import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 
 type PageSidebarProps = {
@@ -10,11 +11,13 @@ type PageSidebarProps = {
   pageProfileImageUrl?: string | null;
   pageNameLoading?: boolean;
   filesExplorer?: ReactNode;
+  creationsExplorer?: ReactNode;
 };
 
 const navigation = [
   { label: "Create", suffix: "create" },
   { label: "Library", suffix: "library" },
+  { label: "Creations", suffix: "creations" },
 ];
 
 export function PageSidebar({
@@ -23,6 +26,7 @@ export function PageSidebar({
   pageProfileImageUrl,
   pageNameLoading,
   filesExplorer,
+  creationsExplorer,
 }: PageSidebarProps) {
   const { pageTabs } = useFilesWorkspaceContext();
   const pagePath = pageId ? `/pages/${pageId}` : "/pages";
@@ -90,15 +94,23 @@ export function PageSidebar({
               (tab) => tab.label === item.label && tab.pageId === pageId,
             );
             return (
-              <NavLink
-                key={item.suffix}
-                to={pageTab?.to ?? `${pagePath}/${item.suffix}`}
-                className={({ isActive }) =>
-                  isActive ? "sidebar-link active" : "sidebar-link"
-                }
-              >
-                {item.label}
-              </NavLink>
+              item.suffix === "creations" ? (
+                <SidebarCreationsLink
+                  key={item.suffix}
+                  to={`${pagePath}/creations`}
+                  explorer={creationsExplorer}
+                />
+              ) : (
+                <NavLink
+                  key={item.suffix}
+                  to={pageTab?.to ?? `${pagePath}/${item.suffix}`}
+                  className={({ isActive }) =>
+                    isActive ? "sidebar-link active" : "sidebar-link"
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              )
             );
           })}
         </nav>

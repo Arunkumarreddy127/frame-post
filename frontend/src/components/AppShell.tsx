@@ -84,7 +84,7 @@ function RenderedAppShell({
   pageNameError,
   chatPanel = true,
 }: AppShellProps) {
-  const { filesExplorer } = useFilesWorkspaceContext();
+  const { filesExplorer, creationsExplorer } = useFilesWorkspaceContext();
   const [chatOpen, setChatOpen] = useState(() => {
     const stored = window.localStorage.getItem(CHAT_OPEN_KEY);
     // First visit: keep the content area roomy on narrower screens.
@@ -116,9 +116,14 @@ function RenderedAppShell({
             pageProfileImageUrl={pageProfileImageUrl}
             pageNameLoading={pageNameLoading}
             filesExplorer={filesExplorer}
+            creationsExplorer={creationsExplorer}
           />
         ) : (
-          <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
+          <Sidebar
+            backTo={backTo}
+            filesExplorer={filesExplorer}
+            creationsExplorer={creationsExplorer}
+          />
         )}
         <main className="app-main">
           <div className="app-main-surface">

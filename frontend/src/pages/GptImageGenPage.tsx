@@ -18,10 +18,18 @@ import {
   getGeneration,
 } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
+import { addCreationItem, errorMessage } from "../creationApi";
+import {
+  CreationTargetBanner,
+  creationQuery,
+} from "../components/creations/CreationTargetBanner";
 import type { Generation, MediaItem, ShellRouteProps } from "../types";
 
 type GptImageGenPageProps = ShellRouteProps & {
   pageId?: string;
+  embedded?: boolean;
+  creationId?: string;
+  onCreationItemAdded?: () => void;
 };
 
 const FALLBACK_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
@@ -49,11 +57,17 @@ export function GptImageGenPage({
   user,
   onLogout,
   pageId,
+  embedded = false,
+  creationId: creationIdProp,
+  onCreationItemAdded,
 }: GptImageGenPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const [searchParams] = useSearchParams();
   const activePageId = pageId ?? routePageId;
-  const createPath = activePageId ? `/pages/${activePageId}/create` : "/create";
+  const creationId = creationIdProp ?? searchParams.get("creationId");
+  const createPath =
+    (activePageId ? `/pages/${activePageId}/create` : "/create") +
+    creationQuery(creationId);
 
   const [models, setModels] = useState(FALLBACK_MODELS);
   const [prompt, setPrompt] = useState("");
@@ -80,7 +94,7 @@ export function GptImageGenPage({
     pageId: activePageId,
     provider: "OPENAI",
     globalOnly: true,
-  });
+  }, !embedded);
   const [parent, setParent] = useState<{
     generationId: string;
     resultKey: string;
@@ -271,6 +285,18 @@ export function GptImageGenPage({
     try {
       const generation = await createImageGeneration(input, activePageId);
       prepend(generation);
+      if (creationId) {
+        try {
+          await addCreationItem(activePageId, creationId, {
+            generationId: generation.id,
+          });
+          onCreationItemAdded?.();
+        } catch (attachError) {
+          setError(
+            `Generated, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`,
+          );
+        }
+      }
     } catch (requestError) {
       // Give the user their work back unless they have already started a new prompt.
       if (!(promptInput.current?.value ?? "").trim()) {
@@ -293,19 +319,22 @@ export function GptImageGenPage({
     }
   }
 
-  return (
-    <AppShell
-      user={user}
-      onLogout={onLogout}
-      pageTitle="Image"
-      sidebar={activePageId ? "page" : "global"}
-      pageId={activePageId}
-      backTo={createPath}
-    >
-      <Link to={createPath} className="secondary-button">
-        <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-        Back to Create
-      </Link>
+  const composer = (
+    <>
+      {!embedded && (
+        <>
+          <Link to={createPath} className="secondary-button">
+            <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+            Back to Create
+          </Link>
+          {creationId && (
+            <CreationTargetBanner
+              pageId={activePageId}
+              creationId={creationId}
+            />
+          )}
+        </>
+      )}
       <div className="image-gen-layout">
         <form className="panel image-gen-form" onSubmit={submit}>
           <h2 className="app-page-title">Images</h2>
@@ -535,22 +564,24 @@ export function GptImageGenPage({
           )}
         </form>
 
-        <GenerationFeed
-          items={history}
-          hasMore={hasMore}
-          loading={historyLoading}
-          loadError={historyError}
-          emptyMessage="No images yet."
-          onLoadMore={loadMore}
-          onUpdate={update}
-          onDeleted={(generation) => {
-            removeWhere((item) => item.id === generation.id);
-            setParent((current) =>
-              current?.generationId === generation.id ? null : current,
-            );
-          }}
-          onEdit={startEdit}
-        />
+        {!embedded && (
+          <GenerationFeed
+            items={history}
+            hasMore={hasMore}
+            loading={historyLoading}
+            loadError={historyError}
+            emptyMessage="No images yet."
+            onLoadMore={loadMore}
+            onUpdate={update}
+            onDeleted={(generation) => {
+              removeWhere((item) => item.id === generation.id);
+              setParent((current) =>
+                current?.generationId === generation.id ? null : current,
+              );
+            }}
+            onEdit={startEdit}
+          />
+        )}
       </div>
       {pickerOpen && (
         <LibraryPicker
@@ -592,6 +623,20 @@ export function GptImageGenPage({
           />
         </div>
       )}
+    </>
+  );
+  return embedded ? (
+    <div className="creation-generator">{composer}</div>
+  ) : (
+    <AppShell
+      user={user}
+      onLogout={onLogout}
+      pageTitle="Image"
+      sidebar={activePageId ? "page" : "global"}
+      pageId={activePageId}
+      backTo={createPath}
+    >
+      {composer}
     </AppShell>
   );
 }

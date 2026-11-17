@@ -1,4 +1,6 @@
 export { CreatePage } from "./CreatePage";
+export { CreationDetailPage } from "./CreationDetailPage";
+export { CreationsPage } from "./CreationsPage";
 export { FilesPage } from "./FilesPage";
 export { GenerationsPage } from "./GenerationsPage";
 export { GptImageGenPage } from "./GptImageGenPage";

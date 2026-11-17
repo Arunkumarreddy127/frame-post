@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.framepost.auth.User;
+import com.example.framepost.creation.CreationItemRepository;
 import com.example.framepost.generation.ContentGenerationStore.Cursor;
 import com.example.framepost.generation.ContentGenerationStore.Hydrated;
 import com.example.framepost.image.ImageGenerationService;
@@ -38,6 +39,7 @@ public class GenerationService {
     private final ImageGenerationService imageService;
     private final RunningHubGenerationService runningHubService;
     private final LibraryFileResolver libraryFiles;
+    private final CreationItemRepository creationItems;
 
     public GenerationService(
             ContentGenerationStore store,
@@ -45,7 +47,8 @@ public class GenerationService {
             StorageService storage,
             ImageGenerationService imageService,
             RunningHubGenerationService runningHubService,
-            LibraryFileResolver libraryFiles
+            LibraryFileResolver libraryFiles,
+            CreationItemRepository creationItems
     ) {
         this.libraryFiles = libraryFiles;
         this.store = store;
@@ -53,6 +56,7 @@ public class GenerationService {
         this.storage = storage;
         this.imageService = imageService;
         this.runningHubService = runningHubService;
+        this.creationItems = creationItems;
     }
 
     public record Catalog(List<String> imageModels, List<WorkflowView> runningHubWorkflows) {
@@ -92,6 +96,14 @@ public class GenerationService {
         return toResponse(load(user, pageId, id));
     }
 
+    /** Generations of the given ids that fall in the scope; unknown or out-of-scope ids are skipped. */
+    public List<GenerationResponse> getMany(User user, String pageId, List<String> ids) {
+        validateScope(user, pageId);
+        return store.hydrate(store.findGenerationsByIds(user.id(), pageId, pageId == null, ids)).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     public PagedResponse<GenerationResponse> children(
             User user, String pageId, String id, String before, Integer limit
     ) {
@@ -108,6 +120,8 @@ public class GenerationService {
 
     public void delete(User user, String pageId, String id) {
         Hydrated hydrated = load(user, pageId, id);
+        // A creation membership would otherwise keep pointing at a deleted generation.
+        creationItems.deleteByGenerationId(id);
         store.delete(id);
         // Library files can be shared with other generations, so an object goes only with its last user.
         hydrated.inputs().stream().map(ContentInput::key).filter(key -> !store.isKeyUsedElsewhere(key, id))

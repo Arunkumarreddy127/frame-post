@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { CreatePage } from "../pages/CreatePage";
+import { CreationDetailPage } from "../pages/CreationDetailPage";
+import { CreationsPage } from "../pages/CreationsPage";
 import { FilesPage } from "../pages/FilesPage";
 import { GenerationsPage } from "../pages/GenerationsPage";
 import { GptImageGenPage } from "../pages/GptImageGenPage";
@@ -127,6 +129,18 @@ export function PageWorkspaceRoutes({ user, onLogout }: ShellRouteProps) {
       <Route
         path="generations"
         element={<GenerationsPage user={user} onLogout={onLogout} />}
+      />
+      <Route
+        path="creations"
+        element={
+          <CreationsPage user={user} onLogout={onLogout} pageId={pageId} />
+        }
+      />
+      <Route
+        path="creations/:creationId"
+        element={
+          <CreationDetailPage user={user} onLogout={onLogout} pageId={pageId} />
+        }
       />
     </>
   );
