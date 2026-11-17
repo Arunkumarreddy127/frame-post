@@ -55,7 +55,8 @@ function AuthenticatedFilesWorkspaceProvider({
   children: ReactNode;
 }) {
   const pageMatch = useMatch("/pages/:pageId/*");
-  const pageId = pageMatch?.params.pageId;
+  const isNewPageRoute = useMatch({ path: "/pages/new", end: true }) !== null;
+  const pageId = isNewPageRoute ? undefined : pageMatch?.params.pageId;
   const filesPath = pageId ? `/pages/${pageId}/files` : "/files";
   const location = useLocation();
   const navigate = useNavigate();

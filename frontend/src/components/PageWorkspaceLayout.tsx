@@ -1,12 +1,10 @@
-import { createContext, useCallback, useEffect, useState } from "react";
-import { Outlet, useParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 import { API_BASE_URL } from "../api";
 import { WorkspaceAppShell } from "./AppShell";
+import { PageWorkspaceUpdateContext } from "./PageWorkspaceContext";
+import { PageWorkspaceRoutes } from "./PageWorkspaceRoutes";
 import type { Page, ShellRouteProps } from "../types";
-
-export const PageWorkspaceUpdateContext = createContext<
-  ((page: Page) => void) | null
->(null);
 
 export function PageWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
   const { pageId } = useParams<{ pageId: string }>();
@@ -84,6 +82,7 @@ export function PageWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
     <WorkspaceAppShell
       user={user}
       onLogout={onLogout}
+      pageTitle="Page workspace"
       pageId={pageId}
       pageName={pageName}
       pageProfileImageUrl={pageProfileImageUrl}
@@ -91,7 +90,7 @@ export function PageWorkspaceLayout({ user, onLogout }: ShellRouteProps) {
       pageNameError={pageNameError}
     >
       <PageWorkspaceUpdateContext.Provider value={updatePageIdentity}>
-        <Outlet />
+        <PageWorkspaceRoutes user={user} onLogout={onLogout} />
       </PageWorkspaceUpdateContext.Provider>
     </WorkspaceAppShell>
   );

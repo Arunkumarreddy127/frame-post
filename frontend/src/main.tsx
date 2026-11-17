@@ -4,56 +4,26 @@ import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
   Navigate,
+  Routes,
   useLocation,
   Route,
   useParams,
 } from "react-router-dom";
 import { AuthPage } from "./components/AuthPage";
+import { GlobalWorkspaceLayout } from "./components/GlobalWorkspaceLayout";
 import { PageWorkspaceLayout } from "./components/PageWorkspaceLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { FilesWorkspaceProvider } from "./components/files/FilesWorkspaceProvider";
-import { WorkspaceRouteCache } from "./components/WorkspaceRouteCache";
 import { useAuth } from "./hooks/useAuth";
-import {
-  CreatePage,
-  FilesPage,
-  GenerationsPage,
-  GptImageGenPage,
-  HomePage,
-  PageDetailPage,
-  PageEditorPage,
-  PageListPage,
-  LibraryPage,
-  RunningHubWorkflowPage,
-} from "./pages";
 import type { User } from "./types";
 import "./styles.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-const LEGACY_MINIMAX_KEY = "minimax-h3-ff-image-to-video";
-
-function PageLibraryRoute({
-  user,
-  onLogout,
-}: {
-  user: User;
-  onLogout: () => Promise<void>;
-}) {
-  const { pageId } = useParams<{ pageId: string }>();
-  return <LibraryPage user={user} onLogout={onLogout} pageId={pageId} />;
-}
-
 function PageChatRedirect() {
   const { pageId } = useParams<{ pageId: string }>();
   const { search } = useLocation();
   return <Navigate to={`/pages/${pageId}${search}`} replace />;
-}
-
-function LegacyMinimaxRedirect() {
-  const { pageId } = useParams<{ pageId?: string }>();
-  const base = pageId ? `/pages/${pageId}/create` : "/create";
-  return <Navigate to={`${base}/rh/${LEGACY_MINIMAX_KEY}`} replace />;
 }
 
 function App() {
@@ -102,7 +72,7 @@ function App() {
   return (
     <BrowserRouter>
       <FilesWorkspaceProvider enabled={user !== null}>
-        <WorkspaceRouteCache enabled={user !== null}>
+        <Routes>
           <Route
             path="/login"
             element={<AuthPage user={user} onSubmit={submit} />}
@@ -111,37 +81,9 @@ function App() {
             path="/register"
             element={<AuthPage user={user} onSubmit={submit} />}
           />
-          <Route
-            path="/home"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <HomePage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pages"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <PageListPage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/pages/new"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <PageEditorPage
-                  mode="new"
-                  user={user as User}
-                  onLogout={logout}
-                />
-              </ProtectedRoute>
-            }
-          />
           <Route path="/pages/:pageId/chat" element={<PageChatRedirect />} />
           <Route
-            path="/pages/:pageId"
+            path="/pages/:pageId/*"
             element={
               <ProtectedRoute user={user} loading={loading}>
                 <PageWorkspaceLayout
@@ -150,111 +92,20 @@ function App() {
                 />
               </ProtectedRoute>
             }
+          />
+          <Route
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <GlobalWorkspaceLayout
+                  user={user as User}
+                  onLogout={logout}
+                />
+              </ProtectedRoute>
+            }
           >
-            <Route
-              index
-              element={<PageDetailPage user={user as User} onLogout={logout} />}
-            />
-            <Route
-              path="edit"
-              element={
-                <PageEditorPage
-                  mode="edit"
-                  user={user as User}
-                  onLogout={logout}
-                />
-              }
-            />
-            <Route
-              path="files"
-              element={<FilesPage user={user as User} onLogout={logout} />}
-            />
-            <Route
-              path="create"
-              element={<CreatePage user={user as User} onLogout={logout} />}
-            />
-            <Route
-              path="create/gpt-image-gen"
-              element={<GptImageGenPage user={user as User} onLogout={logout} />}
-            />
-            <Route
-              path="create/rh-minimax-h3-ff-image-to-video"
-              element={<LegacyMinimaxRedirect />}
-            />
-            <Route
-              path="create/rh/:workflowKey"
-              element={
-                <RunningHubWorkflowPage
-                  user={user as User}
-                  onLogout={logout}
-                />
-              }
-            />
-            <Route
-              path="library"
-              element={<PageLibraryRoute user={user as User} onLogout={logout} />}
-            />
-            <Route
-              path="generations"
-              element={<GenerationsPage user={user as User} onLogout={logout} />}
-            />
+            <Route path="pages/new" element={<></>} />
+            <Route path="*" element={<></>} />
           </Route>
-          <Route
-            path="/generations"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <GenerationsPage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/chat" element={<Navigate to="/home" replace />} />
-          <Route
-            path="/files"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <FilesPage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/create"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <CreatePage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/create/gpt-image-gen"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <GptImageGenPage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/create/rh-minimax-h3-ff-image-to-video"
-            element={<LegacyMinimaxRedirect />}
-          />
-          <Route
-            path="/create/rh/:workflowKey"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <RunningHubWorkflowPage
-                  user={user as User}
-                  onLogout={logout}
-                />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/library"
-            element={
-              <ProtectedRoute user={user} loading={loading}>
-                <LibraryPage user={user as User} onLogout={logout} />
-              </ProtectedRoute>
-            }
-          />
           <Route
             path="/"
             element={<Navigate to={user ? "/home" : "/login"} replace />}
@@ -263,7 +114,7 @@ function App() {
             path="*"
             element={<Navigate to={user ? "/home" : "/login"} replace />}
           />
-        </WorkspaceRouteCache>
+        </Routes>
       </FilesWorkspaceProvider>
     </BrowserRouter>
   );

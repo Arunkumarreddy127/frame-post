@@ -1,12 +1,9 @@
 import {
   createContext,
-  useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useState,
 } from "react";
-import { useMatch } from "react-router-dom";
 import { ChatPanel } from "./ChatPanel";
 import { Header } from "./Header";
 import { PageSidebar } from "./PageSidebar";
@@ -32,121 +29,46 @@ type AppShellProps = {
   chatPanel?: boolean;
 };
 
-type AppShellConfig = Pick<
-  AppShellProps,
-  "pageTitle" | "backTo" | "sidebar" | "pageId" | "chatPanel"
->;
-
-const WorkspaceShellConfigContext = createContext<
-  ((config: AppShellConfig) => void) | null
->(null);
+const WorkspaceShellContext = createContext(false);
 
 export function WorkspaceAppShell({
   children,
   user,
   onLogout,
+  pageTitle,
+  backTo,
+  sidebar,
   pageId,
   pageName,
   pageProfileImageUrl,
   pageNameLoading,
   pageNameError,
-}: Pick<
-  AppShellProps,
-  | "children"
-  | "user"
-  | "onLogout"
-  | "pageId"
-  | "pageName"
-  | "pageProfileImageUrl"
-  | "pageNameLoading"
-  | "pageNameError"
->) {
-  const [shellConfig, setShellConfig] = useState<AppShellConfig>({
-    pageTitle: "Page workspace",
-    backTo: "/pages",
-    sidebar: "page",
-    pageId,
-    chatPanel: true,
-  });
-  const reportShellConfig = useCallback((config: AppShellConfig) => {
-    setShellConfig((current) =>
-      sameShellConfig(current, config) ? current : config,
-    );
-  }, []);
-
+  chatPanel,
+}: AppShellProps) {
   return (
     <AppShell
       user={user}
       onLogout={onLogout}
-      {...shellConfig}
+      pageTitle={pageTitle}
+      backTo={backTo ?? (pageId ? "/pages" : "/home")}
+      sidebar={sidebar ?? (pageId ? "page" : "global")}
       pageId={pageId}
       pageName={pageName}
       pageProfileImageUrl={pageProfileImageUrl}
       pageNameLoading={pageNameLoading}
       pageNameError={pageNameError}
+      chatPanel={chatPanel}
     >
-      <WorkspaceShellConfigContext.Provider value={reportShellConfig}>
+      <WorkspaceShellContext.Provider value>
         {children}
-      </WorkspaceShellConfigContext.Provider>
+      </WorkspaceShellContext.Provider>
     </AppShell>
   );
 }
 
 export function AppShell(props: AppShellProps) {
-  const parentShellConfig = useContext(WorkspaceShellConfigContext);
-  const config: AppShellConfig = {
-    pageTitle: props.pageTitle,
-    backTo: props.backTo ?? "/home",
-    sidebar: props.sidebar ?? "global",
-    pageId: props.pageId,
-    chatPanel: props.chatPanel ?? true,
-  };
-
-  if (parentShellConfig) {
-    return (
-      <NestedAppShell
-        config={config}
-        reportShellConfig={parentShellConfig}
-      >
-        {props.children}
-      </NestedAppShell>
-    );
-  }
-
-  return <RenderedAppShell {...props} {...config} />;
-}
-
-function NestedAppShell({
-  children,
-  config,
-  reportShellConfig,
-}: {
-  children: React.ReactNode;
-  config: AppShellConfig;
-  reportShellConfig: (config: AppShellConfig) => void;
-}) {
-  useLayoutEffect(() => {
-    reportShellConfig(config);
-  }, [
-    config.pageTitle,
-    config.backTo,
-    config.sidebar,
-    config.pageId,
-    config.chatPanel,
-    reportShellConfig,
-  ]);
-
-  return <>{children}</>;
-}
-
-function sameShellConfig(left: AppShellConfig, right: AppShellConfig) {
-  return (
-    left.pageTitle === right.pageTitle &&
-    left.backTo === right.backTo &&
-    left.sidebar === right.sidebar &&
-    left.pageId === right.pageId &&
-    left.chatPanel === right.chatPanel
-  );
+  const isNested = useContext(WorkspaceShellContext);
+  return isNested ? <>{props.children}</> : <RenderedAppShell {...props} />;
 }
 
 function RenderedAppShell({
@@ -163,9 +85,6 @@ function RenderedAppShell({
   chatPanel = true,
 }: AppShellProps) {
   const { filesExplorer } = useFilesWorkspaceContext();
-  const isFilesPage =
-    useMatch({ path: "/files", end: true }) !== null ||
-    useMatch({ path: "/pages/:pageId/files", end: true }) !== null;
   const [chatOpen, setChatOpen] = useState(() => {
     const stored = window.localStorage.getItem(CHAT_OPEN_KEY);
     // First visit: keep the content area roomy on narrower screens.
@@ -202,13 +121,7 @@ function RenderedAppShell({
           <Sidebar backTo={backTo} filesExplorer={filesExplorer} />
         )}
         <main className="app-main">
-          <div
-            className={
-              isFilesPage
-                ? "app-main-content"
-                : "app-main-content app-main-surface"
-            }
-          >
+          <div className="app-main-content">
             <WorkspaceTabs />
             {pageNameError && sidebar === "page" && (
               <p className="page-workspace-error error" role="alert">

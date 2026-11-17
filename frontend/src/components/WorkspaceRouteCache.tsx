@@ -8,27 +8,7 @@ type CachedRoute = {
   location: ReturnType<typeof useLocation>;
 };
 
-export function WorkspaceRouteCache({
-  enabled,
-  children,
-}: {
-  enabled: boolean;
-  children: ReactNode;
-}) {
-  return enabled ? (
-    <AuthenticatedWorkspaceRouteCache>
-      {children}
-    </AuthenticatedWorkspaceRouteCache>
-  ) : (
-    <Routes>{children}</Routes>
-  );
-}
-
-function AuthenticatedWorkspaceRouteCache({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function WorkspaceRouteCache({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { activePageTabKey, pageTabs } = useFilesWorkspaceContext();
   const activeRouteKey = activePageTabKey
@@ -36,7 +16,13 @@ function AuthenticatedWorkspaceRouteCache({
     : undefined;
   const [cachedRoutes, setCachedRoutes] = useState<CachedRoute[]>(() =>
     activePageTabKey && activeRouteKey
-      ? [{ key: activeRouteKey, pageTabKey: activePageTabKey, location }]
+      ? [
+          {
+            key: activeRouteKey,
+            pageTabKey: activePageTabKey,
+            location,
+          },
+        ]
       : [],
   );
 
@@ -57,7 +43,11 @@ function AuthenticatedWorkspaceRouteCache({
     });
   }, [activePageTabKey, activeRouteKey, location]);
 
-  const openKeys = new Set(pageTabs.map((tab) => tab.key));
+  const openKeys = new Set(
+    pageTabs
+      .filter((tab) => tab.pageId === undefined)
+      .map((tab) => tab.key),
+  );
   if (activePageTabKey) openKeys.add(activePageTabKey);
   const routesToKeep = cachedRoutes
     .filter((route) => openKeys.has(route.pageTabKey))
@@ -80,11 +70,7 @@ function AuthenticatedWorkspaceRouteCache({
       {routesToKeep.map((route) => {
         const active = route.key === activeRouteKey;
         return (
-          <div
-            key={route.key}
-            hidden={!active}
-            aria-hidden={!active}
-          >
+          <div key={route.key} hidden={!active} aria-hidden={!active}>
             <Routes location={route.location}>{children}</Routes>
           </div>
         );

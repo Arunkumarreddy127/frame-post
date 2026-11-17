@@ -2,7 +2,7 @@ import { FormEvent, useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { API_BASE_URL, buildPageForm } from "../api";
 import { AppShell } from "../components/AppShell";
-import { PageWorkspaceUpdateContext } from "../components/PageWorkspaceLayout";
+import { PageWorkspaceUpdateContext } from "../components/PageWorkspaceContext";
 import type { Page, PageFormState, ShellRouteProps } from "../types";
 
 type PageEditorPageProps = ShellRouteProps & {

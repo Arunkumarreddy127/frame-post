@@ -21,9 +21,10 @@ export function WorkspaceTabs() {
     closePageTab,
   } = useFilesWorkspaceContext();
   const navigate = useNavigate();
-  const isFilesPage =
-    useMatch({ path: "/files", end: true }) !== null ||
+  const isGlobalFilesPage = useMatch({ path: "/files", end: true }) !== null;
+  const isPageFilesPage =
     useMatch({ path: "/pages/:pageId/files", end: true }) !== null;
+  const isFilesPage = isGlobalFilesPage || isPageFilesPage;
   const currentPageTabs = pageTabs.filter((tab) => tab.pageId === pageId);
 
   if (workspace.tabs.length === 0 && currentPageTabs.length === 0) return null;

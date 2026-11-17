@@ -7,6 +7,7 @@
     sans-serif;
   color: #1f2328;
   background: #f5f6f7;
+  scrollbar-gutter: stable;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -1002,8 +1003,8 @@ textarea {
 
 .app-chat {
   position: sticky;
-  top: 5rem;
-  height: calc(100vh - 6.5rem);
+  top: 3.8rem;
+  height: calc(100vh - 5.3rem);
   min-width: 0;
 }
 
