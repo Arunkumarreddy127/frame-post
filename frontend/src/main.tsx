@@ -6,13 +6,13 @@ import {
   Navigate,
   useLocation,
   Route,
-  Routes,
   useParams,
 } from "react-router-dom";
 import { AuthPage } from "./components/AuthPage";
 import { PageWorkspaceLayout } from "./components/PageWorkspaceLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { FilesWorkspaceProvider } from "./components/files/FilesWorkspaceProvider";
+import { WorkspaceRouteCache } from "./components/WorkspaceRouteCache";
 import { useAuth } from "./hooks/useAuth";
 import {
   CreatePage,
@@ -102,164 +102,168 @@ function App() {
   return (
     <BrowserRouter>
       <FilesWorkspaceProvider enabled={user !== null}>
-        <Routes>
-        <Route
-          path="/login"
-          element={<AuthPage user={user} onSubmit={submit} />}
-        />
-        <Route
-          path="/register"
-          element={<AuthPage user={user} onSubmit={submit} />}
-        />
-        <Route
-          path="/home"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <HomePage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pages"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <PageListPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pages/new"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <PageEditorPage
-                mode="new"
-                user={user as User}
-                onLogout={logout}
-              />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/pages/:pageId/chat" element={<PageChatRedirect />} />
-        <Route
-          path="/pages/:pageId"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <PageWorkspaceLayout
-                user={user as User}
-                onLogout={logout}
-              />
-            </ProtectedRoute>
-          }
-        >
-        <Route
-          index
-          element={<PageDetailPage user={user as User} onLogout={logout} />}
-        />
-        <Route
-          path="edit"
-          element={
-            <PageEditorPage
-              mode="edit"
-              user={user as User}
-              onLogout={logout}
+        <WorkspaceRouteCache enabled={user !== null}>
+          <Route
+            path="/login"
+            element={<AuthPage user={user} onSubmit={submit} />}
+          />
+          <Route
+            path="/register"
+            element={<AuthPage user={user} onSubmit={submit} />}
+          />
+          <Route
+            path="/home"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <HomePage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pages"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <PageListPage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pages/new"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <PageEditorPage
+                  mode="new"
+                  user={user as User}
+                  onLogout={logout}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/pages/:pageId/chat" element={<PageChatRedirect />} />
+          <Route
+            path="/pages/:pageId"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <PageWorkspaceLayout
+                  user={user as User}
+                  onLogout={logout}
+                />
+              </ProtectedRoute>
+            }
+          >
+            <Route
+              index
+              element={<PageDetailPage user={user as User} onLogout={logout} />}
             />
-          }
-        />
-        <Route
-          path="files"
-          element={<FilesPage user={user as User} onLogout={logout} />}
-        />
-        <Route
-          path="create"
-          element={<CreatePage user={user as User} onLogout={logout} />}
-        />
-        <Route
-          path="create/gpt-image-gen"
-          element={<GptImageGenPage user={user as User} onLogout={logout} />}
-        />
-        <Route
-          path="create/rh-minimax-h3-ff-image-to-video"
-          element={<LegacyMinimaxRedirect />}
-        />
-        <Route
-          path="create/rh/:workflowKey"
-          element={
-            <RunningHubWorkflowPage user={user as User} onLogout={logout} />
-          }
-        />
-        <Route
-          path="library"
-          element={
-            <PageLibraryRoute user={user as User} onLogout={logout} />
-          }
-        />
-        <Route
-          path="generations"
-          element={<GenerationsPage user={user as User} onLogout={logout} />}
-        />
-        </Route>
-        <Route
-          path="/generations"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <GenerationsPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/chat" element={<Navigate to="/home" replace />} />
-        <Route
-          path="/files"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <FilesPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/create"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <CreatePage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/create/gpt-image-gen"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <GptImageGenPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/create/rh-minimax-h3-ff-image-to-video"
-          element={<LegacyMinimaxRedirect />}
-        />
-        <Route
-          path="/create/rh/:workflowKey"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <RunningHubWorkflowPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/library"
-          element={
-            <ProtectedRoute user={user} loading={loading}>
-              <LibraryPage user={user as User} onLogout={logout} />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/"
-          element={<Navigate to={user ? "/home" : "/login"} replace />}
-        />
-        <Route
-          path="*"
-          element={<Navigate to={user ? "/home" : "/login"} replace />}
-        />
-        </Routes>
+            <Route
+              path="edit"
+              element={
+                <PageEditorPage
+                  mode="edit"
+                  user={user as User}
+                  onLogout={logout}
+                />
+              }
+            />
+            <Route
+              path="files"
+              element={<FilesPage user={user as User} onLogout={logout} />}
+            />
+            <Route
+              path="create"
+              element={<CreatePage user={user as User} onLogout={logout} />}
+            />
+            <Route
+              path="create/gpt-image-gen"
+              element={<GptImageGenPage user={user as User} onLogout={logout} />}
+            />
+            <Route
+              path="create/rh-minimax-h3-ff-image-to-video"
+              element={<LegacyMinimaxRedirect />}
+            />
+            <Route
+              path="create/rh/:workflowKey"
+              element={
+                <RunningHubWorkflowPage
+                  user={user as User}
+                  onLogout={logout}
+                />
+              }
+            />
+            <Route
+              path="library"
+              element={<PageLibraryRoute user={user as User} onLogout={logout} />}
+            />
+            <Route
+              path="generations"
+              element={<GenerationsPage user={user as User} onLogout={logout} />}
+            />
+          </Route>
+          <Route
+            path="/generations"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <GenerationsPage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/chat" element={<Navigate to="/home" replace />} />
+          <Route
+            path="/files"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <FilesPage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <CreatePage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/create/gpt-image-gen"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <GptImageGenPage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/create/rh-minimax-h3-ff-image-to-video"
+            element={<LegacyMinimaxRedirect />}
+          />
+          <Route
+            path="/create/rh/:workflowKey"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <RunningHubWorkflowPage
+                  user={user as User}
+                  onLogout={logout}
+                />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/library"
+            element={
+              <ProtectedRoute user={user} loading={loading}>
+                <LibraryPage user={user as User} onLogout={logout} />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/"
+            element={<Navigate to={user ? "/home" : "/login"} replace />}
+          />
+          <Route
+            path="*"
+            element={<Navigate to={user ? "/home" : "/login"} replace />}
+          />
+        </WorkspaceRouteCache>
       </FilesWorkspaceProvider>
     </BrowserRouter>
   );

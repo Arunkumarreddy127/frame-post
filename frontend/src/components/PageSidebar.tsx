@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { SidebarFilesLink } from "./SidebarFilesLink";
+import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 
 type PageSidebarProps = {
   pageId?: string;
@@ -23,9 +24,13 @@ export function PageSidebar({
   pageNameLoading,
   filesExplorer,
 }: PageSidebarProps) {
+  const { pageTabs } = useFilesWorkspaceContext();
   const pagePath = pageId ? `/pages/${pageId}` : "/pages";
   const displayName =
     pageName ?? (pageNameLoading ? "Loading page..." : "Page unavailable");
+  const overviewTab = pageTabs.find(
+    (tab) => tab.label === "Overview" && tab.pageId === pageId,
+  );
 
   return (
     <aside className="app-sidebar">
@@ -71,7 +76,7 @@ export function PageSidebar({
           aria-label="Page navigation"
         >
           <NavLink
-            to={pagePath}
+            to={overviewTab?.to ?? pagePath}
             end
             className={({ isActive }) =>
               isActive ? "sidebar-link active" : "sidebar-link"
@@ -80,18 +85,22 @@ export function PageSidebar({
             Overview
           </NavLink>
           <SidebarFilesLink to={`${pagePath}/files`} explorer={filesExplorer} />
-          {navigation.map((item) => (
-            <NavLink
-              key={item.suffix}
-              to={`${pagePath}/${item.suffix}`}
-              end
-              className={({ isActive }) =>
-                isActive ? "sidebar-link active" : "sidebar-link"
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {navigation.map((item) => {
+            const pageTab = pageTabs.find(
+              (tab) => tab.label === item.label && tab.pageId === pageId,
+            );
+            return (
+              <NavLink
+                key={item.suffix}
+                to={pageTab?.to ?? `${pagePath}/${item.suffix}`}
+                className={({ isActive }) =>
+                  isActive ? "sidebar-link active" : "sidebar-link"
+                }
+              >
+                {item.label}
+              </NavLink>
+            );
+          })}
         </nav>
       </section>
     </aside>

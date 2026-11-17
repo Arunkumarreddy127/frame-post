@@ -11,6 +11,7 @@ import { ChatPanel } from "./ChatPanel";
 import { Header } from "./Header";
 import { PageSidebar } from "./PageSidebar";
 import { Sidebar } from "./Sidebar";
+import { WorkspaceTabs } from "./WorkspaceTabs";
 import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 import type { User } from "../types";
 
@@ -208,6 +209,7 @@ function RenderedAppShell({
                 : "app-main-content app-main-surface"
             }
           >
+            <WorkspaceTabs />
             {pageNameError && sidebar === "page" && (
               <p className="page-workspace-error error" role="alert">
                 Unable to load page name: {pageNameError}

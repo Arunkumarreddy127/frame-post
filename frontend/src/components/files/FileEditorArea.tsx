@@ -15,50 +15,15 @@ type FileEditorAreaProps = {
 
 export function FileEditorArea({ pageId, workspace }: FileEditorAreaProps) {
   const {
-    tabs,
     activeTab,
     saving,
     error,
-    setActiveKey,
     updateDraft,
-    closeTab,
     save,
   } = workspace;
 
   return (
     <div className="files-editor-area">
-      <div className="files-tabs" role="tablist">
-        {tabs.map((tab) => (
-          <div
-            key={tab.key}
-            role="tab"
-            aria-selected={tab.key === activeTab?.key}
-            className={
-              tab.key === activeTab?.key ? "files-tab active" : "files-tab"
-            }
-          >
-            <button
-              type="button"
-              className="files-tab-label"
-              onClick={() => setActiveKey(tab.key)}
-            >
-              <FileText size={13} strokeWidth={2} aria-hidden="true" />
-              <span>{tab.draft.name || "untitled"}</span>
-            </button>
-            {isDirty(tab) && (
-              <span className="files-dirty-dot" aria-label="Unsaved" />
-            )}
-            <button
-              type="button"
-              className="files-icon-button files-tab-close"
-              onClick={() => void closeTab(tab)}
-              aria-label={`Close ${tab.draft.name || "untitled"}`}
-            >
-              <X size={13} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-      </div>
       {activeTab ? (
         <>
           <div className="files-editor-toolbar">

@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { SidebarFilesLink } from "./SidebarFilesLink";
+import { useFilesWorkspaceContext } from "./files/FilesWorkspaceProvider";
 
 type SidebarProps = {
   backTo?: string;
@@ -15,14 +16,20 @@ const navigation = [
 ];
 
 export function Sidebar({ backTo = "/home", filesExplorer }: SidebarProps) {
+  const { pageTabs } = useFilesWorkspaceContext();
+
   return (
     <aside className="app-sidebar">
       <nav className="sidebar-nav" aria-label="Main navigation">
-        {navigation.map((item) => (
-          <Fragment key={item.to}>
+        {navigation.map((item) => {
+          const pageTab = pageTabs.find(
+            (tab) => tab.label === item.label && tab.pageId === undefined,
+          );
+          return (
+            <Fragment key={item.to}>
             <NavLink
-              to={item.to}
-              end={item.end}
+              to={pageTab?.to ?? item.to}
+              end={item.label === "Home" || item.label === "Pages"}
               className={({ isActive }) =>
                 isActive ? "sidebar-link active" : "sidebar-link"
               }
@@ -32,8 +39,9 @@ export function Sidebar({ backTo = "/home", filesExplorer }: SidebarProps) {
             {item.to === "/home" && (
               <SidebarFilesLink to="/files" explorer={filesExplorer} />
             )}
-          </Fragment>
-        ))}
+            </Fragment>
+          );
+        })}
       </nav>
     </aside>
   );

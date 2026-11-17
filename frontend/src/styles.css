@@ -3844,6 +3844,29 @@ h2 {
   background: #f6f8fa;
 }
 
+.workspace-tabs {
+  border: 1px solid #d0d7de;
+  border-radius: 0.5rem;
+}
+
+.app-main-surface > .workspace-tabs {
+  margin: -1.25rem -1.25rem 0;
+  border: 0;
+  border-bottom: 1px solid #d0d7de;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.files-workspace-tabs {
+  border-bottom: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.files-workspace-tabs + .files-editor-area {
+  height: calc(100vh - 10.7rem);
+  border-top: 0;
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
 .files-tab {
   display: flex;
   flex: 0 0 auto;
@@ -3973,6 +3996,14 @@ h2 {
 @media (max-width: 720px) {
   .files-editor-area {
     height: calc(100vh - 14rem);
+  }
+
+  .app-main-surface > .workspace-tabs {
+    margin: -0.85rem -0.85rem 0;
+  }
+
+  .files-workspace-tabs + .files-editor-area {
+    height: calc(100vh - 16.2rem);
   }
 
   .sidebar-nav:has(.sidebar-files-explorer) {
