@@ -1,4 +1,4 @@
-import { FileText, Trash2 } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { isDirty, type FilesWorkspaceState } from "./useFilesWorkspace";
 
@@ -8,7 +8,7 @@ type FileExplorerProps = {
 };
 
 export function FileExplorer({ workspace, filesPath }: FileExplorerProps) {
-  const { files, groups, tabs, activeTab, saving, openFile, remove } =
+  const { files, groups, tabs, activeTab, openFile } =
     workspace;
   const navigate = useNavigate();
   const location = useLocation();
@@ -50,16 +50,6 @@ export function FileExplorer({ workspace, filesPath }: FileExplorerProps) {
                     {openTab && isDirty(openTab) && (
                       <span className="files-dirty-dot" aria-label="Unsaved" />
                     )}
-                  </button>
-                  <button
-                    type="button"
-                    className="files-icon-button files-explorer-delete"
-                    onClick={() => void remove(file)}
-                    aria-label={`Delete ${file.name}`}
-                    title="Delete"
-                    disabled={saving}
-                  >
-                    <Trash2 size={14} strokeWidth={2} aria-hidden="true" />
                   </button>
                 </div>
               );

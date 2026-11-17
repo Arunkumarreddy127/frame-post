@@ -3,9 +3,7 @@ import { CodeEditor } from "./CodeEditor";
 import {
   isDirty,
   MAX_CONTENT_LENGTH,
-  MAX_NAME_LENGTH,
   type FilesWorkspaceState,
-  type Scope,
 } from "./useFilesWorkspace";
 
 type FileEditorAreaProps = {
@@ -27,39 +25,14 @@ export function FileEditorArea({ pageId, workspace }: FileEditorAreaProps) {
       {activeTab ? (
         <>
           <div className="files-editor-toolbar">
-            <input
-              className="files-name-input"
-              value={activeTab.draft.name}
-              maxLength={MAX_NAME_LENGTH}
-              placeholder="File name"
-              aria-label="Instruction file name"
-              onChange={(event) =>
-                updateDraft(activeTab.key, { name: event.target.value })
-              }
-              onKeyDown={(event) => {
-                if (
-                  (event.metaKey || event.ctrlKey) &&
-                  event.key.toLowerCase() === "s"
-                ) {
-                  event.preventDefault();
-                  void save(activeTab);
-                }
-              }}
-            />
-            {pageId && (
-              <select
-                value={activeTab.draft.scope}
-                aria-label="Instruction file scope"
-                onChange={(event) =>
-                  updateDraft(activeTab.key, {
-                    scope: event.target.value as Scope,
-                  })
-                }
-              >
-                <option value="user">Global</option>
-                <option value="page">This page</option>
-              </select>
-            )}
+            <div className="files-editor-file-details">
+              <strong>{activeTab.draft.name || "untitled"}</strong>
+              {pageId && (
+                <small>
+                  {activeTab.draft.scope === "page" ? "This page" : "Global"}
+                </small>
+              )}
+            </div>
             <button
               type="button"
               className="secondary-button small-button"

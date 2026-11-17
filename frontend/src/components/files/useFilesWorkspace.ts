@@ -136,7 +136,7 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
     setActiveKey(file.id);
   }
 
-  function newFile() {
+  function newFile(input: { name: string; scope: Scope }) {
     const key = `untitled-${untitledCount + 1}`;
     setUntitledCount((count) => count + 1);
     setTabs((current) => [
@@ -145,10 +145,11 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
         key,
         fileId: null,
         saved: null,
-        draft: { name: "", content: "", scope: pageId ? "page" : "user" },
+        draft: { name: input.name, content: "", scope: input.scope },
       },
     ]);
     setActiveKey(key);
+    return key;
   }
 
   function updateDraft(key: string, changes: Partial<Draft>) {
@@ -243,6 +244,56 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
     }
   }
 
+  async function saveFileMetadata(
+    file: InstructionFile,
+    draft: Pick<Draft, "name" | "scope">,
+  ) {
+    if (saving) return false;
+    const name = draft.name.trim();
+    if (!name) {
+      setError("Enter a file name before saving.");
+      return false;
+    }
+    if (name === file.name && draft.scope === file.scope) return true;
+
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await updateInstructionFile(file.id, {
+        name,
+        content: file.content,
+        scope: draft.scope,
+        pageId: draft.scope === "page" ? (pageId ?? null) : null,
+      });
+      setFiles((current) =>
+        (current ?? []).map((item) => (item.id === file.id ? updated : item)),
+      );
+      const saved = toDraft(updated);
+      setTabs((current) =>
+        current.map((tab) =>
+          tab.fileId === file.id
+            ? {
+                ...tab,
+                saved,
+                draft: {
+                  ...tab.draft,
+                  name: updated.name,
+                  scope: updated.scope,
+                },
+              }
+            : tab,
+        ),
+      );
+      notifyInstructionFilesChanged();
+      return true;
+    } catch (requestError) {
+      setError(messageFrom(requestError, "Unable to update file details"));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove(file: InstructionFile) {
     if (saving) return;
     const accepted = await confirm({
@@ -284,6 +335,7 @@ export function useFilesWorkspace(pageId: string | undefined, confirm: Confirm) 
     closeAllTabs,
     setActiveKey,
     save,
+    saveFileMetadata,
     remove,
   };
 }
