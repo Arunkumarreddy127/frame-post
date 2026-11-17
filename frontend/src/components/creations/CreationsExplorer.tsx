@@ -81,7 +81,7 @@ export function CreationsExplorer({
                   onClick={() => navigate(to)}
                 >
                   <FolderOpen size={14} strokeWidth={2} aria-hidden="true" />
-                  <span>{creation.name}</span>
+                  <span className="creation-explorer-name">{creation.name}</span>
                 </button>
               </div>
             );

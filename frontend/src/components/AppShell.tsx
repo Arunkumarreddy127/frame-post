@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { ChatPanel } from "./ChatPanel";
 import { Header } from "./Header";
 import { PageSidebar } from "./PageSidebar";
@@ -95,6 +96,13 @@ function RenderedAppShell({
     window.localStorage.setItem(CHAT_OPEN_KEY, String(chatOpen));
   }, [chatOpen]);
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   const showChat = chatPanel && chatOpen;
 
   return (
@@ -104,27 +112,31 @@ function RenderedAppShell({
         chatPanel={chatPanel}
         chatOpen={showChat}
         onToggleChat={() => setChatOpen((current) => !current)}
+        menuOpen={menuOpen}
+        onToggleMenu={() => setMenuOpen((current) => !current)}
         onLogout={onLogout}
       />
       <div
-        className={`app-body${showChat ? " has-chat" : ""}`}
+        className={`app-body${showChat ? " has-chat" : ""}${menuOpen ? " menu-open" : ""}`}
       >
-        {sidebar === "page" ? (
-          <PageSidebar
-            pageId={pageId}
-            pageName={pageName}
-            pageProfileImageUrl={pageProfileImageUrl}
-            pageNameLoading={pageNameLoading}
-            filesExplorer={filesExplorer}
-            creationsExplorer={creationsExplorer}
-          />
-        ) : (
-          <Sidebar
-            backTo={backTo}
-            filesExplorer={filesExplorer}
-            creationsExplorer={creationsExplorer}
-          />
-        )}
+        <div id="app-sidebar-menu" className="app-sidebar-menu">
+          {sidebar === "page" ? (
+            <PageSidebar
+              pageId={pageId}
+              pageName={pageName}
+              pageProfileImageUrl={pageProfileImageUrl}
+              pageNameLoading={pageNameLoading}
+              filesExplorer={filesExplorer}
+              creationsExplorer={creationsExplorer}
+            />
+          ) : (
+            <Sidebar
+              backTo={backTo}
+              filesExplorer={filesExplorer}
+              creationsExplorer={creationsExplorer}
+            />
+          )}
+        </div>
         <main className="app-main">
           <div className="app-main-surface">
             <WorkspaceTabs />

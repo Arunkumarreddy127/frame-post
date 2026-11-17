@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MessageSquare } from "lucide-react";
+import { Menu, MessageSquare } from "lucide-react";
 import { UserInfo } from "./UserInfo";
 
 type HeaderProps = {
@@ -7,6 +7,8 @@ type HeaderProps = {
   chatPanel: boolean;
   chatOpen: boolean;
   onToggleChat: () => void;
+  menuOpen: boolean;
+  onToggleMenu: () => void;
   onLogout: () => Promise<void>;
 };
 
@@ -15,6 +17,8 @@ export function Header({
   chatPanel,
   chatOpen,
   onToggleChat,
+  menuOpen,
+  onToggleMenu,
   onLogout,
 }: HeaderProps) {
   return (
@@ -23,6 +27,18 @@ export function Header({
         <LinkBrand />
         <div className="app-header-main">
           <div className="app-header-right">
+            <button
+              type="button"
+              className={`sidebar-menu-toggle${menuOpen ? " active" : ""}`}
+              aria-expanded={menuOpen}
+              aria-controls="app-sidebar-menu"
+              aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+              title={menuOpen ? "Close navigation" : "Open navigation"}
+              onClick={onToggleMenu}
+            >
+              <Menu size={17} strokeWidth={2} aria-hidden="true" />
+              <span>Menu</span>
+            </button>
             <UserInfo username={username} onLogout={onLogout} />
             {chatPanel && (
               <button

@@ -1,5 +1,18 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type FormEvent,
+} from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  Pencil,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { useConfirm } from "../components/ConfirmDialog";
@@ -36,6 +49,12 @@ const VIEWS: { value: View; label: string }[] = [
   { value: "grouped", label: "Grouped by tool" },
   { value: "storyboard", label: "Storyboard" },
 ];
+
+const VIEW_HINTS: Record<View, string> = {
+  feed: "All items in order. Drag cards or use the arrows to reorder.",
+  grouped: "Items grouped by the tool that made them. Order is not editable here.",
+  storyboard: "Ordered steps with lanes and links to the step they follow.",
+};
 
 const PICKER_PAGE_SIZE = 24;
 
@@ -96,6 +115,7 @@ export function CreationDetailPage({
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [pickerLane, setPickerLane] = useState("");
   const [pickerParent, setPickerParent] = useState("");
+  const [dragId, setDragId] = useState<string | null>(null);
 
   async function refresh() {
     const [next, list] = await Promise.all([
@@ -237,12 +257,36 @@ export function CreationDetailPage({
     }
   }
 
-  function move(index: number, delta: number) {
-    const target = index + delta;
-    if (target < 0 || target >= items.length) return;
+  function moveTo(from: number, to: number) {
+    if (from === to || to < 0 || to >= items.length) return;
     const next = [...items];
-    [next[index], next[target]] = [next[target], next[index]];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
     void persistOrder(next);
+  }
+
+  function move(index: number, delta: number) {
+    moveTo(index, index + delta);
+  }
+
+  function dragProps(index: number) {
+    return {
+      draggable: !busy,
+      onDragStart: (event: DragEvent<HTMLLIElement>) => {
+        setDragId(items[index].id);
+        event.dataTransfer.effectAllowed = "move";
+      },
+      onDragOver: (event: DragEvent<HTMLLIElement>) => {
+        if (dragId) event.preventDefault();
+      },
+      onDrop: (event: DragEvent<HTMLLIElement>) => {
+        event.preventDefault();
+        const from = items.findIndex((entry) => entry.id === dragId);
+        setDragId(null);
+        if (from >= 0) moveTo(from, index);
+      },
+      onDragEnd: () => setDragId(null),
+    };
   }
 
   function saveLane(item: CreationItem, lane: string) {
@@ -330,7 +374,14 @@ export function CreationDetailPage({
     return (
       <ol className="creation-list">
         {items.map((item, index) => (
-          <li className="panel creation-card" key={item.id}>
+          <li
+            className={`panel creation-card${dragId === item.id ? " is-dragging" : ""}`}
+            key={item.id}
+            {...dragProps(index)}
+          >
+            <span className="creation-drag-handle" aria-hidden="true">
+              <GripVertical size={16} />
+            </span>
             <Thumb generation={item.generation} />
             <div className="creation-card-body">
               <p className="creation-card-prompt">
@@ -373,13 +424,12 @@ export function CreationDetailPage({
                   <p>{item.generation.inputs.prompt || "No prompt"}</p>
                   <button
                     type="button"
-                    className="icon-button danger-icon"
-                    aria-label="Remove from creation"
-                    title="Remove from creation"
+                    className="secondary-button danger-button creation-grid-remove"
                     disabled={busy}
                     onClick={() => void removeItem(item)}
                   >
                     <Trash2 size={14} aria-hidden="true" />
+                    Remove
                   </button>
                 </li>
               ))}
@@ -398,7 +448,14 @@ export function CreationDetailPage({
             ? itemIndexById.get(item.parentItemId)
             : undefined;
           return (
-            <li className="creation-step" key={item.id}>
+            <li
+              className={`creation-step${dragId === item.id ? " is-dragging" : ""}`}
+              key={item.id}
+              {...dragProps(index)}
+            >
+              <span className="creation-drag-handle" aria-hidden="true">
+                <GripVertical size={16} />
+              </span>
               <span className="creation-step-number">{index + 1}</span>
               <Thumb generation={item.generation} />
               <div className="creation-card-body">
@@ -417,6 +474,7 @@ export function CreationDetailPage({
                     key={`${item.id}:${item.laneId ?? ""}`}
                     defaultValue={item.laneId ?? ""}
                     maxLength={64}
+                    list="creation-lane-options"
                     placeholder="e.g. Reel A"
                     disabled={busy}
                     onBlur={(event) => saveLane(item, event.target.value)}
@@ -436,6 +494,15 @@ export function CreationDetailPage({
       </ol>
     );
   }
+
+
+  const laneOptions = [
+    ...new Set(
+      items
+        .map((item) => item.laneId)
+        .filter((lane): lane is string => Boolean(lane)),
+    ),
+  ];
 
   const content = loading ? (
     <div className="page-list" aria-busy="true" aria-label="Loading creation">
@@ -467,11 +534,11 @@ export function CreationDetailPage({
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button danger-button"
             onClick={() => void removeCreation()}
             disabled={busy}
           >
-            Delete
+            <Trash2 size={14} aria-hidden="true" /> Delete
           </button>
         </div>
       </header>
@@ -585,18 +652,21 @@ export function CreationDetailPage({
       )}
 
       <div className="creation-toolbar">
-        <div className="creation-view-switch" role="group" aria-label="View">
-          {VIEWS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={view === option.value ? "is-active" : ""}
-              aria-pressed={view === option.value}
-              onClick={() => setView(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
+        <div className="creation-toolbar-main">
+          <div className="creation-view-switch" role="group" aria-label="View">
+            {VIEWS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={view === option.value ? "is-active" : ""}
+                aria-pressed={view === option.value}
+                onClick={() => setView(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="creation-view-hint">{VIEW_HINTS[view]}</p>
         </div>
         <div className="creation-toolbar-actions">
           <button
@@ -609,7 +679,7 @@ export function CreationDetailPage({
               setSelectedTool("");
             }}
           >
-            {newGenerationOpen ? "Close generator" : "New"}
+            {newGenerationOpen ? "Close generator" : "New generation"}
           </button>
           <button
             type="button"
@@ -617,83 +687,122 @@ export function CreationDetailPage({
             onClick={togglePicker}
             aria-expanded={pickerOpen}
           >
-            {pickerOpen ? "Close picker" : "Add"}
+            {pickerOpen ? "Close picker" : "Add existing"}
           </button>
         </div>
       </div>
 
       {pickerOpen && (
-        <section
-          className="panel creation-picker"
-          aria-label="Add existing generations"
-        >
-          <div className="creation-picker-options">
-            <label>
-              Lane for new items
-              <input
-                value={pickerLane}
-                maxLength={64}
-                placeholder="Optional"
-                onChange={(event) => setPickerLane(event.target.value)}
-              />
-            </label>
-            <label>
-              Follows
-              <select
-                value={pickerParent}
-                onChange={(event) => setPickerParent(event.target.value)}
+        <div className="creation-picker-backdrop" onClick={togglePicker}>
+          <section
+            className="panel creation-picker"
+            aria-label="Add existing generations"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="creation-picker-header">
+              <h3>Add existing generations</h3>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Close picker"
+                onClick={togglePicker}
               >
-                <option value="">Nothing</option>
-                {items.map((item, index) => (
-                  <option key={item.id} value={item.id}>
-                    Step {index + 1}
-                  </option>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="creation-picker-options">
+              <label>
+                Lane for new items
+                <input
+                  value={pickerLane}
+                  maxLength={64}
+                  placeholder="Optional"
+                  list="creation-lane-options"
+                  onChange={(event) => setPickerLane(event.target.value)}
+                />
+                <small>Applied to the items you add now.</small>
+              </label>
+              <label>
+                Follows
+                <select
+                  value={pickerParent}
+                  onChange={(event) => setPickerParent(event.target.value)}
+                >
+                  <option value="">Nothing</option>
+                  {items.map((item, index) => (
+                    <option key={item.id} value={item.id}>
+                      Step {index + 1}
+                    </option>
+                  ))}
+                </select>
+                <small>Places added items after this step in the storyboard.</small>
+              </label>
+            </div>
+            {candidates.length === 0 && !candidatesLoading ? (
+              <p className="status">
+                No ungrouped generations here. Use New generation to create one
+                in this creation.
+              </p>
+            ) : (
+              <ul className="creation-grid">
+                {candidates.map((generation) => (
+                  <li className="creation-grid-item" key={generation.id}>
+                    <Thumb generation={generation} />
+                    <p>{generation.inputs.prompt || "No prompt"}</p>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={busy}
+                      onClick={() => void addGeneration(generation)}
+                    >
+                      Add
+                    </button>
+                  </li>
                 ))}
-              </select>
-            </label>
-          </div>
-          {candidates.length === 0 && !candidatesLoading ? (
-            <p className="status">
-              No ungrouped generations here. Use New to create one in this
-              creation.
-            </p>
-          ) : (
-            <ul className="creation-grid">
-              {candidates.map((generation) => (
-                <li className="creation-grid-item" key={generation.id}>
-                  <Thumb generation={generation} />
-                  <p>{generation.inputs.prompt || "No prompt"}</p>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => void addGeneration(generation)}
-                  >
-                    Add
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {candidateCursor && (
+              </ul>
+            )}
+            {candidateCursor && (
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={candidatesLoading}
+                onClick={() => void loadCandidates(candidateCursor)}
+              >
+                {candidatesLoading ? "Loading…" : "Load more"}
+              </button>
+            )}
+          </section>
+        </div>
+      )}
+
+      <datalist id="creation-lane-options">
+        {laneOptions.map((lane) => (
+          <option key={lane} value={lane} />
+        ))}
+      </datalist>
+
+      {items.length === 0 ? (
+        <div className="empty-state creation-empty">
+          <p>This creation is empty. Start a new generation or add existing ones.</p>
+          <div className="creation-empty-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setNewGenerationOpen(true);
+                setSelectedTool("");
+              }}
+            >
+              New generation
+            </button>
             <button
               type="button"
               className="secondary-button"
-              disabled={candidatesLoading}
-              onClick={() => void loadCandidates(candidateCursor)}
+              onClick={togglePicker}
             >
-              {candidatesLoading ? "Loading…" : "Load more"}
+              Add existing
             </button>
-          )}
-        </section>
-      )}
-
-      {items.length === 0 ? (
-        <div className="empty-state">
-          <p>
-            This creation is empty. Use New to create one here, or Add to
-            select an existing one.
-          </p>
+          </div>
         </div>
       ) : view === "feed" ? (
         renderFeed()
@@ -763,13 +872,12 @@ function CardActions({
       </button>
       <button
         type="button"
-        className="icon-button danger-icon"
-        aria-label="Remove from creation"
-        title="Remove from creation"
+        className="secondary-button danger-button creation-card-remove"
         disabled={busy}
         onClick={onRemove}
       >
-        <Trash2 size={16} aria-hidden="true" />
+        <Trash2 size={14} aria-hidden="true" />
+        Remove
       </button>
     </div>
   );
