@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useInfiniteScroll } from "../../hooks/useInfiniteScroll";
 import { useMediaPages } from "../../hooks/useGenerationPages";
 import type { MediaItem } from "../../types";
@@ -11,7 +11,11 @@ type LibraryPickerProps = {
   accept: string[];
   /** How many more files can be chosen. */
   limit: number;
-  onSelect: (items: MediaItem[]) => void;
+  excludeGenerationIds?: ReadonlySet<string>;
+  beforeGrid?: ReactNode;
+  title?: string;
+  actionLabel?: string;
+  onSelect: (items: MediaItem[]) => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -25,12 +29,18 @@ export function LibraryPicker({
   pageId,
   accept,
   limit,
+  excludeGenerationIds,
+  beforeGrid,
+  title = "Choose from Library",
+  actionLabel = "Use selected",
   onSelect,
   onClose,
 }: LibraryPickerProps) {
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("outputs");
   const [selected, setSelected] = useState<MediaItem[]>([]);
   const [viewing, setViewing] = useState<MediaItem | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState("");
   const { items, hasMore, loading, error, loadMore } = useMediaPages(
     tab,
     pageId,
@@ -39,9 +49,19 @@ export function LibraryPicker({
     loadMore,
     hasMore && !loading,
   );
-  const visible = items.filter((item) => accept.includes(item.contentType));
+  const visible = items.filter(
+    (item) =>
+      !excludeGenerationIds?.has(item.generationId) &&
+      accept.some(
+        (type) =>
+          type === item.contentType ||
+          (type.endsWith("/*") &&
+            item.contentType.startsWith(type.slice(0, -1))),
+      ),
+  );
 
   function toggle(item: MediaItem) {
+    setActionError("");
     setSelected((current) => {
       if (current.some((entry) => entry.key === item.key)) {
         return current.filter((entry) => entry.key !== item.key);
@@ -49,6 +69,22 @@ export function LibraryPicker({
       if (limit === 1) return [item];
       return current.length >= limit ? current : [...current, item];
     });
+  }
+
+  async function select() {
+    setSubmitting(true);
+    setActionError("");
+    try {
+      await onSelect(selected);
+    } catch (caught) {
+      setActionError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to use the selected files",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -64,7 +100,7 @@ export function LibraryPicker({
         onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="library-picker-header">
-          <h3>Choose from Library</h3>
+          <h3>{title}</h3>
           <div className="library-picker-tabs" role="tablist">
             {TABS.map((entry) => (
               <button
@@ -90,9 +126,11 @@ export function LibraryPicker({
         </header>
         <div className="library-picker-body">
           {error && <p className="status error">{error}</p>}
+          {actionError && <p className="status error">{actionError}</p>}
           {!error && !loading && visible.length === 0 && (
             <p className="status">No matching files here yet.</p>
           )}
+          {beforeGrid}
           <div className="library-picker-grid">
             {visible.map((item) => {
               const chosen = selected.some((entry) => entry.key === item.key);
@@ -120,10 +158,10 @@ export function LibraryPicker({
           <button
             type="button"
             className="primary-button"
-            disabled={selected.length === 0}
-            onClick={() => onSelect(selected)}
+            disabled={selected.length === 0 || submitting}
+            onClick={() => void select()}
           >
-            Use selected
+            {submitting ? "Adding…" : actionLabel}
           </button>
         </footer>
       </div>

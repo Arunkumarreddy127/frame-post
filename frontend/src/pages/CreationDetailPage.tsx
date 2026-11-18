@@ -10,13 +10,15 @@ import {
   ChevronUp,
   GripVertical,
   Pencil,
+  Play,
   Trash2,
-  X,
 } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { useConfirm } from "../components/ConfirmDialog";
 import { useFilesWorkspaceContext } from "../components/files/FilesWorkspaceProvider";
+import { LibraryPicker } from "../components/library/LibraryPicker";
+import { MediaViewer } from "../components/media/MediaViewer";
 import { GptImageGenPage } from "./GptImageGenPage";
 import { RunningHubWorkflowPage } from "./RunningHubWorkflowPage";
 import {
@@ -31,18 +33,20 @@ import {
   reorderCreationItems,
   updateCreation,
 } from "../creationApi";
-import { getCatalog, listGenerations } from "../generationApi";
+import { getCatalog } from "../generationApi";
 import { formatDate } from "../format";
 import type {
   Creation,
   CreationItem,
   Generation,
+  MediaItem,
   ShellRouteProps,
   Workflow,
 } from "../types";
 
 type CreationDetailPageProps = ShellRouteProps & { pageId?: string };
 type View = "feed" | "grouped" | "storyboard";
+type SortOrder = "latest" | "earliest" | "manual";
 
 const VIEWS: { value: View; label: string }[] = [
   { value: "feed", label: "Feed" },
@@ -56,8 +60,6 @@ const VIEW_HINTS: Record<View, string> = {
   storyboard: "Ordered steps with lanes and links to the step they follow.",
 };
 
-const PICKER_PAGE_SIZE = 24;
-
 function toolLabel(generation: Generation) {
   if (generation.provider === "OPENAI") return "GPT Image";
   return generation.workflowKey
@@ -65,7 +67,13 @@ function toolLabel(generation: Generation) {
     : "RunningHub";
 }
 
-function Thumb({ generation }: { generation: Generation }) {
+function Thumb({
+  generation,
+  onOpen,
+}: {
+  generation: Generation;
+  onOpen: (item: MediaItem) => void;
+}) {
   const output = generation.outputs[0];
   if (!output) {
     return (
@@ -76,10 +84,29 @@ function Thumb({ generation }: { generation: Generation }) {
   }
   if (output.mediaType === "video") {
     return (
-      <video className="creation-thumb" src={output.url} muted preload="metadata" />
+      <button
+        type="button"
+        className="creation-thumb creation-thumb-button"
+        aria-label={`View video: ${output.name}`}
+        onClick={() => onOpen(output)}
+      >
+        <video src={output.url} muted playsInline preload="metadata" />
+        <span className="creation-thumb-play" aria-hidden="true">
+          <Play size={16} fill="currentColor" />
+        </span>
+      </button>
     );
   }
-  return <img className="creation-thumb" src={output.url} alt="" loading="lazy" />;
+  return (
+    <button
+      type="button"
+      className="creation-thumb creation-thumb-button"
+      aria-label={`View image: ${output.name}`}
+      onClick={() => onOpen(output)}
+    >
+      <img src={output.url} alt="" loading="lazy" />
+    </button>
+  );
 }
 
 export function CreationDetailPage({
@@ -89,6 +116,7 @@ export function CreationDetailPage({
 }: CreationDetailPageProps) {
   const { creationId = "" } = useParams<{ creationId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { closePageTab, setCreationTabLabel } = useFilesWorkspaceContext();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const base = pageId ? `/pages/${pageId}` : "";
@@ -96,6 +124,8 @@ export function CreationDetailPage({
   const [creation, setCreation] = useState<Creation | null>(null);
   const [items, setItems] = useState<CreationItem[]>([]);
   const [view, setView] = useState<View>("feed");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
+  const [viewing, setViewing] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -110,9 +140,6 @@ export function CreationDetailPage({
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState("");
-  const [candidates, setCandidates] = useState<Generation[]>([]);
-  const [candidateCursor, setCandidateCursor] = useState<string | null>(null);
-  const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [pickerLane, setPickerLane] = useState("");
   const [pickerParent, setPickerParent] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
@@ -178,63 +205,88 @@ export function CreationDetailPage({
     if (creation) setCreationTabLabel(creationId, creation.name);
   }, [creation?.name, creationId, setCreationTabLabel]);
 
+  const displayedItems = useMemo(() => {
+    if (sortOrder === "manual") return items;
+    const direction = sortOrder === "latest" ? -1 : 1;
+    return [...items].sort((first, second) => {
+      const dateOrder =
+        (Date.parse(first.addedAt) - Date.parse(second.addedAt)) * direction;
+      return dateOrder || first.position - second.position;
+    });
+  }, [items, sortOrder]);
+
+  const viewerItems = useMemo(
+    () => displayedItems.flatMap((item) => item.generation.outputs),
+    [displayedItems],
+  );
+  const mediaId = searchParams.get("media");
+
   const itemIndexById = useMemo(
-    () => new Map(items.map((item, index) => [item.id, index])),
-    [items],
+    () => new Map(displayedItems.map((item, index) => [item.id, index])),
+    [displayedItems],
   );
 
-  async function loadCandidates(cursor: string | null) {
-    setCandidatesLoading(true);
-    try {
-      const page = await listGenerations(
-        { pageId, globalOnly: !pageId },
-        { limit: PICKER_PAGE_SIZE, before: cursor ?? undefined },
-      );
-      const ready = page.items.filter(
-        (generation) =>
-          generation.status === "COMPLETED" && generation.outputs.length > 0,
-      );
-      const grouped = new Set(
-        ready.length
-          ? await groupedGenerationIds(
-              pageId,
-              ready.map((generation) => generation.id),
-            )
-          : [],
-      );
-      const free = ready.filter((generation) => !grouped.has(generation.id));
-      setCandidates((current) => (cursor ? [...current, ...free] : free));
-      setCandidateCursor(page.nextCursor);
-    } catch (requestError) {
-      setError(errorMessage(requestError, "Unable to load generations"));
-    } finally {
-      setCandidatesLoading(false);
+  useEffect(() => {
+    if (!mediaId) {
+      setViewing(null);
+      return;
     }
+    setViewing(viewerItems.find((item) => item.id === mediaId) ?? null);
+  }, [mediaId, viewerItems]);
+
+  function showMedia(item: MediaItem, replace = true) {
+    setViewing(item);
+    const next = new URLSearchParams(searchParams);
+    next.set("media", item.id);
+    setSearchParams(next, { replace });
+  }
+
+  function openMedia(item: MediaItem) {
+    showMedia(item, false);
+  }
+
+  function closeMediaViewer() {
+    setViewing(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("media");
+    setSearchParams(next, { replace: true });
   }
 
   function togglePicker() {
-    const next = !pickerOpen;
-    setPickerOpen(next);
-    if (next && candidates.length === 0) {
-      void loadCandidates(null);
-    }
+    setPickerOpen((open) => !open);
   }
 
-  async function addGeneration(generation: Generation) {
-    setBusy(true);
+  async function addSelectedMedia(media: MediaItem[]) {
+    const generationIds = [...new Set(media.map((item) => item.generationId))];
+    if (generationIds.length === 0) return;
     setError("");
+    setBusy(true);
     try {
-      await addCreationItem(pageId, creationId, {
-        generationId: generation.id,
-        laneId: pickerLane.trim() || undefined,
-        parentItemId: pickerParent || undefined,
-      });
-      setCandidates((current) =>
-        current.filter((entry) => entry.id !== generation.id),
+      const grouped = new Set(
+        await groupedGenerationIds(pageId, generationIds),
       );
+      if (grouped.size > 0) {
+        throw new Error(
+          `${grouped.size} selected ${
+            grouped.size === 1 ? "generation is" : "generations are"
+          } already in a creation. Deselect ${
+            grouped.size === 1 ? "that file" : "those files"
+          } and try again.`,
+        );
+      }
+      for (const generationId of generationIds) {
+        await addCreationItem(pageId, creationId, {
+          generationId,
+          laneId: pickerLane.trim() || undefined,
+          parentItemId: pickerParent || undefined,
+        });
+      }
       await refresh();
+      setPickerOpen(false);
     } catch (requestError) {
-      setError(errorMessage(requestError, "Unable to add generation"));
+      throw new Error(
+        errorMessage(requestError, "Unable to add selected files"),
+      );
     } finally {
       setBusy(false);
     }
@@ -270,6 +322,7 @@ export function CreationDetailPage({
   }
 
   function dragProps(index: number) {
+    if (sortOrder !== "manual") return {};
     return {
       draggable: !busy,
       onDragStart: (event: DragEvent<HTMLLIElement>) => {
@@ -373,7 +426,7 @@ export function CreationDetailPage({
   function renderFeed() {
     return (
       <ol className="creation-list">
-        {items.map((item, index) => (
+        {displayedItems.map((item, index) => (
           <li
             className={`panel creation-card${dragId === item.id ? " is-dragging" : ""}`}
             key={item.id}
@@ -382,7 +435,7 @@ export function CreationDetailPage({
             <span className="creation-drag-handle" aria-hidden="true">
               <GripVertical size={16} />
             </span>
-            <Thumb generation={item.generation} />
+            <Thumb generation={item.generation} onOpen={openMedia} />
             <div className="creation-card-body">
               <p className="creation-card-prompt">
                 {item.generation.inputs.prompt || "No prompt"}
@@ -395,6 +448,7 @@ export function CreationDetailPage({
               busy={busy}
               index={index}
               total={items.length}
+              reorderable={sortOrder === "manual"}
               onMove={(delta) => move(index, delta)}
               onRemove={() => void removeItem(item)}
             />
@@ -406,7 +460,7 @@ export function CreationDetailPage({
 
   function renderGrouped() {
     const groups = new Map<string, CreationItem[]>();
-    items.forEach((item) => {
+    displayedItems.forEach((item) => {
       const label = toolLabel(item.generation);
       groups.set(label, [...(groups.get(label) ?? []), item]);
     });
@@ -420,7 +474,7 @@ export function CreationDetailPage({
             <ul className="creation-grid">
               {group.map((item) => (
                 <li className="creation-grid-item" key={item.id}>
-                  <Thumb generation={item.generation} />
+                  <Thumb generation={item.generation} onOpen={openMedia} />
                   <p>{item.generation.inputs.prompt || "No prompt"}</p>
                   <button
                     type="button"
@@ -443,7 +497,7 @@ export function CreationDetailPage({
   function renderStoryboard() {
     return (
       <ol className="creation-steps">
-        {items.map((item, index) => {
+        {displayedItems.map((item, index) => {
           const parentIndex = item.parentItemId
             ? itemIndexById.get(item.parentItemId)
             : undefined;
@@ -457,7 +511,7 @@ export function CreationDetailPage({
                 <GripVertical size={16} />
               </span>
               <span className="creation-step-number">{index + 1}</span>
-              <Thumb generation={item.generation} />
+              <Thumb generation={item.generation} onOpen={openMedia} />
               <div className="creation-card-body">
                 <p className="creation-card-prompt">
                   {item.generation.inputs.prompt || "No prompt"}
@@ -485,6 +539,7 @@ export function CreationDetailPage({
                 busy={busy}
                 index={index}
                 total={items.length}
+                reorderable={sortOrder === "manual"}
                 onMove={(delta) => move(index, delta)}
                 onRemove={() => void removeItem(item)}
               />
@@ -584,6 +639,68 @@ export function CreationDetailPage({
         </p>
       )}
 
+      <div className="creation-toolbar">
+        <div className="creation-toolbar-main">
+          <div className="creation-view-controls">
+            <div className="creation-view-switch" role="group" aria-label="View">
+              {VIEWS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={view === option.value ? "is-active" : ""}
+                  aria-pressed={view === option.value}
+                  onClick={() => setView(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <label className="creation-sort-control">
+              Sort
+              <select
+                value={sortOrder}
+                onChange={(event) =>
+                  setSortOrder(event.target.value as SortOrder)
+                }
+              >
+                <option value="latest">Latest</option>
+                <option value="earliest">Earliest</option>
+                <option value="manual">Manual order</option>
+              </select>
+            </label>
+          </div>
+          <p className="creation-view-hint">
+            {sortOrder === "manual"
+              ? VIEW_HINTS[view]
+              : `Items sorted by when they were added, ${
+                  sortOrder === "latest" ? "latest" : "earliest"
+                } first. Select Manual order to reorder them.`}
+          </p>
+        </div>
+        <div className="creation-toolbar-actions">
+          <button
+            type="button"
+            className="primary-button"
+            aria-expanded={newGenerationOpen}
+            aria-controls="creation-new-generation"
+            onClick={() => {
+              setNewGenerationOpen((open) => !open);
+              setSelectedTool("");
+            }}
+          >
+            {newGenerationOpen ? "Close generator" : "New generation"}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={togglePicker}
+            aria-expanded={pickerOpen}
+          >
+            {pickerOpen ? "Close picker" : "Add existing"}
+          </button>
+        </div>
+      </div>
+
       {newGenerationOpen && (
         <section
           id="creation-new-generation"
@@ -651,65 +768,17 @@ export function CreationDetailPage({
         </section>
       )}
 
-      <div className="creation-toolbar">
-        <div className="creation-toolbar-main">
-          <div className="creation-view-switch" role="group" aria-label="View">
-            {VIEWS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={view === option.value ? "is-active" : ""}
-                aria-pressed={view === option.value}
-                onClick={() => setView(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <p className="creation-view-hint">{VIEW_HINTS[view]}</p>
-        </div>
-        <div className="creation-toolbar-actions">
-          <button
-            type="button"
-            className="primary-button"
-            aria-expanded={newGenerationOpen}
-            aria-controls="creation-new-generation"
-            onClick={() => {
-              setNewGenerationOpen((open) => !open);
-              setSelectedTool("");
-            }}
-          >
-            {newGenerationOpen ? "Close generator" : "New generation"}
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={togglePicker}
-            aria-expanded={pickerOpen}
-          >
-            {pickerOpen ? "Close picker" : "Add existing"}
-          </button>
-        </div>
-      </div>
-
       {pickerOpen && (
-        <div className="creation-picker-backdrop" onClick={togglePicker}>
-          <section
-            className="panel creation-picker"
-            aria-label="Add existing generations"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="creation-picker-header">
-              <h3>Add existing generations</h3>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label="Close picker"
-                onClick={togglePicker}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
+        <LibraryPicker
+          pageId={pageId}
+          accept={["image/*", "video/*"]}
+          limit={24}
+          excludeGenerationIds={new Set(items.map((item) => item.generation.id))}
+          title="Add existing files"
+          actionLabel="Add selected"
+          onSelect={addSelectedMedia}
+          onClose={togglePicker}
+          beforeGrid={
             <div className="creation-picker-options">
               <label>
                 Lane for new items
@@ -729,7 +798,7 @@ export function CreationDetailPage({
                   onChange={(event) => setPickerParent(event.target.value)}
                 >
                   <option value="">Nothing</option>
-                  {items.map((item, index) => (
+                  {displayedItems.map((item, index) => (
                     <option key={item.id} value={item.id}>
                       Step {index + 1}
                     </option>
@@ -738,41 +807,8 @@ export function CreationDetailPage({
                 <small>Places added items after this step in the storyboard.</small>
               </label>
             </div>
-            {candidates.length === 0 && !candidatesLoading ? (
-              <p className="status">
-                No ungrouped generations here. Use New generation to create one
-                in this creation.
-              </p>
-            ) : (
-              <ul className="creation-grid">
-                {candidates.map((generation) => (
-                  <li className="creation-grid-item" key={generation.id}>
-                    <Thumb generation={generation} />
-                    <p>{generation.inputs.prompt || "No prompt"}</p>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      disabled={busy}
-                      onClick={() => void addGeneration(generation)}
-                    >
-                      Add
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {candidateCursor && (
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={candidatesLoading}
-                onClick={() => void loadCandidates(candidateCursor)}
-              >
-                {candidatesLoading ? "Loading…" : "Load more"}
-              </button>
-            )}
-          </section>
-        </div>
+          }
+        />
       )}
 
       <datalist id="creation-lane-options">
@@ -811,6 +847,7 @@ export function CreationDetailPage({
       ) : (
         renderStoryboard()
       )}
+
     </>
   );
 
@@ -831,6 +868,21 @@ export function CreationDetailPage({
         content
       )}
       {confirmDialog}
+      {viewing && (
+        <MediaViewer
+          item={viewing}
+          items={viewerItems}
+          alt={
+            displayedItems
+              .map((entry) => entry.generation)
+              .find((generation) =>
+                generation.outputs.some((output) => output.id === viewing.id),
+              )?.inputs.prompt
+          }
+          onSelect={(item) => showMedia(item)}
+          onClose={closeMediaViewer}
+        />
+      )}
     </AppShell>
   );
 }
@@ -839,37 +891,43 @@ function CardActions({
   busy,
   index,
   total,
+  reorderable,
   onMove,
   onRemove,
 }: {
   busy: boolean;
   index: number;
   total: number;
+  reorderable: boolean;
   onMove: (delta: number) => void;
   onRemove: () => void;
 }) {
   return (
     <div className="creation-card-actions">
-      <button
-        type="button"
-        className="icon-button"
-        aria-label="Move up"
-        title="Move up"
-        disabled={busy || index === 0}
-        onClick={() => onMove(-1)}
-      >
-        <ChevronUp size={16} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className="icon-button"
-        aria-label="Move down"
-        title="Move down"
-        disabled={busy || index === total - 1}
-        onClick={() => onMove(1)}
-      >
-        <ChevronDown size={16} aria-hidden="true" />
-      </button>
+      {reorderable && (
+        <>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Move up"
+            title="Move up"
+            disabled={busy || index === 0}
+            onClick={() => onMove(-1)}
+          >
+            <ChevronUp size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Move down"
+            title="Move down"
+            disabled={busy || index === total - 1}
+            onClick={() => onMove(1)}
+          >
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+        </>
+      )}
       <button
         type="button"
         className="secondary-button danger-button creation-card-remove"
