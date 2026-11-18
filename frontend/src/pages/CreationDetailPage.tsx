@@ -672,9 +672,9 @@ export function CreationDetailPage({
           <p className="creation-view-hint">
             {sortOrder === "manual"
               ? VIEW_HINTS[view]
-              : `Items sorted by when they were added, ${
+              : `Sorted by date added, ${
                   sortOrder === "latest" ? "latest" : "earliest"
-                } first. Select Manual order to reorder them.`}
+                } first. Choose Manual order to reorder.`}
           </p>
         </div>
         <div className="creation-toolbar-actions">

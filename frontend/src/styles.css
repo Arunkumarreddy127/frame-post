@@ -4876,6 +4876,18 @@ h2 {
   outline-offset: 2px;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .creation-thumb-button img,
+  .creation-thumb-button video {
+    transition: transform 0.2s ease;
+  }
+
+  .creation-thumb-button:hover img,
+  .creation-thumb-button:hover video {
+    transform: scale(1.03);
+  }
+}
+
 .creation-grid-item p {
   margin: 0;
   font-size: 0.8rem;
@@ -5089,8 +5101,10 @@ h2 {
   }
 
   .creation-list .creation-card {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
   }
 
   .creation-list .creation-card .creation-thumb {
@@ -5099,7 +5113,12 @@ h2 {
     aspect-ratio: 4 / 3;
   }
 
+  .creation-list .creation-card .creation-card-prompt {
+    -webkit-line-clamp: 2;
+  }
+
   .creation-list .creation-card-actions {
     flex-wrap: wrap;
+    margin-top: auto;
   }
 }
