@@ -29,7 +29,9 @@ type GptImageGenPageProps = ShellRouteProps & {
   pageId?: string;
   embedded?: boolean;
   creationId?: string;
+  onGenerationTriggered?: () => void;
   onCreationItemAdded?: () => void;
+  onCreationItemError?: (message: string) => void;
 };
 
 const FALLBACK_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
@@ -59,7 +61,9 @@ export function GptImageGenPage({
   pageId,
   embedded = false,
   creationId: creationIdProp,
+  onGenerationTriggered,
   onCreationItemAdded,
+  onCreationItemError,
 }: GptImageGenPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const [searchParams] = useSearchParams();
@@ -285,6 +289,7 @@ export function GptImageGenPage({
     try {
       const generation = await createImageGeneration(input, activePageId);
       prepend(generation);
+      onGenerationTriggered?.();
       if (creationId) {
         try {
           await addCreationItem(activePageId, creationId, {
@@ -292,9 +297,9 @@ export function GptImageGenPage({
           });
           onCreationItemAdded?.();
         } catch (attachError) {
-          setError(
-            `Generated, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`,
-          );
+          const message = `Generated, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`;
+          if (onCreationItemError) onCreationItemError(message);
+          else setError(message);
         }
       }
     } catch (requestError) {

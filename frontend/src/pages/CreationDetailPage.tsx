@@ -742,10 +742,14 @@ export function CreationDetailPage({
               pageId={pageId}
               embedded
               creationId={creationId}
+              onGenerationTriggered={() => setNewGenerationOpen(false)}
               onCreationItemAdded={() => {
                 void refresh().catch((requestError: unknown) =>
                   setError(errorMessage(requestError, "Unable to refresh creation")),
                 );
+              }}
+              onCreationItemError={(message) => {
+                setError(message);
               }}
             />
           )}
@@ -758,11 +762,13 @@ export function CreationDetailPage({
               workflowKey={selectedTool.slice(3)}
               embedded
               creationId={creationId}
+              onGenerationTriggered={() => setNewGenerationOpen(false)}
               onCreationItemAdded={() => {
                 void refresh().catch((requestError: unknown) =>
                   setError(errorMessage(requestError, "Unable to refresh creation")),
                 );
               }}
+              onCreationItemError={(message) => setError(message)}
             />
           )}
         </section>

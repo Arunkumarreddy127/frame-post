@@ -32,7 +32,9 @@ type RunningHubWorkflowPageProps = ShellRouteProps & {
   workflowKey?: string;
   embedded?: boolean;
   creationId?: string;
+  onGenerationTriggered?: () => void;
   onCreationItemAdded?: () => void;
+  onCreationItemError?: (message: string) => void;
 };
 
 const INSTANCE_TYPES: { value: InstanceType; label: string }[] = [
@@ -76,7 +78,9 @@ export function RunningHubWorkflowPage({
   workflowKey: workflowKeyProp,
   embedded = false,
   creationId: creationIdProp,
+  onGenerationTriggered,
   onCreationItemAdded,
+  onCreationItemError,
 }: RunningHubWorkflowPageProps) {
   const { pageId: routePageId, workflowKey: routeWorkflowKey = "" } = useParams<{
     pageId?: string;
@@ -262,6 +266,7 @@ export function RunningHubWorkflowPage({
         },
       );
       prepend(created);
+      onGenerationTriggered?.();
       if (creationId && activePageId) {
         try {
           await addCreationItem(activePageId, creationId, {
@@ -269,9 +274,9 @@ export function RunningHubWorkflowPage({
           });
           onCreationItemAdded?.();
         } catch (attachError) {
-          setError(
-            `Started, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`,
-          );
+          const message = `Started, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`;
+          if (onCreationItemError) onCreationItemError(message);
+          else setError(message);
         }
       }
       fileInputs.forEach((input) => {
