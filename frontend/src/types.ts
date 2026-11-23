@@ -158,6 +158,7 @@ export type Workflow = {
   label: string;
   description: string;
   group: string;
+  tool: CreationTool;
   configured: boolean;
   inputs: WorkflowInput[];
   outputType: string;
@@ -180,12 +181,55 @@ export type Creation = {
   updatedAt: string;
 };
 
+export type CreationTool = "IMAGE" | "VIDEO" | "EDIT" | "UPSCALE" | "CHAT";
+
 export type CreationItem = {
   id: string;
   creationId: string;
   position: number;
-  laneId: string | null;
   parentItemId: string | null;
+  sceneId: string | null;
+  shotId: string | null;
+  tool: CreationTool | null;
   addedAt: string;
   generation: Generation;
+};
+
+export type ShotStatus =
+  | "NOT_STARTED"
+  | "IMAGE_NEEDED"
+  | "IMAGE_READY"
+  | "VIDEO_READY"
+  | "FINAL";
+
+export type Shot = {
+  id: string;
+  creationId: string;
+  sceneId: string;
+  position: number;
+  title: string;
+  brief: string | null;
+  shotSize: string | null;
+  shotTypes: string[];
+  movement: string | null;
+  durationSeconds: number | null;
+  finalItemId: string | null;
+  status: ShotStatus;
+  invocations: CreationItem[];
+};
+
+export type Scene = {
+  id: string;
+  creationId: string;
+  position: number;
+  title: string;
+  description: string | null;
+  outputs: CreationItem[];
+  shots: Shot[];
+};
+
+export type CreationOutline = {
+  creationId: string;
+  scenes: Scene[];
+  unassigned: CreationItem[];
 };

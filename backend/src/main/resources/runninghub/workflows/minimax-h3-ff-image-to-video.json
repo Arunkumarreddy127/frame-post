@@ -3,6 +3,7 @@
   "label": "Minimax H3 - FF Image to Video",
   "description": "Turn a still image into a short video with Minimax H3 (first-frame).",
   "group": "RH",
+  "tool": "VIDEO",
   "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF",
   "inputs": [
     {

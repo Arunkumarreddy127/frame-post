@@ -1,5 +1,10 @@
 import { API_BASE_URL } from "./api";
-import type { Creation, CreationItem } from "./types";
+import type {
+  Creation,
+  CreationItem,
+  CreationOutline,
+  CreationTool,
+} from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -67,7 +72,13 @@ export function listCreationItems(pageId: string | undefined, id: string) {
 export function addCreationItem(
   pageId: string | undefined,
   id: string,
-  placement: { generationId: string; laneId?: string; parentItemId?: string },
+  placement: {
+    generationId: string;
+    parentItemId?: string;
+    shotId?: string;
+    sceneId?: string;
+    tool?: CreationTool;
+  },
 ) {
   return request<CreationItem>(
     scoped(pageId, `/creations/${id}/items`),
@@ -88,7 +99,7 @@ export function removeCreationItem(
 export function reorderCreationItems(
   pageId: string | undefined,
   id: string,
-  items: { itemId: string; laneId: string | null }[],
+  items: { itemId: string }[],
 ) {
   return request<CreationItem[]>(
     scoped(pageId, `/creations/${id}/items/order`),
@@ -96,15 +107,115 @@ export function reorderCreationItems(
   );
 }
 
-/** Returns the subset of these generation ids that already belong to a creation. */
-export function groupedGenerationIds(
+export type SceneDraft = { title: string; description: string | null };
+
+export type ShotDraft = {
+  sceneId: string;
+  title: string;
+  brief: string | null;
+  shotSize: string | null;
+  shotTypes: string[];
+  movement: string | null;
+  durationSeconds: number | null;
+};
+
+export function getOutline(pageId: string | undefined, id: string) {
+  return request<CreationOutline>(scoped(pageId, `/creations/${id}/outline`));
+}
+
+export function createScene(
   pageId: string | undefined,
-  generationIds: string[],
+  id: string,
+  draft: SceneDraft,
 ) {
-  const search = new URLSearchParams();
-  generationIds.forEach((id) => search.append("generationIds", id));
-  return request<string[]>(
-    scoped(pageId, `/creations/grouped?${search.toString()}`),
+  return request<void>(scoped(pageId, `/creations/${id}/scenes`), json("POST", draft));
+}
+
+export function updateScene(
+  pageId: string | undefined,
+  id: string,
+  sceneId: string,
+  draft: SceneDraft,
+) {
+  return request<void>(
+    scoped(pageId, `/creations/${id}/scenes/${sceneId}`),
+    json("PUT", draft),
+  );
+}
+
+export function deleteScene(pageId: string | undefined, id: string, sceneId: string) {
+  return request<void>(scoped(pageId, `/creations/${id}/scenes/${sceneId}`), {
+    method: "DELETE",
+  });
+}
+
+export function reorderScenes(
+  pageId: string | undefined,
+  id: string,
+  sceneIds: string[],
+) {
+  return request<void>(
+    scoped(pageId, `/creations/${id}/scenes/order`),
+    json("PUT", { sceneIds }),
+  );
+}
+
+export function createShot(pageId: string | undefined, id: string, draft: ShotDraft) {
+  return request<void>(scoped(pageId, `/creations/${id}/shots`), json("POST", draft));
+}
+
+export function updateShot(
+  pageId: string | undefined,
+  id: string,
+  shotId: string,
+  draft: Omit<ShotDraft, "sceneId">,
+) {
+  return request<void>(
+    scoped(pageId, `/creations/${id}/shots/${shotId}`),
+    json("PUT", draft),
+  );
+}
+
+export function deleteShot(pageId: string | undefined, id: string, shotId: string) {
+  return request<void>(scoped(pageId, `/creations/${id}/shots/${shotId}`), {
+    method: "DELETE",
+  });
+}
+
+export function reorderShots(
+  pageId: string | undefined,
+  id: string,
+  sceneId: string,
+  shotIds: string[],
+) {
+  return request<void>(
+    scoped(pageId, `/creations/${id}/shots/order`),
+    json("PUT", { sceneId, shotIds }),
+  );
+}
+
+export function setShotFinal(
+  pageId: string | undefined,
+  id: string,
+  shotId: string,
+  itemId: string | null,
+) {
+  return request<void>(
+    scoped(pageId, `/creations/${id}/shots/${shotId}/final`),
+    json("PUT", { itemId }),
+  );
+}
+
+/** Pass a null shotId to move an item back to Unassigned. */
+export function moveCreationItem(
+  pageId: string | undefined,
+  id: string,
+  itemId: string,
+  shotId: string | null,
+) {
+  return request<void>(
+    scoped(pageId, `/creations/${id}/items/${itemId}/shot`),
+    json("PUT", { shotId }),
   );
 }
 

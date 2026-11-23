@@ -31,22 +31,27 @@ public class CreationService {
 
     private static final int MAX_NAME_LENGTH = 120;
     private static final int MAX_DESCRIPTION_LENGTH = 2000;
-    private static final int MAX_LANE_LENGTH = 64;
     private static final int MAX_ID_LENGTH = 128;
 
     private final CreationRepository creations;
     private final CreationItemRepository items;
+    private final SceneRepository scenes;
+    private final ShotRepository shots;
     private final GenerationService generations;
     private final PageService pageService;
 
     public CreationService(
             CreationRepository creations,
             CreationItemRepository items,
+            SceneRepository scenes,
+            ShotRepository shots,
             GenerationService generations,
             PageService pageService
     ) {
         this.creations = creations;
         this.items = items;
+        this.scenes = scenes;
+        this.shots = shots;
         this.generations = generations;
         this.pageService = pageService;
     }
@@ -54,10 +59,11 @@ public class CreationService {
     public record CreationRequest(String name, String description) {
     }
 
-    public record AddItemRequest(String generationId, String laneId, String parentItemId) {
+    /** A shot id places the item in that shot. Without one, a scene id places it in the scene as an output. */
+    public record AddItemRequest(String generationId, String parentItemId, String shotId, String sceneId, String tool) {
     }
 
-    public record ItemPlacement(String itemId, String laneId) {
+    public record ItemPlacement(String itemId) {
     }
 
     public record ReorderRequest(List<ItemPlacement> items) {
@@ -79,8 +85,10 @@ public class CreationService {
             String id,
             String creationId,
             int position,
-            String laneId,
             String parentItemId,
+            String sceneId,
+            String shotId,
+            String tool,
             Instant addedAt,
             GenerationResponse generation
     ) {
@@ -139,6 +147,8 @@ public class CreationService {
         Creation creation = load(user, pageId, id);
         // Memberships go first: a crash then leaves an empty creation rather than generations locked to a missing one.
         items.deleteByCreationId(id);
+        shots.deleteByCreationId(id);
+        scenes.deleteByCreationId(id);
         creations.delete(creation);
     }
 
@@ -148,20 +158,39 @@ public class CreationService {
         return toItemResponses(user, pageId, items.findByCreationIdOrderByPositionAsc(id));
     }
 
-    /** Adds a generation to the end of the creation. Each generation can belong to only one creation. */
+    /** Adds a generation to the end of the creation. A generation can be added to several creations, but only once to each. */
     public CreationItemResponse addItem(User user, String pageId, String id, AddItemRequest request) {
         Creation creation = load(user, pageId, id);
         String generationId = requiredText(request.generationId(), "Generation", MAX_ID_LENGTH);
         GenerationResponse generation = generations.getMany(user, pageId, List.of(generationId)).stream()
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Generation not found"));
-        if (items.existsByGenerationId(generationId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Generation is already in a creation");
+        if (items.existsByCreationIdAndGenerationId(id, generationId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Generation is already in this creation");
         }
         String parentItemId = optionalText(request.parentItemId(), "Parent item", MAX_ID_LENGTH);
-        if (parentItemId != null && items.findByIdAndCreationId(parentItemId, id).isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent item is not in this creation");
+        String shotId = optionalText(request.shotId(), "Shot", MAX_ID_LENGTH);
+        String sceneId = null;
+        if (shotId != null) {
+            Shot shot = shots.findByIdAndCreationId(shotId, id)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Shot is not in this creation"));
+            sceneId = shot.sceneId();
+        } else {
+            String requestedSceneId = optionalText(request.sceneId(), "Scene", MAX_ID_LENGTH);
+            if (requestedSceneId != null) {
+                scenes.findByIdAndCreationId(requestedSceneId, id)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Scene is not in this creation"));
+                sceneId = requestedSceneId;
+            }
         }
+        if (parentItemId != null) {
+            CreationItem parent = items.findByIdAndCreationId(parentItemId, id)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent item is not in this creation"));
+            if (!Objects.equals(parent.shotId(), shotId) || !Objects.equals(parent.sceneId(), sceneId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parent item belongs to a different shot or scene");
+            }
+        }
+        String tool = ShotFields.resolveTool(request.tool(), generation.mediaType());
         int position = items.findFirstByCreationIdOrderByPositionDesc(id)
                 .map(last -> last.position() + 1)
                 .orElse(0);
@@ -172,26 +201,16 @@ public class CreationService {
                     id,
                     generationId,
                     position,
-                    optionalText(request.laneId(), "Lane", MAX_LANE_LENGTH),
                     parentItemId,
+                    sceneId,
+                    shotId,
+                    tool,
                     Instant.now()));
         } catch (DuplicateKeyException exception) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Generation is already in a creation", exception);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Generation is already in this creation", exception);
         }
         touch(creation);
-        return new CreationItemResponse(saved.id(), saved.creationId(), saved.position(), saved.laneId(),
-                saved.parentItemId(), saved.createdAt(), generation);
-    }
-
-    /** Which of the given generations already belong to a creation. Only generations in scope are considered. */
-    public List<String> groupedGenerationIds(User user, String pageId, List<String> generationIds) {
-        List<String> inScope = generations.getMany(user, pageId, generationIds).stream()
-                .map(GenerationResponse::id)
-                .toList();
-        if (inScope.isEmpty()) {
-            return List.of();
-        }
-        return items.findByGenerationIdIn(inScope).stream().map(CreationItem::generationId).toList();
+        return toItemResponse(saved, generation);
     }
 
     public void removeItem(User user, String pageId, String id, String itemId) {
@@ -203,7 +222,7 @@ public class CreationService {
     }
 
     /**
-     * Sets the full order and lane of a creation. The request must name every current item exactly once,
+     * Sets the full order of a creation. The request must name every current item exactly once,
      * so a stale client cannot silently drop or duplicate memberships.
      */
     public List<CreationItemResponse> reorder(User user, String pageId, String id, ReorderRequest request) {
@@ -232,8 +251,10 @@ public class CreationService {
                     old.creationId(),
                     old.generationId(),
                     position,
-                    optionalText(placement.laneId(), "Lane", MAX_LANE_LENGTH),
                     old.parentItemId(),
+                    old.sceneId(),
+                    old.shotId(),
+                    old.tool(),
                     old.createdAt()));
         }
         items.saveAll(reordered);
@@ -241,14 +262,14 @@ public class CreationService {
         return toItemResponses(user, pageId, items.findByCreationIdOrderByPositionAsc(id));
     }
 
-    private Creation load(User user, String pageId, String id) {
+    Creation load(User user, String pageId, String id) {
         validateScope(user, pageId);
         return creations.findByIdAndUserId(id, user.id())
                 .filter(creation -> Objects.equals(creation.pageId(), pageId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Creation not found"));
     }
 
-    private void touch(Creation creation) {
+    void touch(Creation creation) {
         creations.save(new Creation(
                 creation.id(),
                 creation.userId(),
@@ -259,7 +280,7 @@ public class CreationService {
                 Instant.now()));
     }
 
-    private List<CreationItemResponse> toItemResponses(User user, String pageId, List<CreationItem> rows) {
+    List<CreationItemResponse> toItemResponses(User user, String pageId, List<CreationItem> rows) {
         if (rows.isEmpty()) {
             return List.of();
         }
@@ -268,9 +289,13 @@ public class CreationService {
                 .collect(Collectors.toMap(GenerationResponse::id, Function.identity()));
         return rows.stream()
                 .filter(row -> byId.containsKey(row.generationId()))
-                .map(row -> new CreationItemResponse(row.id(), row.creationId(), row.position(), row.laneId(),
-                        row.parentItemId(), row.createdAt(), byId.get(row.generationId())))
+                .map(row -> toItemResponse(row, byId.get(row.generationId())))
                 .toList();
+    }
+
+    static CreationItemResponse toItemResponse(CreationItem row, GenerationResponse generation) {
+        return new CreationItemResponse(row.id(), row.creationId(), row.position(), row.parentItemId(),
+                row.sceneId(), row.shotId(), row.tool(), row.createdAt(), generation);
     }
 
     private CreationResponse toResponse(Creation creation, List<CreationItem> members) {
@@ -295,7 +320,7 @@ public class CreationService {
         }
     }
 
-    private static String requiredText(String value, String field, int maxLength) {
+    static String requiredText(String value, String field, int maxLength) {
         String trimmed = value == null ? "" : value.trim();
         if (trimmed.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required");
@@ -307,7 +332,7 @@ public class CreationService {
         return trimmed;
     }
 
-    private static String optionalText(String value, String field, int maxLength) {
+    static String optionalText(String value, String field, int maxLength) {
         return value == null || value.isBlank() ? null : requiredText(value, field, maxLength);
     }
 }

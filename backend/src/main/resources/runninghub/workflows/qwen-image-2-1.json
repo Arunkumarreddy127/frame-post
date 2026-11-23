@@ -3,6 +3,7 @@
     "label": "Qwen Image 2.1",
     "description": "Generate an image with Qwen Image 2.1.",
     "group": "RH",
+    "tool": "IMAGE",
     "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_QWEN_IMAGE_2_1",
     "inputs": [
         {

@@ -24,6 +24,15 @@ import com.example.framepost.creation.CreationService.CreationItemResponse;
 import com.example.framepost.creation.CreationService.CreationRequest;
 import com.example.framepost.creation.CreationService.CreationResponse;
 import com.example.framepost.creation.CreationService.ReorderRequest;
+import com.example.framepost.creation.ProductionService.FinalFrameRequest;
+import com.example.framepost.creation.ProductionService.MoveItemRequest;
+import com.example.framepost.creation.ProductionService.OutlineResponse;
+import com.example.framepost.creation.ProductionService.SceneOrderRequest;
+import com.example.framepost.creation.ProductionService.SceneRequest;
+import com.example.framepost.creation.ProductionService.SceneResponse;
+import com.example.framepost.creation.ProductionService.ShotOrderRequest;
+import com.example.framepost.creation.ProductionService.ShotRequest;
+import com.example.framepost.creation.ProductionService.ShotResponse;
 
 /**
  * Creations API. Each route also exists under {@code /api/pages/{pageId}} to scope it to one page.
@@ -35,10 +44,12 @@ public class CreationController {
     private static final String COOKIE_NAME = "framepost_session";
 
     private final CreationService service;
+    private final ProductionService production;
     private final AuthService authService;
 
-    public CreationController(CreationService service, AuthService authService) {
+    public CreationController(CreationService service, ProductionService production, AuthService authService) {
         this.service = service;
+        this.production = production;
         this.authService = authService;
     }
 
@@ -57,15 +68,6 @@ public class CreationController {
             HttpServletRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(currentUser(request), pageId, body));
-    }
-
-    @GetMapping({"/creations/grouped", "/pages/{pageId}/creations/grouped"})
-    public List<String> grouped(
-            @PathVariable(required = false) String pageId,
-            @RequestParam List<String> generationIds,
-            HttpServletRequest request
-    ) {
-        return service.groupedGenerationIds(currentUser(request), pageId, generationIds);
     }
 
     @GetMapping({"/creations/{id}", "/pages/{pageId}/creations/{id}"})
@@ -137,6 +139,123 @@ public class CreationController {
             HttpServletRequest request
     ) {
         return service.reorder(currentUser(request), pageId, id, body);
+    }
+
+    @GetMapping({"/creations/{id}/outline", "/pages/{pageId}/creations/{id}/outline"})
+    public OutlineResponse outline(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            HttpServletRequest request
+    ) {
+        return production.outline(currentUser(request), pageId, id);
+    }
+
+    @PostMapping({"/creations/{id}/scenes", "/pages/{pageId}/creations/{id}/scenes"})
+    public ResponseEntity<SceneResponse> createScene(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @RequestBody SceneRequest body,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(production.createScene(currentUser(request), pageId, id, body));
+    }
+
+    @PutMapping({"/creations/{id}/scenes/order", "/pages/{pageId}/creations/{id}/scenes/order"})
+    public OutlineResponse reorderScenes(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @RequestBody SceneOrderRequest body,
+            HttpServletRequest request
+    ) {
+        return production.reorderScenes(currentUser(request), pageId, id, body);
+    }
+
+    @PutMapping({"/creations/{id}/scenes/{sceneId}", "/pages/{pageId}/creations/{id}/scenes/{sceneId}"})
+    public SceneResponse updateScene(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @PathVariable String sceneId,
+            @RequestBody SceneRequest body,
+            HttpServletRequest request
+    ) {
+        return production.updateScene(currentUser(request), pageId, id, sceneId, body);
+    }
+
+    @DeleteMapping({"/creations/{id}/scenes/{sceneId}", "/pages/{pageId}/creations/{id}/scenes/{sceneId}"})
+    public ResponseEntity<Void> deleteScene(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @PathVariable String sceneId,
+            HttpServletRequest request
+    ) {
+        production.deleteScene(currentUser(request), pageId, id, sceneId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping({"/creations/{id}/shots", "/pages/{pageId}/creations/{id}/shots"})
+    public ResponseEntity<ShotResponse> createShot(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @RequestBody ShotRequest body,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(production.createShot(currentUser(request), pageId, id, body));
+    }
+
+    @PutMapping({"/creations/{id}/shots/order", "/pages/{pageId}/creations/{id}/shots/order"})
+    public OutlineResponse reorderShots(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @RequestBody ShotOrderRequest body,
+            HttpServletRequest request
+    ) {
+        return production.reorderShots(currentUser(request), pageId, id, body);
+    }
+
+    @PutMapping({"/creations/{id}/shots/{shotId}", "/pages/{pageId}/creations/{id}/shots/{shotId}"})
+    public ShotResponse updateShot(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @PathVariable String shotId,
+            @RequestBody ShotRequest body,
+            HttpServletRequest request
+    ) {
+        return production.updateShot(currentUser(request), pageId, id, shotId, body);
+    }
+
+    @DeleteMapping({"/creations/{id}/shots/{shotId}", "/pages/{pageId}/creations/{id}/shots/{shotId}"})
+    public ResponseEntity<Void> deleteShot(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @PathVariable String shotId,
+            HttpServletRequest request
+    ) {
+        production.deleteShot(currentUser(request), pageId, id, shotId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping({"/creations/{id}/shots/{shotId}/final", "/pages/{pageId}/creations/{id}/shots/{shotId}/final"})
+    public ShotResponse setFinal(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @PathVariable String shotId,
+            @RequestBody FinalFrameRequest body,
+            HttpServletRequest request
+    ) {
+        return production.setFinal(currentUser(request), pageId, id, shotId, body);
+    }
+
+    @PutMapping({"/creations/{id}/items/{itemId}/shot", "/pages/{pageId}/creations/{id}/items/{itemId}/shot"})
+    public CreationItemResponse moveItem(
+            @PathVariable(required = false) String pageId,
+            @PathVariable String id,
+            @PathVariable String itemId,
+            @RequestBody MoveItemRequest body,
+            HttpServletRequest request
+    ) {
+        return production.moveItem(currentUser(request), pageId, id, itemId, body);
     }
 
     private User currentUser(HttpServletRequest request) {

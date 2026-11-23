@@ -23,12 +23,19 @@ import {
   CreationTargetBanner,
   creationQuery,
 } from "../components/creations/CreationTargetBanner";
-import type { Generation, MediaItem, ShellRouteProps } from "../types";
+import {
+  parseCreationTool,
+  useShotTarget,
+} from "../components/creations/shotTarget";
+import type { CreationTool, Generation, MediaItem, ShellRouteProps } from "../types";
 
 type GptImageGenPageProps = ShellRouteProps & {
   pageId?: string;
   embedded?: boolean;
   creationId?: string;
+  shotId?: string | null;
+  sceneId?: string | null;
+  shotTool?: CreationTool | null;
   onGenerationTriggered?: () => void;
   onCreationItemAdded?: () => void;
   onCreationItemError?: (message: string) => void;
@@ -61,6 +68,9 @@ export function GptImageGenPage({
   pageId,
   embedded = false,
   creationId: creationIdProp,
+  shotId: shotIdProp,
+  sceneId: sceneIdProp,
+  shotTool: shotToolProp,
   onGenerationTriggered,
   onCreationItemAdded,
   onCreationItemError,
@@ -69,12 +79,25 @@ export function GptImageGenPage({
   const [searchParams] = useSearchParams();
   const activePageId = pageId ?? routePageId;
   const creationId = creationIdProp ?? searchParams.get("creationId");
+  const shotId = embedded ? (shotIdProp ?? null) : searchParams.get("shotId");
+  const sceneId = embedded ? (sceneIdProp ?? null) : searchParams.get("sceneId");
+  const shotTool = embedded
+    ? (shotToolProp ?? null)
+    : parseCreationTool(searchParams.get("tool"));
+  const shotTarget = useShotTarget(activePageId, creationId, shotId);
   const createPath =
     (activePageId ? `/pages/${activePageId}/create` : "/create") +
-    creationQuery(creationId);
+    creationQuery(creationId, { shotId, sceneId, tool: shotTool });
 
   const [models, setModels] = useState(FALLBACK_MODELS);
   const [prompt, setPrompt] = useState("");
+  const prefilledShotId = useRef<string | null>(null);
+  useEffect(() => {
+    const brief = shotTarget?.shot.brief?.trim();
+    if (!shotId || !brief || prefilledShotId.current === shotId) return;
+    prefilledShotId.current = shotId;
+    setPrompt((current) => (current.trim() ? current : brief));
+  }, [shotId, shotTarget]);
   const [model, setModel] = useState(FALLBACK_MODELS[0]);
   const [size, setSize] = useState("auto");
   const [quality, setQuality] = useState("auto");
@@ -294,6 +317,11 @@ export function GptImageGenPage({
         try {
           await addCreationItem(activePageId, creationId, {
             generationId: generation.id,
+            ...(shotId
+              ? { shotId, tool: "IMAGE" as const }
+              : sceneId
+                ? { sceneId, tool: "IMAGE" as const }
+                : {}),
           });
           onCreationItemAdded?.();
         } catch (attachError) {
@@ -336,6 +364,9 @@ export function GptImageGenPage({
             <CreationTargetBanner
               pageId={activePageId}
               creationId={creationId}
+              shotId={shotId}
+              sceneId={sceneId}
+              tool={shotId || sceneId ? "IMAGE" : null}
             />
           )}
         </>

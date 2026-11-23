@@ -3,6 +3,7 @@
   "label": "Minimax H3 - Single Image Reference",
   "description": "Turn a reference image into a short video with Minimax H3.",
   "group": "RH",
+  "tool": "VIDEO",
   "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_SINGLE_IMAGE_REFERENCE",
   "inputs": [
     {

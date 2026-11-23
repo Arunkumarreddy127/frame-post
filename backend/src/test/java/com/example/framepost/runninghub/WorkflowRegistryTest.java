@@ -86,7 +86,7 @@ class WorkflowRegistryTest {
                 .find(MINIMAX).orElseThrow();
         TransformDefinition unknown = new TransformDefinition("noSuchTransform", Map.of(), Map.of(), Map.of());
         WorkflowDefinition broken = new WorkflowDefinition(
-                base.key(), base.label(), base.description(), base.group(), base.workflowIdEnv(),
+                base.key(), base.label(), base.description(), base.group(), base.tool(), base.workflowIdEnv(),
                 base.inputs(), base.nodeMappings(), List.of(unknown), base.output());
 
         assertThrows(IllegalStateException.class,
@@ -119,7 +119,7 @@ class WorkflowRegistryTest {
 
     private static WorkflowDefinition withNodeMappings(WorkflowDefinition base, List<NodeMapping> mappings) {
         return new WorkflowDefinition(
-                base.key(), base.label(), base.description(), base.group(), base.workflowIdEnv(),
+                base.key(), base.label(), base.description(), base.group(), base.tool(), base.workflowIdEnv(),
                 base.inputs(), mappings, base.transforms(), base.output());
     }
 }

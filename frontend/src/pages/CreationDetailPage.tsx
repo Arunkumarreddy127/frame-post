@@ -2,21 +2,33 @@ import {
   useEffect,
   useMemo,
   useState,
-  type DragEvent,
   type FormEvent,
 } from "react";
 import {
-  ChevronDown,
-  ChevronUp,
-  GripVertical,
+  ChevronRight,
+  Clock,
+  Layers,
   Pencil,
-  Play,
+  Plus,
   Trash2,
 } from "lucide-react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { useConfirm } from "../components/ConfirmDialog";
 import { useFilesWorkspaceContext } from "../components/files/FilesWorkspaceProvider";
+import {
+  toolLabel,
+} from "../components/creations/CreationThumb";
+import { ProductionBoard } from "../components/creations/ProductionBoard";
+import { SceneWorkspace } from "../components/creations/SceneWorkspace";
+import { ShotWorkspace } from "../components/creations/ShotWorkspace";
+import { adjacentShots, findShot } from "../components/creations/shotTarget";
+import { adjacentScenes, findScene } from "../components/creations/sceneTarget";
 import { LibraryPicker } from "../components/library/LibraryPicker";
 import { MediaViewer } from "../components/media/MediaViewer";
 import { GptImageGenPage } from "./GptImageGenPage";
@@ -26,11 +38,9 @@ import {
   deleteCreation,
   errorMessage,
   getCreation,
-  groupedGenerationIds,
+  getOutline,
   listCreationItems,
   notifyCreationsChanged,
-  removeCreationItem,
-  reorderCreationItems,
   updateCreation,
 } from "../creationApi";
 import { getCatalog } from "../generationApi";
@@ -38,75 +48,26 @@ import { formatDate } from "../format";
 import type {
   Creation,
   CreationItem,
-  Generation,
+  CreationOutline,
+  CreationTool,
   MediaItem,
   ShellRouteProps,
   Workflow,
 } from "../types";
+import { ACTION_TOOLS, actionLabel } from "../creationTools";
 
 type CreationDetailPageProps = ShellRouteProps & { pageId?: string };
-type View = "feed" | "grouped" | "storyboard";
 type SortOrder = "latest" | "earliest" | "manual";
 
-const VIEWS: { value: View; label: string }[] = [
-  { value: "feed", label: "Feed" },
-  { value: "grouped", label: "Grouped by tool" },
-  { value: "storyboard", label: "Storyboard" },
-];
-
-const VIEW_HINTS: Record<View, string> = {
-  feed: "All items in order. Drag cards or use the arrows to reorder.",
-  grouped: "Items grouped by the tool that made them. Order is not editable here.",
-  storyboard: "Ordered steps with lanes and links to the step they follow.",
-};
-
-function toolLabel(generation: Generation) {
-  if (generation.provider === "OPENAI") return "GPT Image";
-  return generation.workflowKey
-    ? `RunningHub · ${generation.workflowKey}`
-    : "RunningHub";
-}
-
-function Thumb({
-  generation,
-  onOpen,
-}: {
-  generation: Generation;
-  onOpen: (item: MediaItem) => void;
-}) {
-  const output = generation.outputs[0];
-  if (!output) {
-    return (
-      <div className="creation-thumb creation-thumb-empty">
-        {generation.status === "FAILED" ? "Failed" : "Pending"}
-      </div>
-    );
+function optionsFor(tool: CreationTool, workflows: Workflow[]) {
+  const options: { value: string; label: string }[] = [];
+  if (tool === "IMAGE") options.push({ value: "image", label: "GPT Image" });
+  for (const workflow of workflows) {
+    if (workflow.tool === tool) {
+      options.push({ value: `rh:${workflow.key}`, label: workflow.label });
+    }
   }
-  if (output.mediaType === "video") {
-    return (
-      <button
-        type="button"
-        className="creation-thumb creation-thumb-button"
-        aria-label={`View video: ${output.name}`}
-        onClick={() => onOpen(output)}
-      >
-        <video src={output.url} muted playsInline preload="metadata" />
-        <span className="creation-thumb-play" aria-hidden="true">
-          <Play size={16} fill="currentColor" />
-        </span>
-      </button>
-    );
-  }
-  return (
-    <button
-      type="button"
-      className="creation-thumb creation-thumb-button"
-      aria-label={`View image: ${output.name}`}
-      onClick={() => onOpen(output)}
-    >
-      <img src={output.url} alt="" loading="lazy" />
-    </button>
-  );
+  return options;
 }
 
 export function CreationDetailPage({
@@ -123,7 +84,9 @@ export function CreationDetailPage({
 
   const [creation, setCreation] = useState<Creation | null>(null);
   const [items, setItems] = useState<CreationItem[]>([]);
-  const [view, setView] = useState<View>("feed");
+  const [outline, setOutline] = useState<CreationOutline | null>(null);
+  const shotParam = searchParams.get("shot");
+  const sceneParam = searchParams.get("scene");
   const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
   const [viewing, setViewing] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,26 +98,29 @@ export function CreationDetailPage({
   const [draftDescription, setDraftDescription] = useState("");
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [newGenerationOpen, setNewGenerationOpen] = useState(false);
+  const [activeTool, setActiveTool] = useState<CreationTool | null>(null);
+  const [generatorShotId, setGeneratorShotId] = useState<string | null>(null);
+  const [generatorSceneId, setGeneratorSceneId] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState("");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState("");
-  const [pickerLane, setPickerLane] = useState("");
   const [pickerParent, setPickerParent] = useState("");
-  const [dragId, setDragId] = useState<string | null>(null);
+  const [pickerShotId, setPickerShotId] = useState("");
 
   async function refresh() {
-    const [next, list] = await Promise.all([
+    const [next, list, nextOutline] = await Promise.all([
       getCreation(pageId, creationId),
       listCreationItems(pageId, creationId),
+      getOutline(pageId, creationId),
     ]);
     setCreation(next);
     setItems(list);
+    setOutline(nextOutline);
   }
 
   useEffect(() => {
-    if (!newGenerationOpen || workflows.length > 0) return;
+    if (workflows.length > 0) return;
     let cancelled = false;
     setToolsLoading(true);
     setToolsError("");
@@ -173,7 +139,7 @@ export function CreationDetailPage({
     return () => {
       cancelled = true;
     };
-  }, [newGenerationOpen, workflows.length]);
+  }, [workflows.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,11 +148,13 @@ export function CreationDetailPage({
     Promise.all([
       getCreation(pageId, creationId),
       listCreationItems(pageId, creationId),
+      getOutline(pageId, creationId),
     ])
-      .then(([next, list]) => {
+      .then(([next, list, nextOutline]) => {
         if (cancelled) return;
         setCreation(next);
         setItems(list);
+        setOutline(nextOutline);
       })
       .catch((requestError: unknown) => {
         if (!cancelled) {
@@ -221,11 +189,6 @@ export function CreationDetailPage({
   );
   const mediaId = searchParams.get("media");
 
-  const itemIndexById = useMemo(
-    () => new Map(displayedItems.map((item, index) => [item.id, index])),
-    [displayedItems],
-  );
-
   useEffect(() => {
     if (!mediaId) {
       setViewing(null);
@@ -245,6 +208,43 @@ export function CreationDetailPage({
     showMedia(item, false);
   }
 
+  const shotLocation = outline && shotParam ? findShot(outline, shotParam) : null;
+  const shotNeighbours =
+    outline && shotLocation ? adjacentShots(outline, shotLocation.shot.id) : null;
+  const sceneLocation = outline && sceneParam ? findScene(outline, sceneParam) : null;
+  const sceneNeighbours =
+    outline && sceneLocation ? adjacentScenes(outline, sceneLocation.scene.id) : null;
+
+  function openShot(shotId: string) {
+    closeGenerator();
+    const next = new URLSearchParams(searchParams);
+    next.set("shot", shotId);
+    setSearchParams(next);
+  }
+
+  function closeShot() {
+    closeGenerator();
+    const next = new URLSearchParams(searchParams);
+    next.delete("shot");
+    setSearchParams(next);
+  }
+
+  function openScene(sceneId: string) {
+    closeGenerator();
+    const next = new URLSearchParams(searchParams);
+    next.set("scene", sceneId);
+    next.delete("shot");
+    setSearchParams(next);
+  }
+
+  function closeScene() {
+    closeGenerator();
+    const next = new URLSearchParams(searchParams);
+    next.delete("scene");
+    next.delete("shot");
+    setSearchParams(next);
+  }
+
   function closeMediaViewer() {
     setViewing(null);
     const next = new URLSearchParams(searchParams);
@@ -254,6 +254,55 @@ export function CreationDetailPage({
 
   function togglePicker() {
     setPickerOpen((open) => !open);
+    setPickerShotId("");
+  }
+
+  function openGenerator(
+    tool: CreationTool,
+    target: { shotId?: string | null; sceneId?: string | null } = {},
+  ) {
+    const first = optionsFor(tool, workflows)[0];
+    setActiveTool(tool);
+    setGeneratorShotId(target.shotId ?? null);
+    setGeneratorSceneId(target.sceneId ?? null);
+    setSelectedTool(first?.value ?? "");
+  }
+
+  function closeGenerator() {
+    setActiveTool(null);
+    setGeneratorShotId(null);
+    setGeneratorSceneId(null);
+    setSelectedTool("");
+  }
+
+  const toolCount = useMemo(
+    () => new Set(items.map((item) => toolLabel(item.generation))).size,
+    [items],
+  );
+  const hasCreateActions = ACTION_TOOLS.some(
+    (tool) => optionsFor(tool, workflows).length > 0,
+  );
+
+  function renderActionButtons(className: string) {
+    return ACTION_TOOLS.filter((tool) => optionsFor(tool, workflows).length > 0).map(
+      (tool) => (
+        <button
+          key={tool}
+          type="button"
+          className={className}
+          aria-expanded={activeTool === tool}
+          aria-controls="creation-new-generation"
+          onClick={() => openGenerator(tool)}
+        >
+          {actionLabel(tool, workflows)}
+        </button>
+      ),
+    );
+  }
+
+  function openShotPicker(shotId: string) {
+    setPickerShotId(shotId);
+    setPickerOpen(true);
   }
 
   async function addSelectedMedia(media: MediaItem[]) {
@@ -262,111 +311,20 @@ export function CreationDetailPage({
     setError("");
     setBusy(true);
     try {
-      const grouped = new Set(
-        await groupedGenerationIds(pageId, generationIds),
-      );
-      if (grouped.size > 0) {
-        throw new Error(
-          `${grouped.size} selected ${
-            grouped.size === 1 ? "generation is" : "generations are"
-          } already in a creation. Deselect ${
-            grouped.size === 1 ? "that file" : "those files"
-          } and try again.`,
-        );
-      }
       for (const generationId of generationIds) {
         await addCreationItem(pageId, creationId, {
           generationId,
-          laneId: pickerLane.trim() || undefined,
-          parentItemId: pickerParent || undefined,
+          shotId: pickerShotId || undefined,
+          parentItemId: pickerShotId ? undefined : pickerParent || undefined,
         });
       }
       await refresh();
       setPickerOpen(false);
+      setPickerShotId("");
     } catch (requestError) {
       throw new Error(
         errorMessage(requestError, "Unable to add selected files"),
       );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function persistOrder(next: CreationItem[]) {
-    setBusy(true);
-    setError("");
-    try {
-      const saved = await reorderCreationItems(
-        pageId,
-        creationId,
-        next.map((item) => ({ itemId: item.id, laneId: item.laneId })),
-      );
-      setItems(saved);
-    } catch (requestError) {
-      setError(errorMessage(requestError, "Unable to save order"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function moveTo(from: number, to: number) {
-    if (from === to || to < 0 || to >= items.length) return;
-    const next = [...items];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    void persistOrder(next);
-  }
-
-  function move(index: number, delta: number) {
-    moveTo(index, index + delta);
-  }
-
-  function dragProps(index: number) {
-    if (sortOrder !== "manual") return {};
-    return {
-      draggable: !busy,
-      onDragStart: (event: DragEvent<HTMLLIElement>) => {
-        setDragId(items[index].id);
-        event.dataTransfer.effectAllowed = "move";
-      },
-      onDragOver: (event: DragEvent<HTMLLIElement>) => {
-        if (dragId) event.preventDefault();
-      },
-      onDrop: (event: DragEvent<HTMLLIElement>) => {
-        event.preventDefault();
-        const from = items.findIndex((entry) => entry.id === dragId);
-        setDragId(null);
-        if (from >= 0) moveTo(from, index);
-      },
-      onDragEnd: () => setDragId(null),
-    };
-  }
-
-  function saveLane(item: CreationItem, lane: string) {
-    const trimmed = lane.trim() || null;
-    if (trimmed === item.laneId) return;
-    void persistOrder(
-      items.map((entry) =>
-        entry.id === item.id ? { ...entry, laneId: trimmed } : entry,
-      ),
-    );
-  }
-
-  async function removeItem(item: CreationItem) {
-    const accepted = await confirm({
-      title: "Remove from creation?",
-      message: "The generation and its files are kept.",
-      confirmLabel: "Remove",
-      danger: true,
-    });
-    if (!accepted) return;
-    setBusy(true);
-    setError("");
-    try {
-      await removeCreationItem(pageId, creationId, item.id);
-      await refresh();
-    } catch (requestError) {
-      setError(errorMessage(requestError, "Unable to remove generation"));
     } finally {
       setBusy(false);
     }
@@ -423,141 +381,86 @@ export function CreationDetailPage({
     }
   }
 
-  function renderFeed() {
-    return (
-      <ol className="creation-list">
-        {displayedItems.map((item, index) => (
-          <li
-            className={`panel creation-card${dragId === item.id ? " is-dragging" : ""}`}
-            key={item.id}
-            {...dragProps(index)}
-          >
-            <span className="creation-drag-handle" aria-hidden="true">
-              <GripVertical size={16} />
-            </span>
-            <Thumb generation={item.generation} onOpen={openMedia} />
-            <div className="creation-card-body">
-              <p className="creation-card-prompt">
-                {item.generation.inputs.prompt || "No prompt"}
-              </p>
-              <small>
-                {toolLabel(item.generation)} · Added {formatDate(item.addedAt)}
-              </small>
-            </div>
-            <CardActions
-              busy={busy}
-              index={index}
-              total={items.length}
-              reorderable={sortOrder === "manual"}
-              onMove={(delta) => move(index, delta)}
-              onRemove={() => void removeItem(item)}
-            />
-          </li>
-        ))}
-      </ol>
-    );
-  }
-
-  function renderGrouped() {
-    const groups = new Map<string, CreationItem[]>();
-    displayedItems.forEach((item) => {
-      const label = toolLabel(item.generation);
-      groups.set(label, [...(groups.get(label) ?? []), item]);
-    });
-    return (
-      <div className="creation-groups">
-        {[...groups.entries()].map(([label, group]) => (
-          <section className="creation-group" key={label}>
-            <h3>
-              {label} <span className="creation-count">{group.length}</span>
-            </h3>
-            <ul className="creation-grid">
-              {group.map((item) => (
-                <li className="creation-grid-item" key={item.id}>
-                  <Thumb generation={item.generation} onOpen={openMedia} />
-                  <p>{item.generation.inputs.prompt || "No prompt"}</p>
-                  <button
-                    type="button"
-                    className="secondary-button danger-button creation-grid-remove"
-                    disabled={busy}
-                    onClick={() => void removeItem(item)}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+  const generatorPanel = activeTool ? (
+    <section
+      id="creation-new-generation"
+      className="panel creation-generator-panel"
+      aria-label={actionLabel(activeTool, workflows)}
+    >
+      <div className="creation-generator-header">
+        <h3>{actionLabel(activeTool, workflows)}</h3>
+        <button type="button" className="secondary-button" onClick={closeGenerator}>
+          Close
+        </button>
       </div>
-    );
-  }
-
-  function renderStoryboard() {
-    return (
-      <ol className="creation-steps">
-        {displayedItems.map((item, index) => {
-          const parentIndex = item.parentItemId
-            ? itemIndexById.get(item.parentItemId)
-            : undefined;
-          return (
-            <li
-              className={`creation-step${dragId === item.id ? " is-dragging" : ""}`}
-              key={item.id}
-              {...dragProps(index)}
+      <label className="creation-tool-select">
+        Model
+        <select
+          value={selectedTool}
+          onChange={(event) => setSelectedTool(event.target.value)}
+          disabled={toolsLoading}
+        >
+          {optionsFor(activeTool, workflows).map((option) => (
+            <option
+              key={option.value}
+              value={option.value}
+              disabled={option.value.startsWith("rh:") && !pageId}
             >
-              <span className="creation-drag-handle" aria-hidden="true">
-                <GripVertical size={16} />
-              </span>
-              <span className="creation-step-number">{index + 1}</span>
-              <Thumb generation={item.generation} onOpen={openMedia} />
-              <div className="creation-card-body">
-                <p className="creation-card-prompt">
-                  {item.generation.inputs.prompt || "No prompt"}
-                </p>
-                <small>
-                  {parentIndex !== undefined
-                    ? `Follows step ${parentIndex + 1} · `
-                    : ""}
-                  {toolLabel(item.generation)}
-                </small>
-                <label className="creation-lane">
-                  Lane
-                  <input
-                    key={`${item.id}:${item.laneId ?? ""}`}
-                    defaultValue={item.laneId ?? ""}
-                    maxLength={64}
-                    list="creation-lane-options"
-                    placeholder="e.g. Reel A"
-                    disabled={busy}
-                    onBlur={(event) => saveLane(item, event.target.value)}
-                  />
-                </label>
-              </div>
-              <CardActions
-                busy={busy}
-                index={index}
-                total={items.length}
-                reorderable={sortOrder === "manual"}
-                onMove={(delta) => move(index, delta)}
-                onRemove={() => void removeItem(item)}
-              />
-            </li>
-          );
-        })}
-      </ol>
-    );
-  }
-
-
-  const laneOptions = [
-    ...new Set(
-      items
-        .map((item) => item.laneId)
-        .filter((lane): lane is string => Boolean(lane)),
-    ),
-  ];
+              {option.label}
+              {option.value.startsWith("rh:") && !pageId ? " (requires a page)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {toolsError && (
+        <p className="error" role="alert">
+          {toolsError}
+        </p>
+      )}
+      {selectedTool === "image" && (
+        <GptImageGenPage
+          user={user}
+          onLogout={onLogout}
+          pageId={pageId}
+          embedded
+          creationId={creationId}
+          shotId={generatorShotId}
+          sceneId={generatorSceneId}
+          shotTool={generatorShotId || generatorSceneId ? activeTool : null}
+          onGenerationTriggered={closeGenerator}
+          onCreationItemAdded={() => {
+            void refresh().catch((requestError: unknown) =>
+              setError(errorMessage(requestError, "Unable to refresh creation")),
+            );
+          }}
+          onCreationItemError={(message) => {
+            setError(message);
+          }}
+        />
+      )}
+      {selectedTool.startsWith("rh:") && (
+        <RunningHubWorkflowPage
+          key={selectedTool}
+          user={user}
+          onLogout={onLogout}
+          pageId={pageId}
+          workflowKey={selectedTool.slice(3)}
+          embedded
+          creationId={creationId}
+          shotId={generatorShotId}
+          sceneId={generatorSceneId}
+          shotTool={generatorShotId || generatorSceneId ? activeTool : null}
+          onGenerationTriggered={closeGenerator}
+          onCreationItemAdded={() => {
+            void refresh().catch((requestError: unknown) =>
+              setError(errorMessage(requestError, "Unable to refresh creation")),
+            );
+          }}
+          onCreationItemError={(message) => setError(message)}
+        />
+      )}
+    </section>
+  ) : null;
 
   const content = loading ? (
     <div className="page-list" aria-busy="true" aria-label="Loading creation">
@@ -565,18 +468,41 @@ export function CreationDetailPage({
     </div>
   ) : !creation ? null : (
     <>
-      <header className="app-page-header creation-detail-header">
-        <div>
-          <p className="eyebrow">Creation</p>
-          <h2 className="app-page-title">{creation.name}</h2>
+      <nav className="creation-breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          <li>
+            <Link to={`${base}/creations`}>Creations</Link>
+          </li>
+          <li aria-current="page">
+            <ChevronRight size={14} aria-hidden="true" />
+            <span>{creation.name}</span>
+          </li>
+        </ol>
+      </nav>
+
+      <header className="creation-hero">
+        <div className="creation-hero-main">
+          <p className="creation-hero-eyebrow">
+            <Layers size={14} aria-hidden="true" /> Creation
+          </p>
+          <h2 className="creation-hero-title">{creation.name}</h2>
           {creation.description && (
-            <p className="app-page-description">{creation.description}</p>
+            <p className="creation-hero-description">{creation.description}</p>
           )}
-          <small>
-            {creation.itemCount}{" "}
-            {creation.itemCount === 1 ? "item" : "items"} · Updated{" "}
-            {formatDate(creation.updatedAt)}
-          </small>
+          <ul className="creation-stats" aria-label="Creation summary">
+            <li>
+              <strong>{creation.itemCount}</strong>{" "}
+              {creation.itemCount === 1 ? "item" : "items"}
+            </li>
+            <li>
+              <strong>{toolCount}</strong>{" "}
+              {toolCount === 1 ? "tool" : "tools"}
+            </li>
+            <li>
+              <Clock size={13} aria-hidden="true" />
+              Updated {formatDate(creation.updatedAt)}
+            </li>
+          </ul>
         </div>
         <div className="creation-header-actions">
           <button
@@ -639,22 +565,9 @@ export function CreationDetailPage({
         </p>
       )}
 
-      <div className="creation-toolbar">
-        <div className="creation-toolbar-main">
-          <div className="creation-view-controls">
-            <div className="creation-view-switch" role="group" aria-label="View">
-              {VIEWS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={view === option.value ? "is-active" : ""}
-                  aria-pressed={view === option.value}
-                  onClick={() => setView(option.value)}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+      <section className="creation-toolbar" aria-label="Creation controls">
+        <div className="creation-toolbar-row">
+          <div className="creation-toolbar-tools">
             <label className="creation-sort-control">
               Sort
               <select
@@ -668,111 +581,36 @@ export function CreationDetailPage({
                 <option value="manual">Manual order</option>
               </select>
             </label>
-          </div>
-          <p className="creation-view-hint">
-            {sortOrder === "manual"
-              ? VIEW_HINTS[view]
-              : `Sorted by date added, ${
-                  sortOrder === "latest" ? "latest" : "earliest"
-                } first. Choose Manual order to reorder.`}
-          </p>
-        </div>
-        <div className="creation-toolbar-actions">
-          <button
-            type="button"
-            className="primary-button"
-            aria-expanded={newGenerationOpen}
-            aria-controls="creation-new-generation"
-            onClick={() => {
-              setNewGenerationOpen((open) => !open);
-              setSelectedTool("");
-            }}
-          >
-            {newGenerationOpen ? "Close generator" : "New generation"}
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={togglePicker}
-            aria-expanded={pickerOpen}
-          >
-            {pickerOpen ? "Close picker" : "Add existing"}
-          </button>
-        </div>
-      </div>
-
-      {newGenerationOpen && (
-        <section
-          id="creation-new-generation"
-          className="panel creation-generator-panel"
-          aria-label="Create a generation"
-        >
-          <label className="creation-tool-select">
-            Create tool
-            <select
-              value={selectedTool}
-              onChange={(event) => setSelectedTool(event.target.value)}
-              disabled={toolsLoading}
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={togglePicker}
+              aria-expanded={pickerOpen}
             >
-              <option value="">
-                {toolsLoading ? "Loading tools…" : "Select a create tool"}
-              </option>
-              <option value="image">GPT Image</option>
-              {workflows.map((workflow) => (
-                <option
-                  key={workflow.key}
-                  value={`rh:${workflow.key}`}
-                  disabled={!pageId}
-                >
-                  {workflow.label}
-                  {!pageId ? " (requires a page)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          {toolsError && (
-            <p className="error" role="alert">
-              {toolsError}
-            </p>
-          )}
-          {selectedTool === "image" && (
-            <GptImageGenPage
-              user={user}
-              onLogout={onLogout}
-              pageId={pageId}
-              embedded
-              creationId={creationId}
-              onGenerationTriggered={() => setNewGenerationOpen(false)}
-              onCreationItemAdded={() => {
-                void refresh().catch((requestError: unknown) =>
-                  setError(errorMessage(requestError, "Unable to refresh creation")),
-                );
-              }}
-              onCreationItemError={(message) => {
-                setError(message);
-              }}
-            />
-          )}
-          {selectedTool.startsWith("rh:") && (
-            <RunningHubWorkflowPage
-              key={selectedTool}
-              user={user}
-              onLogout={onLogout}
-              pageId={pageId}
-              workflowKey={selectedTool.slice(3)}
-              embedded
-              creationId={creationId}
-              onGenerationTriggered={() => setNewGenerationOpen(false)}
-              onCreationItemAdded={() => {
-                void refresh().catch((requestError: unknown) =>
-                  setError(errorMessage(requestError, "Unable to refresh creation")),
-                );
-              }}
-              onCreationItemError={(message) => setError(message)}
-            />
-          )}
-        </section>
-      )}
+              {pickerOpen ? "Close picker" : "Add existing"}
+            </button>
+          </div>
+        </div>
+        {hasCreateActions && (
+          <div className="creation-create-bar">
+            <span className="creation-create-label">
+              <Plus size={14} aria-hidden="true" /> New generation
+            </span>
+            <div className="creation-create-actions">
+              {renderActionButtons("primary-button")}
+            </div>
+          </div>
+        )}
+        <p className="creation-view-hint">
+          {sortOrder === "manual"
+            ? "Items are in manual order."
+            : `Sorted by date added, ${
+                sortOrder === "latest" ? "latest" : "earliest"
+              } first. Choose Manual order to reorder.`}
+        </p>
+      </section>
+
+      {!shotLocation && !sceneLocation && generatorPanel}
 
       {pickerOpen && (
         <LibraryPicker
@@ -785,18 +623,12 @@ export function CreationDetailPage({
           onSelect={addSelectedMedia}
           onClose={togglePicker}
           beforeGrid={
+            pickerShotId ? (
+              <p className="creation-view-hint">
+                Selected files are added to the shot you chose.
+              </p>
+            ) : (
             <div className="creation-picker-options">
-              <label>
-                Lane for new items
-                <input
-                  value={pickerLane}
-                  maxLength={64}
-                  placeholder="Optional"
-                  list="creation-lane-options"
-                  onChange={(event) => setPickerLane(event.target.value)}
-                />
-                <small>Applied to the items you add now.</small>
-              </label>
               <label>
                 Follows
                 <select
@@ -804,39 +636,82 @@ export function CreationDetailPage({
                   onChange={(event) => setPickerParent(event.target.value)}
                 >
                   <option value="">Nothing</option>
-                  {displayedItems.map((item, index) => (
+                  {displayedItems.map((item) => (
                     <option key={item.id} value={item.id}>
-                      Step {index + 1}
+                      Step {item.position + 1}
                     </option>
                   ))}
                 </select>
-                <small>Places added items after this step in the storyboard.</small>
+                <small>Places added items after this step.</small>
               </label>
             </div>
+            )
           }
         />
       )}
 
-      <datalist id="creation-lane-options">
-        {laneOptions.map((lane) => (
-          <option key={lane} value={lane} />
-        ))}
-      </datalist>
-
-      {items.length === 0 ? (
+      {shotLocation && shotNeighbours ? (
+        <ShotWorkspace
+          pageId={pageId}
+          creationId={creationId}
+          location={shotLocation}
+          confirm={confirm}
+          onChanged={refresh}
+          onError={setError}
+          onOpenMedia={openMedia}
+          onBack={closeShot}
+          backLabel={sceneLocation ? "Scene" : "Production"}
+          onGenerate={(tool) => openGenerator(tool, { shotId: shotLocation.shot.id })}
+          generator={generatorPanel}
+          position={shotNeighbours.position}
+          total={shotNeighbours.total}
+          previous={shotNeighbours.previous}
+          next={shotNeighbours.next}
+          onOpenShot={openShot}
+        />
+      ) : sceneLocation && sceneNeighbours ? (
+        <SceneWorkspace
+          pageId={pageId}
+          creationId={creationId}
+          location={sceneLocation}
+          confirm={confirm}
+          onChanged={refresh}
+          onError={setError}
+          onOpenMedia={openMedia}
+          onBack={closeScene}
+          position={sceneNeighbours.position}
+          total={sceneNeighbours.total}
+          previous={sceneNeighbours.previous}
+          next={sceneNeighbours.next}
+          onOpenScene={openScene}
+          onOpenShot={openShot}
+          onGenerate={(tool) => openGenerator(tool, { sceneId: sceneLocation.scene.id })}
+          generator={generatorPanel}
+        />
+      ) : outline ? (
+        <ProductionBoard
+          pageId={pageId}
+          creationId={creationId}
+          outline={outline}
+          busy={busy}
+          confirm={confirm}
+          onChanged={refresh}
+          onError={setError}
+          onOpenMedia={openMedia}
+          onOpenScene={openScene}
+          onOpenShot={openShot}
+          onAddExisting={openShotPicker}
+        />
+      ) : items.length === 0 ? (
         <div className="empty-state creation-empty">
-          <p>This creation is empty. Start a new generation or add existing ones.</p>
+          <span className="creation-empty-icon" aria-hidden="true">
+            <Layers size={22} />
+          </span>
+          <h3>Nothing here yet</h3>
+          <p>Create something new or add files you already have.</p>
+
           <div className="creation-empty-actions">
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => {
-                setNewGenerationOpen(true);
-                setSelectedTool("");
-              }}
-            >
-              New generation
-            </button>
+            {renderActionButtons("primary-button")}
             <button
               type="button"
               className="secondary-button"
@@ -846,13 +721,7 @@ export function CreationDetailPage({
             </button>
           </div>
         </div>
-      ) : view === "feed" ? (
-        renderFeed()
-      ) : view === "grouped" ? (
-        renderGrouped()
-      ) : (
-        renderStoryboard()
-      )}
+      ) : null}
 
     </>
   );
@@ -890,59 +759,5 @@ export function CreationDetailPage({
         />
       )}
     </AppShell>
-  );
-}
-
-function CardActions({
-  busy,
-  index,
-  total,
-  reorderable,
-  onMove,
-  onRemove,
-}: {
-  busy: boolean;
-  index: number;
-  total: number;
-  reorderable: boolean;
-  onMove: (delta: number) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="creation-card-actions">
-      {reorderable && (
-        <>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Move up"
-            title="Move up"
-            disabled={busy || index === 0}
-            onClick={() => onMove(-1)}
-          >
-            <ChevronUp size={16} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Move down"
-            title="Move down"
-            disabled={busy || index === total - 1}
-            onClick={() => onMove(1)}
-          >
-            <ChevronDown size={16} aria-hidden="true" />
-          </button>
-        </>
-      )}
-      <button
-        type="button"
-        className="secondary-button danger-button creation-card-remove"
-        disabled={busy}
-        onClick={onRemove}
-      >
-        <Trash2 size={14} aria-hidden="true" />
-        Remove
-      </button>
-    </div>
   );
 }

@@ -35,6 +35,7 @@ public class WorkflowRegistry {
     static final Set<String> OUTPUT_TYPES = Set.of("video", "image");
 
     private static final Pattern KEY = Pattern.compile("[a-z0-9]+(-[a-z0-9]+)*");
+    private static final Set<String> TOOLS = Set.of("IMAGE", "VIDEO", "UPSCALE", "EDIT");
 
     private final Map<String, WorkflowDefinition> definitions;
     private final Environment environment;
@@ -95,6 +96,7 @@ public class WorkflowRegistry {
             throw new IllegalStateException("Invalid workflow key in " + where);
         }
         require(!isBlank(definition.label()), where, "label is required");
+        require(TOOLS.contains(definition.tool()), where, "tool must be IMAGE, VIDEO, UPSCALE or EDIT");
         require(!isBlank(definition.workflowIdEnv()), where, "workflowIdEnv is required");
         require(definition.inputs() != null && !definition.inputs().isEmpty(), where, "at least one input is required");
         require(definition.output() != null, where, "output is required");

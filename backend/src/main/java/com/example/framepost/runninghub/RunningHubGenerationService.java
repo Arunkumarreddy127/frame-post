@@ -484,6 +484,7 @@ public class RunningHubGenerationService {
             String label,
             String description,
             String group,
+            String tool,
             boolean configured,
             List<InputDefinition> inputs,
             String outputType,
@@ -491,7 +492,8 @@ public class RunningHubGenerationService {
     ) {
         static WorkflowView from(WorkflowDefinition definition, boolean configured) {
             return new WorkflowView(definition.key(), definition.label(), definition.description(), definition.group(),
-                    configured, definition.inputs(), definition.output().type(), definition.output().contentType());
+                    definition.tool(), configured, definition.inputs(), definition.output().type(),
+                    definition.output().contentType());
         }
     }
 

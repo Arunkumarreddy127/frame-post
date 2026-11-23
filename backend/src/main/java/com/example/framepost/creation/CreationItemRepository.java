@@ -16,9 +16,9 @@ public interface CreationItemRepository extends MongoRepository<CreationItem, St
 
     Optional<CreationItem> findByIdAndCreationId(String id, String creationId);
 
-    boolean existsByGenerationId(String generationId);
+    boolean existsByCreationIdAndGenerationId(String creationId, String generationId);
 
-    List<CreationItem> findByGenerationIdIn(Collection<String> generationIds);
+    List<CreationItem> findByShotIdIn(Collection<String> shotIds);
 
     void deleteByCreationId(String creationId);
 

@@ -10,6 +10,7 @@ public record WorkflowDefinition(
         String label,
         String description,
         String group,
+        String tool,
         String workflowIdEnv,
         List<InputDefinition> inputs,
         List<NodeMapping> nodeMappings,

@@ -19,7 +19,15 @@ import {
   CreationTargetBanner,
   creationQuery,
 } from "../components/creations/CreationTargetBanner";
+import {
+  findSecondsInput,
+  latestOutput,
+  parseCreationTool,
+  secondsForInput,
+  useShotTarget,
+} from "../components/creations/shotTarget";
 import type {
+  CreationTool,
   InstanceType,
   MediaItem,
   ShellRouteProps,
@@ -27,11 +35,18 @@ import type {
   WorkflowInput,
 } from "../types";
 
+function toolForWorkflow(workflow: Workflow): CreationTool {
+  return workflow.tool;
+}
+
 type RunningHubWorkflowPageProps = ShellRouteProps & {
   pageId?: string;
   workflowKey?: string;
   embedded?: boolean;
   creationId?: string;
+  shotId?: string | null;
+  sceneId?: string | null;
+  shotTool?: CreationTool | null;
   onGenerationTriggered?: () => void;
   onCreationItemAdded?: () => void;
   onCreationItemError?: (message: string) => void;
@@ -78,6 +93,9 @@ export function RunningHubWorkflowPage({
   workflowKey: workflowKeyProp,
   embedded = false,
   creationId: creationIdProp,
+  shotId: shotIdProp,
+  sceneId: sceneIdProp,
+  shotTool: shotToolProp,
   onGenerationTriggered,
   onCreationItemAdded,
   onCreationItemError,
@@ -90,9 +108,15 @@ export function RunningHubWorkflowPage({
   const activePageId = pageId ?? routePageId;
   const workflowKey = workflowKeyProp ?? routeWorkflowKey;
   const creationId = creationIdProp ?? searchParams.get("creationId");
+  const shotId = embedded ? (shotIdProp ?? null) : searchParams.get("shotId");
+  const sceneId = embedded ? (sceneIdProp ?? null) : searchParams.get("sceneId");
+  const shotTool = embedded
+    ? (shotToolProp ?? null)
+    : parseCreationTool(searchParams.get("tool"));
+  const shotTarget = useShotTarget(activePageId, creationId, shotId);
   const createPath =
     (activePageId ? `/pages/${activePageId}/create` : "/create") +
-    creationQuery(creationId);
+    creationQuery(creationId, { shotId, sceneId, tool: shotTool });
 
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -107,6 +131,40 @@ export function RunningHubWorkflowPage({
   const [error, setError] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const restoredFrom = useRef("");
+  const prefilledFor = useRef("");
+
+  useEffect(() => {
+    if (!workflow || !shotId || !shotTarget) return;
+    const key = `${shotId}:${workflow.key}`;
+    if (prefilledFor.current === key) return;
+    prefilledFor.current = key;
+    const { shot } = shotTarget;
+
+    const promptName = workflow.inputs.find((input) => input.type === "textarea")?.name;
+    const brief = shot.brief?.trim();
+    if (promptName && brief) {
+      setValues((current) => ({
+        ...current,
+        [promptName]: current[promptName]?.trim() ? current[promptName] : brief,
+      }));
+    }
+
+    const secondsInput = findSecondsInput(workflow.inputs);
+    const seconds = secondsInput ? secondsForInput(secondsInput, shot.durationSeconds) : null;
+    if (secondsInput && seconds) {
+      setValues((current) => ({ ...current, [secondsInput.name]: seconds }));
+    }
+
+    if (toolForWorkflow(workflow) === "VIDEO") {
+      const imageInput = workflow.inputs.find((input) => input.type === "image");
+      const frame = latestOutput(shot, "IMAGE");
+      if (imageInput && frame) {
+        setLibraryFiles((current) =>
+          current[imageInput.name] ? current : { ...current, [imageInput.name]: frame },
+        );
+      }
+    }
+  }, [workflow, shotId, shotTarget]);
 
   const {
     items,
@@ -271,6 +329,11 @@ export function RunningHubWorkflowPage({
         try {
           await addCreationItem(activePageId, creationId, {
             generationId: created.id,
+            ...(shotId
+              ? { shotId, tool: toolForWorkflow(workflow) }
+              : sceneId
+                ? { sceneId, tool: toolForWorkflow(workflow) }
+                : {}),
           });
           onCreationItemAdded?.();
         } catch (attachError) {
@@ -352,6 +415,9 @@ export function RunningHubWorkflowPage({
             <CreationTargetBanner
               pageId={activePageId}
               creationId={creationId}
+              shotId={shotId}
+              sceneId={sceneId}
+              tool={shotId || sceneId ? toolForWorkflow(workflow) : null}
             />
           )}
         </>

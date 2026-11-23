@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addCreationItem,
-  groupedGenerationIds,
+  getOutline,
   listCreations,
+  moveCreationItem,
 } from "./creationApi";
 
 afterEach(() => {
@@ -37,29 +38,48 @@ describe("creationApi", () => {
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/creations$/);
   });
 
-  it("sends each generation id as a repeated query parameter", async () => {
-    const fetchMock = stubFetch(["a"]);
-
-    await expect(groupedGenerationIds(undefined, ["a", "b"])).resolves.toEqual(["a"]);
-
-    expect(fetchMock.mock.calls[0][0]).toMatch(
-      /\/api\/creations\/grouped\?generationIds=a&generationIds=b$/,
-    );
-  });
-
-  it("posts optional lane and parent placement", async () => {
+  it("posts optional shot, tool, and parent placement", async () => {
     const fetchMock = stubFetch({});
 
     await addCreationItem("page-1", "creation-1", {
       generationId: "gen-1",
-      laneId: "Reel A",
+      shotId: "shot-1",
+      tool: "IMAGE",
+      parentItemId: "item-0",
     });
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({
       generationId: "gen-1",
-      laneId: "Reel A",
+      shotId: "shot-1",
+      tool: "IMAGE",
+      parentItemId: "item-0",
     });
+  });
+
+  it("moves an item to a shot, or to Unassigned with a null shot id", async () => {
+    const fetchMock = stubFetch({});
+
+    await moveCreationItem("page-1", "creation-1", "item-1", null);
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("PUT");
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      "/api/pages/page-1/creations/creation-1/items/item-1/shot",
+    );
+    expect(JSON.parse(init.body as string)).toEqual({ shotId: null });
+  });
+
+  it("loads the production outline for a creation", async () => {
+    const fetchMock = stubFetch({ creationId: "creation-1", scenes: [], unassigned: [] });
+
+    await expect(getOutline(undefined, "creation-1")).resolves.toEqual({
+      creationId: "creation-1",
+      scenes: [],
+      unassigned: [],
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/creations\/creation-1\/outline$/);
   });
 });

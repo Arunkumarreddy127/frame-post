@@ -3,6 +3,7 @@
   "label": "SeedVR2 - Video Upscale",
   "description": "Upscale a video with SeedVR2.",
   "group": "RH",
+  "tool": "UPSCALE",
   "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_SEEDVR2",
   "inputs": [
     {
