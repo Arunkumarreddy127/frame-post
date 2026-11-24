@@ -157,6 +157,29 @@ export function SceneWorkspace({
             { label: `${sceneLabel} · ${scene.title}`, current: true },
           ]}
         />
+        <header className="shot-workspace-header">
+          <div>
+            <p className="eyebrow">{sceneLabel}</p>
+            <h2 className="app-page-title">{scene.title}</h2>
+            <small>
+              {scene.shots.length} {scene.shots.length === 1 ? "shot" : "shots"} ·{" "}
+              {finalCount} final
+            </small>
+          </div>
+          <div className="scene-workspace-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={working}
+              onClick={() => {
+                setSceneTitle(scene.title);
+                setRenaming(true);
+              }}
+            >
+              <Pencil size={14} aria-hidden="true" /> Rename
+            </button>
+          </div>
+        </header>
         <div className="shot-workspace-nav-actions">
           <button
             type="button"
@@ -201,30 +224,6 @@ export function SceneWorkspace({
           </div>
         </div>
       </div>
-
-      <header className="shot-workspace-header">
-        <div>
-          <p className="eyebrow">{sceneLabel}</p>
-          <h2 className="app-page-title">{scene.title}</h2>
-          <small>
-            {scene.shots.length} {scene.shots.length === 1 ? "shot" : "shots"} ·{" "}
-            {finalCount} final
-          </small>
-        </div>
-        <div className="scene-workspace-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={working}
-            onClick={() => {
-              setSceneTitle(scene.title);
-              setRenaming(true);
-            }}
-          >
-            <Pencil size={14} aria-hidden="true" /> Rename
-          </button>
-        </div>
-      </header>
 
       {renaming && (
         <SceneForm

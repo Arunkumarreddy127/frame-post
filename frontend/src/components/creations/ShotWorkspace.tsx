@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Check, Trash2 } from "lucide-react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import { ArrowLeft, ArrowRight, Check, Pencil, Trash2 } from "lucide-react";
 import {
   errorMessage,
   removeCreationItem,
@@ -96,14 +101,18 @@ export function ShotWorkspace({
   onOpenShot,
 }: ShotWorkspaceProps) {
   const { shot, scene } = location;
-  const [editing, setEditing] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingBrief, setEditingBrief] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(shot.title);
+  const [titleError, setTitleError] = useState("");
   const [working, setWorking] = useState(false);
-  const rootRef = useRef<HTMLElement>(null);
 
-  // Moving between shots should land at the top of the new shot, and drop any open edit form.
+  // Moving between shots should reset any open inline editors.
   useEffect(() => {
-    setEditing(false);
-    rootRef.current?.scrollIntoView({ block: "start" });
+    setEditingTitle(false);
+    setEditingBrief(false);
+    setTitleDraft(shot.title);
+    setTitleError("");
   }, [shot.id]);
 
   async function run(action: () => Promise<unknown>, fallback: string) {
@@ -121,8 +130,27 @@ export function ShotWorkspace({
   async function saveShot(draft: Omit<ShotDraft, "sceneId">) {
     await run(async () => {
       await updateShot(pageId, creationId, shot.id, draft);
-      setEditing(false);
+      setEditingTitle(false);
+      setEditingBrief(false);
     }, "Unable to save shot");
+  }
+
+  function saveTitle(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = titleDraft.trim();
+    if (!title) {
+      setTitleError("Shot title is required.");
+      return;
+    }
+    setTitleError("");
+    void saveShot({
+      title,
+      brief: shot.brief,
+      shotSize: shot.shotSize,
+      shotTypes: shot.shotTypes,
+      movement: shot.movement,
+      durationSeconds: shot.durationSeconds,
+    });
   }
 
   async function removeInvocation(item: CreationItem) {
@@ -148,7 +176,6 @@ export function ShotWorkspace({
 
   return (
     <section
-      ref={rootRef}
       className="shot-workspace"
       aria-label={`${formatShotLabel(location)} workspace`}
     >
@@ -168,6 +195,78 @@ export function ShotWorkspace({
             },
           ]}
         />
+        <header className="shot-workspace-header">
+          <div>
+            <p className="eyebrow">{formatShotLabel(location)}</p>
+            {editingTitle ? (
+              <form
+                className="shot-workspace-title-editor"
+                onSubmit={saveTitle}
+              >
+                <input
+                  aria-label="Shot title"
+                  aria-invalid={Boolean(titleError)}
+                  aria-describedby={titleError ? "shot-title-error" : undefined}
+                  value={titleDraft}
+                  maxLength={120}
+                  autoFocus
+                  onChange={(event) => {
+                    setTitleDraft(event.target.value);
+                    setTitleError("");
+                  }}
+                  required
+                />
+                <div className="shot-workspace-title-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={working || editingBrief}
+                    onClick={() => {
+                      setTitleDraft(shot.title);
+                      setTitleError("");
+                      setEditingTitle(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={working}
+                  >
+                    Save
+                  </button>
+                </div>
+                {titleError && (
+                  <p id="shot-title-error" className="error" role="alert">
+                    {titleError}
+                  </p>
+                )}
+              </form>
+            ) : (
+              <div className="shot-workspace-title-row">
+                <h2 className="app-page-title">{shot.title}</h2>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={working || editingTitle}
+                  onClick={() => {
+                    setTitleDraft(shot.title);
+                    setTitleError("");
+                    setEditingTitle(true);
+                  }}
+                >
+                  <Pencil size={14} aria-hidden="true" /> Edit title
+                </button>
+              </div>
+            )}
+            <span
+              className={`production-status status-${shot.status.toLowerCase()}`}
+            >
+              {STATUS_LABELS[shot.status]}
+            </span>
+          </div>
+        </header>
         <div className="shot-workspace-nav-actions">
           <button
             type="button"
@@ -212,45 +311,45 @@ export function ShotWorkspace({
           </div>
         </div>
       </div>
-      <header className="shot-workspace-header">
-        <div>
-          <p className="eyebrow">{formatShotLabel(location)}</p>
-          <h2 className="app-page-title">{shot.title}</h2>
-          <span
-            className={`production-status status-${shot.status.toLowerCase()}`}
-          >
-            {STATUS_LABELS[shot.status]}
-          </span>
-        </div>
-      </header>
 
-      {editing ? (
-        <ShotForm
-          initial={shot}
-          disabled={working}
-          onCancel={() => setEditing(false)}
-          onSave={(draft) => void saveShot(draft)}
-        />
-      ) : (
-        <div className="shot-workspace-brief">
+      <section
+        className="shot-workspace-brief"
+        aria-labelledby="shot-workspace-brief-title"
+      >
+        <div className="shot-workspace-brief-heading">
+          <h3 id="shot-workspace-brief-title">Shot brief</h3>
+          {!editingBrief && (
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={working}
+              onClick={() => setEditingBrief(true)}
+            >
+              <Pencil size={14} aria-hidden="true" /> Edit brief
+            </button>
+          )}
+        </div>
+        {editingBrief ? (
+          <ShotForm
+            initial={shot}
+            disabled={working}
+            mode="details"
+            onCancel={() => setEditingBrief(false)}
+            onSave={(draft) => void saveShot(draft)}
+          />
+        ) : (
+          <>
           {settings.length > 0 ? (
             <ul className="shot-workspace-settings">
               {settings.map((setting) => (
                 <li key={setting}>{setting}</li>
               ))}
             </ul>
-          ) : null}
-          <p>{shot.brief || "No brief yet."}</p>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={working}
-            onClick={() => setEditing(true)}
-          >
-            Edit shot
-          </button>
-        </div>
-      )}
+            ) : null}
+            <p>{shot.brief || "No brief yet."}</p>
+            </>
+        )}
+      </section>
 
       <div className="shot-workspace-tools">
         {TOOL_CARDS.map((card) => {

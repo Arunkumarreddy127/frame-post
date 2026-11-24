@@ -337,11 +337,13 @@ export function ShotForm({
   disabled,
   onCancel,
   onSave,
+  mode = "full",
 }: {
   initial?: Shot;
   disabled: boolean;
   onCancel: () => void;
   onSave: (draft: Omit<ShotDraft, "sceneId">) => void;
+  mode?: "full" | "details";
 }) {
   const [form, setForm] = useState<ShotFormState>(() => initialShotState(initial ?? null));
   const [error, setError] = useState("");
@@ -411,16 +413,18 @@ export function ShotForm({
 
   return (
     <form className="production-form production-shot-form" onSubmit={submit} aria-label={initial ? "Edit shot" : "New shot"}>
-      <label>
-        Title
-        <input
-          value={form.title}
-          maxLength={120}
-          onChange={(event) => patch({ title: event.target.value })}
-          required
-          autoFocus
-        />
-      </label>
+      {mode === "full" && (
+        <label>
+          Title
+          <input
+            value={form.title}
+            maxLength={120}
+            onChange={(event) => patch({ title: event.target.value })}
+            required
+            autoFocus
+          />
+        </label>
+      )}
       <label>
         Description
         <textarea
