@@ -31,7 +31,10 @@ public record WorkflowDefinition(
             Double max) {
     }
 
-    public record NodeMapping(String input, String nodeId, String fieldName) {
+    public record NodeMapping(String input, String nodeId, String fieldName, String fallbackInput) {
+        public NodeMapping(String input, String nodeId, String fieldName) {
+            this(input, nodeId, fieldName, null);
+        }
     }
 
     /**

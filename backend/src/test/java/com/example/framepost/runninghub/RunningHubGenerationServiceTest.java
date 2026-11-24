@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -37,6 +38,7 @@ import org.springframework.web.server.ResponseStatusException;
 class RunningHubGenerationServiceTest {
 
     private static final String MINIMAX = "minimax-h3-ff-image-to-video";
+    private static final String MINIMAX_BEST_ACTION = "minimax-h3-best-action-turbo-ref2v";
     private static final String OUTPUT_URL = "https://cdn.example/out.mp4";
 
     private final Map<String, RunningHubGeneration> rows = new ConcurrentHashMap<>();
@@ -47,7 +49,8 @@ class RunningHubGenerationServiceTest {
     private final User user = new User("user-1", "name", "hash", Instant.now());
 
     private final MockEnvironment env = new MockEnvironment()
-            .withProperty("RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF", "workflow-1");
+            .withProperty("RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF", "workflow-1")
+            .withProperty("RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_BEST_ACTION_TURBO_REF2V", "workflow-best-action");
     private final List<InputTransform> transforms = List.of(
             new SecondsToFramesTransform(), new AspectRatioDimensionsTransform());
 
@@ -90,6 +93,26 @@ class RunningHubGenerationServiceTest {
                 any(), eq(2L), eq("video/mp4"));
         verify(repository, timeout(2000)).save(argThat(saved ->
                 saved.status() == RunningHubGenerationStatus.COMPLETED && "video".equals(saved.resultType())));
+    }
+
+    @Test
+    void fillsUnprovidedOptionalReferenceSlotsWithTheRequiredImage() throws Exception {
+        stubRepository();
+        when(client.uploadFile(any(), any(), eq("frame.png"), eq("image/png"))).thenReturn("api/frame.png");
+        when(client.createTask(eq("workflow-best-action"), any(), any(), any())).thenReturn("task-best-action");
+        when(client.taskStatus("task-best-action")).thenReturn("FAILED");
+
+        service().start(user, null, MINIMAX_BEST_ACTION, Map.of(),
+                Map.of("environmentReference", png()), "default");
+
+        verify(client, timeout(2000)).createTask(eq("workflow-best-action"), argThat(nodes ->
+                nodes.contains(new NodeInfo("51", "image", "api/frame.png"))
+                        && nodes.contains(new NodeInfo("49", "image", "api/frame.png"))
+                        && nodes.contains(new NodeInfo("50", "image", "api/frame.png"))
+                        && nodes.contains(new NodeInfo("43", "image", "api/frame.png"))
+                        && nodes.contains(new NodeInfo("19", "image", "api/frame.png"))
+                        && nodes.contains(new NodeInfo("23", "image", "api/frame.png"))), any(), eq("default"));
+        verify(client, times(1)).uploadFile(any(), any(), eq("frame.png"), eq("image/png"));
     }
 
     @Test

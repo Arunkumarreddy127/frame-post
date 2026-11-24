@@ -17,18 +17,19 @@ Copy `.env.example` to `.env` and replace the R2 placeholders when needed. The d
 
 To enable chat, set `OPENAI_API_KEY` in `.env`. The backend sends all OpenAI requests; do not expose this key through `VITE_` variables or frontend code. The default `OPENAI_ALLOWED_MODELS` allowlist contains `gpt-6-luna`, `gpt-6.1-sol`, and `gpt-6-astra`; adjust it only when different models are available to the configured key.
 
-RunningHub workflows are defined in `backend/src/main/resources/runninghub/workflows/*.json`. Each file describes one workflow: its inputs, the RunningHub node and field each input is written to, any derived-value transforms, and the output type. The app loads and validates all definitions at startup and renders one page per workflow at `/create/rh/{workflowKey}` (or `/pages/{pageId}/create/rh/{workflowKey}`). The current workflows are `minimax-h3-ff-image-to-video`, `minimax-h3-single-image-reference`, `seedvr2-video-upscale`, and `qwen-image-2-1`.
+RunningHub workflows are defined in `backend/src/main/resources/runninghub/workflows/*.json`. Each file describes one workflow: its inputs, the RunningHub node and field each input is written to, any derived-value transforms, and the output type. The app loads and validates all definitions at startup and renders one page per workflow at `/create/rh/{workflowKey}` (or `/pages/{pageId}/create/rh/{workflowKey}`). The current workflows are `minimax-h3-ff-image-to-video`, `minimax-h3-single-image-reference`, `minimax-h3-best-action-turbo-ref2v`, `seedvr2-video-upscale`, and `qwen-image-2-1`.
 
 Workflow IDs are never stored in the definitions. Each definition names the env var that holds its ID in `workflowIdEnv`. Set `RUNNINGHUB_API_KEY` plus one ID per workflow in `.env`:
 
 - `RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_FF`
 - `RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_SINGLE_IMAGE_REFERENCE`
+- `RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_BEST_ACTION_TURBO_REF2V`
 - `RUNNINGHUB_WORKFLOW_ID_SEEDVR2`
 - `RUNNINGHUB_WORKFLOW_ID_QWEN_IMAGE_2_1`
 
 The workflow must already be saved on RunningHub. A workflow whose ID is missing is listed as not configured and its page reports it. Node IDs and field names are no longer read from env vars. **Breaking change:** the old `RUNNINGHUB_*_NODE_ID` and `RUNNINGHUB_*_FIELD_NAME` variables are ignored. Remove them from `.env`.
 
-Input types are `image`, `video`, `text`, `textarea`, `select`, and `number`. Files are uploaded to RunningHub and the returned file name is written to the mapped node. Other values are written as strings. Transforms derive values: `secondsToFrames` (seconds × fps) and `aspectRatioDimensions` (width and height from the longest side and aspect ratio, snapped to multiples of 32). Server-side validation uses the definition: required, `maxLength`, select options, accepted content types, and `maxBytes`.
+Input types are `image`, `video`, `text`, `textarea`, `select`, and `number`. Files are uploaded to RunningHub and the returned file name is written to the mapped node. An optional file mapping can set `fallbackInput` to reuse a required file input when its own input is empty; this is useful when a saved workflow has a statically connected file node that cannot be omitted from the request. Other values are written as strings. Transforms derive values: `secondsToFrames` (seconds × fps) and `aspectRatioDimensions` (width and height from the longest side and aspect ratio, snapped to multiples of 32). Server-side validation uses the definition: required, `maxLength`, select options, accepted content types, and `maxBytes`.
 
 To add a workflow, export it from RunningHub, copy the nodes' `nodeId` and `fieldName` values from its `*_api.json` export, and write a definition in the same format as the existing files. Then set its `workflowIdEnv` variable. No Java or frontend code changes are needed. Outputs are stored in R2 and metadata is kept in the shared `content_generations` MongoDB collection. Old `video_generations` records are not read by the app. If those records are needed, run the historical video migration below **before** the shared-content migration. It copies them to the legacy `runninghub_generations` collection, not the new runtime collection. Run from `backend/` with the intended environment exported. Add `--dry-run` to count without writing.
 

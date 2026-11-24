@@ -26,6 +26,7 @@ class WorkflowRegistryTest {
 
     private static final String MINIMAX = "minimax-h3-ff-image-to-video";
     private static final String MINIMAX_REFERENCE = "minimax-h3-single-image-reference";
+    private static final String MINIMAX_BEST_ACTION = "minimax-h3-best-action-turbo-ref2v";
     private static final String SEEDVR2 = "seedvr2-video-upscale";
     private static final String QWEN_IMAGE = "qwen-image-2-1";
 
@@ -33,6 +34,7 @@ class WorkflowRegistryTest {
     private static final Map<String, String> EXPORTS = Map.of(
             MINIMAX, "../resources/Minimax H3 - FF Image to Video_api.json",
             MINIMAX_REFERENCE, "../resources/Minimax H3 Single Image Reference_api.json",
+            MINIMAX_BEST_ACTION, "../resources/Minimax H3 Best Action Workflow turbo Ref2v 1.8mp_api-new.json",
             SEEDVR2, "../resources/SeedVR2 - Video Upscale_api.json",
             QWEN_IMAGE, "../resources/Qwen Image 2.1_ Image_api.json");
 
@@ -45,9 +47,10 @@ class WorkflowRegistryTest {
 
         assertTrue(registry.find(MINIMAX).isPresent());
         assertTrue(registry.find(MINIMAX_REFERENCE).isPresent());
+        assertTrue(registry.find(MINIMAX_BEST_ACTION).isPresent());
         assertTrue(registry.find(SEEDVR2).isPresent());
         assertTrue(registry.find(QWEN_IMAGE).isPresent());
-        assertEquals(4, registry.all().size());
+        assertEquals(5, registry.all().size());
     }
 
     @Test
@@ -67,6 +70,28 @@ class WorkflowRegistryTest {
         WorkflowRegistry registry = new WorkflowRegistry(transforms, new MockEnvironment());
 
         assertFalse(registry.workflowId(registry.find(SEEDVR2).orElseThrow()).isPresent());
+    }
+
+    @Test
+    void resolvesBestActionWorkflowIdFromEnvironment() throws IOException {
+        MockEnvironment env = new MockEnvironment()
+                .withProperty("RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_BEST_ACTION_TURBO_REF2V", "2125263141503508481");
+        WorkflowRegistry registry = new WorkflowRegistry(transforms, env);
+        WorkflowDefinition workflow = registry.find(MINIMAX_BEST_ACTION).orElseThrow();
+
+        assertEquals(Optional.of("2125263141503508481"), registry.workflowId(workflow));
+        assertEquals(11, workflow.inputs().size());
+        assertEquals(6, workflow.inputs().stream().filter(input -> "image".equals(input.type())).count());
+        assertTrue(workflow.inputs().stream()
+                .filter(input -> input.name().equals("environmentReference"))
+                .allMatch(WorkflowDefinition.InputDefinition::required));
+        assertTrue(workflow.inputs().stream()
+                .filter(input -> input.name().equals("girlReference")
+                        || input.name().equals("catReference")
+                        || input.name().equals("referenceImage4")
+                        || input.name().equals("referenceImage5")
+                        || input.name().equals("referenceImage6"))
+                .noneMatch(WorkflowDefinition.InputDefinition::required));
     }
 
     @Test

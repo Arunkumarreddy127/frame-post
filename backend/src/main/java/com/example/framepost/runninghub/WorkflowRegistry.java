@@ -128,6 +128,14 @@ public class WorkflowRegistry {
             require(inputs.containsKey(mapping.input()), where, "node mapping refers to unknown input " + mapping.input());
             require(!isBlank(mapping.nodeId()) && !isBlank(mapping.fieldName()), where,
                     "node mapping for " + mapping.input() + " needs nodeId and fieldName");
+            if (mapping.fallbackInput() != null) {
+                InputDefinition input = inputs.get(mapping.input());
+                InputDefinition fallback = inputs.get(mapping.fallbackInput());
+                require(fallback != null, where, "node mapping refers to unknown fallback input " + mapping.fallbackInput());
+                require(FILE_TYPES.contains(input.type()) && input.type().equals(fallback.type()), where,
+                        "fallback for " + mapping.input() + " must be a file input of the same type");
+                require(fallback.required(), where, "fallback input " + mapping.fallbackInput() + " must be required");
+            }
             used.add(mapping.input());
         }
 

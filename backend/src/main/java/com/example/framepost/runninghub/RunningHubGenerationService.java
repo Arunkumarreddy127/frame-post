@@ -240,15 +240,21 @@ public class RunningHubGenerationService {
             List<NodeInfo> allNodes = new ArrayList<>(nodes);
             Map<String, String> uploaded = new HashMap<>();
             for (NodeMapping mapping : definition.nodeMappings()) {
-                FileUpload upload = uploads.get(mapping.input());
+                String uploadInput = uploads.containsKey(mapping.input())
+                        ? mapping.input()
+                        : mapping.fallbackInput();
+                if (uploadInput == null) {
+                    continue;
+                }
+                FileUpload upload = uploads.get(uploadInput);
                 if (upload == null) {
                     continue;
                 }
-                if (!uploaded.containsKey(mapping.input())) {
-                    uploaded.put(mapping.input(),
+                if (!uploaded.containsKey(uploadInput)) {
+                    uploaded.put(uploadInput,
                             client.uploadFile(upload.fileType(), upload.bytes(), upload.filename(), upload.contentType()));
                 }
-                allNodes.add(new NodeInfo(mapping.nodeId(), mapping.fieldName(), uploaded.get(mapping.input())));
+                allNodes.add(new NodeInfo(mapping.nodeId(), mapping.fieldName(), uploaded.get(uploadInput)));
             }
             String taskId = client.createTask(workflowId, allNodes, webhookUrl(), initial.instanceType());
             repository.findById(id).ifPresent(generation -> repository.save(generation.withTaskId(taskId)));

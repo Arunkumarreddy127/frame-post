@@ -9,7 +9,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 60MB
-      max-request-size: 60MB
+      max-request-size: 125MB
   mongodb:
     uri: ${MONGODB_URI:mongodb://localhost:27017/framepost}
     database: ${MONGODB_DATABASE:framepost}

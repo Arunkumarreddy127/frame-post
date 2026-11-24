@@ -1,0 +1,173 @@
+{
+  "key": "minimax-h3-best-action-turbo-ref2v",
+  "label": "Minimax H3 - Best Action Turbo Ref2V",
+  "description": "Generate a video with up to six reference images and editable prompt, duration, aspect ratio, resolution, and seed.",
+  "group": "RH",
+  "tool": "VIDEO",
+  "workflowIdEnv": "RUNNINGHUB_WORKFLOW_ID_MINIMAX_H3_BEST_ACTION_TURBO_REF2V",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "textarea",
+      "label": "Prompt",
+      "required": true,
+      "maxLength": 7000,
+      "default": "subject_definitions:\n<Picture 1>: Background reference for the sunlit mid-level city side street. Retain its street layout, shopfronts, building shapes, perspective, and color atmosphere. It is an environment reference, not a required first frame.\n<Picture 2>: Character reference for the girl. Retain her face, hairstyle, outfit, body proportions, and shoulder bag consistently. If the sheet contains multiple views, use them as views of the same girl, not separate characters.\n<Picture 3>: Character reference for the ginger cat. Retain its orange coat, tabby markings, face, body proportions, and tail consistently. If the sheet contains multiple views, use them as views of the same cat, not separate characters.\n\nsummary: A 4-second, 16:9 cinematic anime-film shot at 24 fps. On the referenced warm, sunlit city side street, the ginger cat playfully dashes past and the girl notices and begins chasing it. One continuous wide shot, with natural, readable motion and a gentle camera follow.\n\nretention_analysis: Preserve the environment and perspective from <Picture 1>, and preserve the girl’s and cat’s distinct designs from <Picture 2> and <Picture 3>. Keep the girl and cat separate and recognizable; do not merge, duplicate, omit, or swap them. The background remains stable, with coherent scale, lighting, and contact shadows.\n\ndetailed_description: [Shot 1] One continuous 4-second wide shot on the street shown in <Picture 1>. The ginger cat from <Picture 3> darts from left to right across the foreground, tail raised, then briefly glances back while continuing to move. The girl from <Picture 2>, farther back near the shopfronts, notices the cat, smiles, and starts running after it. Her hair, clothes, and shoulder bag respond naturally to her movement. Gently track right with the cat and subtly pan to include the girl, keeping both readable in the frame. Warm afternoon light, soft shadows, detailed anime-film backgrounds, expressive but believable acting. End with the girl still in playful pursuit; she does not catch the cat.\n\noverall_soundscape: Soft city street ambience, light footsteps and cat pawsteps, with the girl giving a brief playful laugh. No dialogue.\n\nnon_diegetic_music: Gentle, playful cinematic instrumental music kept subtle beneath the scene.\n"
+    },
+    {
+      "name": "environmentReference",
+      "type": "image",
+      "label": "Environment reference (Picture 1)",
+      "required": true,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "girlReference",
+      "type": "image",
+      "label": "Girl reference (Picture 2)",
+      "required": false,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "catReference",
+      "type": "image",
+      "label": "Cat reference (Picture 3)",
+      "required": false,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "referenceImage4",
+      "type": "image",
+      "label": "Reference image 4",
+      "required": false,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "referenceImage5",
+      "type": "image",
+      "label": "Reference image 5",
+      "required": false,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "referenceImage6",
+      "type": "image",
+      "label": "Reference image 6",
+      "required": false,
+      "accept": ["image/png", "image/jpeg", "image/webp"],
+      "maxBytes": 20971520
+    },
+    {
+      "name": "duration",
+      "type": "select",
+      "label": "Duration (seconds)",
+      "default": "4",
+      "options": ["3", "4", "5", "6", "7", "8", "10", "12", "15"]
+    },
+    {
+      "name": "aspectRatio",
+      "type": "select",
+      "label": "Aspect ratio",
+      "default": "16:9 (Widescreen)",
+      "options": [
+        "1:1 (Square)",
+        "3:2 (Landscape)",
+        "2:3 (Portrait)",
+        "4:3 (Landscape)",
+        "3:4 (Portrait)",
+        "16:9 (Widescreen)",
+        "9:16 (Portrait Widescreen)",
+        "21:9 (Ultrawide)"
+      ]
+    },
+    {
+      "name": "megapixels",
+      "type": "number",
+      "label": "Megapixels",
+      "required": true,
+      "default": "1.8",
+      "min": 0.25,
+      "max": 4
+    },
+    {
+      "name": "seed",
+      "type": "number",
+      "label": "Seed",
+      "default": "133879187164081",
+      "min": 0
+    }
+  ],
+  "nodeMappings": [
+    {
+      "input": "prompt",
+      "nodeId": "263",
+      "fieldName": "text"
+    },
+    {
+      "input": "environmentReference",
+      "nodeId": "51",
+      "fieldName": "image"
+    },
+    {
+      "input": "girlReference",
+      "nodeId": "49",
+      "fieldName": "image",
+      "fallbackInput": "environmentReference"
+    },
+    {
+      "input": "catReference",
+      "nodeId": "50",
+      "fieldName": "image",
+      "fallbackInput": "environmentReference"
+    },
+    {
+      "input": "referenceImage4",
+      "nodeId": "43",
+      "fieldName": "image",
+      "fallbackInput": "environmentReference"
+    },
+    {
+      "input": "referenceImage5",
+      "nodeId": "19",
+      "fieldName": "image",
+      "fallbackInput": "environmentReference"
+    },
+    {
+      "input": "referenceImage6",
+      "nodeId": "23",
+      "fieldName": "image",
+      "fallbackInput": "environmentReference"
+    },
+    {
+      "input": "duration",
+      "nodeId": "259",
+      "fieldName": "value"
+    },
+    {
+      "input": "aspectRatio",
+      "nodeId": "252",
+      "fieldName": "aspect_ratio"
+    },
+    {
+      "input": "megapixels",
+      "nodeId": "252",
+      "fieldName": "megapixels"
+    },
+    {
+      "input": "seed",
+      "nodeId": "397",
+      "fieldName": "seed"
+    }
+  ],
+  "transforms": [],
+  "output": {
+    "type": "video",
+    "contentType": "video/mp4",
+    "extensions": ["mp4"]
+  }
+}
