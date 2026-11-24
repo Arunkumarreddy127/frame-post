@@ -10,15 +10,9 @@ import {
   createScene,
   createShot,
   deleteScene,
-  deleteShot,
   errorMessage,
-  moveCreationItem,
-  removeCreationItem,
   reorderScenes,
-  reorderShots,
-  setShotFinal,
   updateScene,
-  updateShot,
   type ShotDraft,
 } from "../../creationApi";
 import type { Confirm } from "../ConfirmDialog";
@@ -30,14 +24,13 @@ import {
   validateShotDuration,
 } from "../../shotOptions";
 import type {
-  CreationItem,
   CreationOutline,
   MediaItem,
   Scene,
   Shot,
   ShotStatus,
 } from "../../types";
-import { CreationThumb, toolLabel } from "./CreationThumb";
+import { CreationThumb } from "./CreationThumb";
 
 const SHOT_TYPE_LIMIT = 10;
 const CUSTOM = "__custom__";
@@ -60,9 +53,7 @@ type ProductionBoardProps = {
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
   onOpenMedia: (item: MediaItem) => void;
-  onAddExisting: (shotId: string) => void;
   onOpenScene: (sceneId: string) => void;
-  onOpenShot: (shotId: string) => void;
 };
 
 export function ProductionBoard({
@@ -74,9 +65,7 @@ export function ProductionBoard({
   onChanged,
   onError,
   onOpenMedia,
-  onAddExisting,
   onOpenScene,
-  onOpenShot,
 }: ProductionBoardProps) {
   const [working, setWorking] = useState(false);
   const [sceneEditor, setSceneEditor] = useState<
@@ -88,14 +77,6 @@ export function ProductionBoard({
   >(null);
   const disabled = busy || working;
 
-  const shotOrdinal = new Map<string, number>();
-  const sceneNumber = new Map<string, number>();
-  outline.scenes.forEach((scene, sceneIndex) => {
-    sceneNumber.set(scene.id, sceneIndex + 1);
-    scene.shots.forEach((shot, shotIndex) =>
-      shotOrdinal.set(shot.id, shotIndex + 1),
-    );
-  });
 
   async function run(action: () => Promise<unknown>, fallback: string) {
     setWorking(true);
@@ -127,27 +108,12 @@ export function ProductionBoard({
     );
   }
 
-  function moveShot(scene: Scene, shot: Shot, delta: number) {
-    const next = moveById(scene.shots, shot.id, delta);
-    if (!next) return;
-    void run(
-      () =>
-        reorderShots(
-          pageId,
-          creationId,
-          scene.id,
-          next.map((entry) => entry.id),
-        ),
-      "Unable to reorder shots",
-    );
-  }
-
   async function removeScene(scene: Scene) {
     const accepted = await confirm({
       title: "Delete scene?",
       message: `Delete "${scene.title}" and its ${scene.shots.length} ${
         scene.shots.length === 1 ? "shot" : "shots"
-      }? Their invocations move to Unassigned.`,
+      }? Their invocations stay in Assets.`,
       confirmLabel: "Delete scene",
       danger: true,
     });
@@ -155,20 +121,6 @@ export function ProductionBoard({
     void run(
       () => deleteScene(pageId, creationId, scene.id),
       "Unable to delete scene",
-    );
-  }
-
-  async function removeShot(shot: Shot) {
-    const accepted = await confirm({
-      title: "Delete shot?",
-      message: `Delete "${shot.title}"? Its invocations move to Unassigned.`,
-      confirmLabel: "Delete shot",
-      danger: true,
-    });
-    if (!accepted) return;
-    void run(
-      () => deleteShot(pageId, creationId, shot.id),
-      "Unable to delete shot",
     );
   }
 
@@ -192,15 +144,9 @@ export function ProductionBoard({
     setSceneEditor({ sceneId: scene?.id ?? null });
   }
 
-  const unassigned = outline.unassigned;
-
   return (
     <div className="production-board">
       <div className="production-toolbar">
-        <p className="creation-view-hint">
-          Scenes hold ordered shots. Each shot gathers the invocations made for it.
-          Generations that aren&apos;t assigned yet wait in Unassigned.
-        </p>
         <button
           type="button"
           className="primary-button"
@@ -219,12 +165,6 @@ export function ProductionBoard({
           onCancel={() => setSceneEditor(null)}
           disabled={disabled}
         />
-      )}
-
-      {outline.scenes.length === 0 && (
-        <div className="empty-state production-empty">
-          <p>No scenes yet. Add a scene, then add shots inside it.</p>
-        </div>
       )}
 
       {outline.scenes.map((scene, sceneIndex) => {
@@ -270,107 +210,33 @@ export function ProductionBoard({
           )}
 
           <ol className="production-shots">
-            {scene.shots.map((shot, shotIndex) => (
-              <li className="production-shot" key={shot.id}>
+            {scene.shots.map((shot, shotIndex) => {
+              const finalItem = shot.invocations.find(
+                (item) => item.id === shot.finalItemId,
+              );
+              return (
+                <li className="production-shot" key={shot.id}>
                 <div className="production-shot-header">
-                  <span className="creation-step-number">{shotIndex + 1}</span>
+                  <span className="eyebrow">
+                    Shot {String(shotIndex + 1).padStart(2, "0")}
+                  </span>
                   <div className="production-shot-title">
                     <strong>{shot.title}</strong>
-                    <span className={`production-status status-${shot.status.toLowerCase().replace(/_/g, "-")}`}>
-                      {STATUS_LABELS[shot.status]}
-                    </span>
-                  </div>
-                  <div className="creation-card-actions">
-                    <IconButton label="Move shot up" disabled={disabled || shotIndex === 0} onClick={() => moveShot(scene, shot, -1)}>
-                      <ChevronUp size={16} aria-hidden="true" />
-                    </IconButton>
-                    <IconButton label="Move shot down" disabled={disabled || shotIndex === scene.shots.length - 1} onClick={() => moveShot(scene, shot, 1)}>
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </IconButton>
-                    <IconButton label="Edit shot" disabled={disabled} onClick={() => setShotEditor({ sceneId: scene.id, shot })}>
-                      <Pencil size={16} aria-hidden="true" />
-                    </IconButton>
-                    <IconButton label="Delete shot" disabled={disabled} onClick={() => void removeShot(shot)}>
-                      <Trash2 size={16} aria-hidden="true" />
-                    </IconButton>
                   </div>
                 </div>
 
-                <ShotDetails shot={shot} />
-
-                {shotEditor?.shot?.id === shot.id && (
-                  <ShotForm
-                    key={shot.id}
-                    initial={shot}
-                    disabled={disabled}
-                    onCancel={() => setShotEditor(null)}
-                    onSave={(draft) => {
-                      setShotEditor(null);
-                      void run(
-                        () => updateShot(pageId, creationId, shot.id, draft),
-                        "Unable to save shot",
-                      );
-                    }}
-                  />
+                {finalItem && (
+                  <div className="production-shot-final">
+                    <CreationThumb
+                      generation={finalItem.generation}
+                      onOpen={onOpenMedia}
+                    />
+                  </div>
                 )}
 
-                <div className="production-invocations">
-                  {shot.invocations.length === 0 && (
-                    <p className="production-empty-line">No invocations yet.</p>
-                  )}
-                  {shot.invocations.map((item) => (
-                    <InvocationCard
-                      key={item.id}
-                      item={item}
-                      isFinal={shot.finalItemId === item.id}
-                      disabled={disabled}
-                      onOpen={onOpenMedia}
-                      onSetFinal={() =>
-                        void run(
-                          () =>
-                            setShotFinal(
-                              pageId,
-                              creationId,
-                              shot.id,
-                              shot.finalItemId === item.id ? null : item.id,
-                            ),
-                          "Unable to set final",
-                        )
-                      }
-                      onUnassign={() =>
-                        void run(
-                          () => moveCreationItem(pageId, creationId, item.id, null),
-                          "Unable to move invocation",
-                        )
-                      }
-                      onRemove={() =>
-                        void run(
-                          () => removeCreationItem(pageId, creationId, item.id),
-                          "Unable to remove invocation",
-                        )
-                      }
-                    />
-                  ))}
-                </div>
-                <div className="production-shot-footer">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => onOpenShot(shot.id)}
-                  >
-                    Open shot
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={disabled}
-                    onClick={() => onAddExisting(shot.id)}
-                  >
-                    Add existing
-                  </button>
-                </div>
               </li>
-            ))}
+              );
+            })}
           </ol>
 
           {addingShotHere && (
@@ -400,75 +266,6 @@ export function ProductionBoard({
         );
       })}
 
-      <section className="production-unassigned" aria-label="Unassigned invocations">
-        <h3>Unassigned</h3>
-        <p className="creation-view-hint">
-          Assign these invocations to a shot. Shot numbers follow scene order.
-        </p>
-        {unassigned.length === 0 ? (
-          <p className="production-empty-line">Nothing waiting. New generations land here.</p>
-        ) : (
-          <div className="production-unassigned-grid">
-            {unassigned.map((item) => (
-              <div className="production-unassigned-card" key={item.id}>
-                <CreationThumb generation={item.generation} onOpen={onOpenMedia} />
-                <div className="creation-card-body">
-                  <p className="creation-card-prompt">
-                    {item.generation.inputs.prompt || "No prompt"}
-                  </p>
-                  <small>{toolLabel(item.generation)}</small>
-                </div>
-                <label className="production-assign">
-                  Assign to shot
-                  <select
-                    value=""
-                    disabled={disabled || outline.scenes.every((scene) => scene.shots.length === 0)}
-                    onChange={(event) => {
-                      const shotId = event.target.value;
-                      if (!shotId) return;
-                      void run(
-                        () => moveCreationItem(pageId, creationId, item.id, shotId),
-                        "Unable to assign invocation",
-                      );
-                    }}
-                  >
-                    <option value="">Choose a shot</option>
-                    {outline.scenes.map((scene) =>
-                      scene.shots.length === 0 ? null : (
-                        <optgroup
-                          key={scene.id}
-                          label={`Scene ${String(sceneNumber.get(scene.id)).padStart(2, "0")} · ${scene.title}`}
-                        >
-                          {scene.shots.map((shot) => (
-                            <option key={shot.id} value={shot.id}>
-                              Shot {String(shotOrdinal.get(shot.id)).padStart(2, "0")} · {shot.title}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ),
-                    )}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  className="icon-button"
-                  aria-label="Remove invocation"
-                  title="Remove invocation"
-                  disabled={disabled}
-                  onClick={() =>
-                    void run(
-                      () => removeCreationItem(pageId, creationId, item.id),
-                      "Unable to remove invocation",
-                    )
-                  }
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }
@@ -532,72 +329,6 @@ export function SceneForm({
         </button>
       </div>
     </form>
-  );
-}
-
-function ShotDetails({ shot }: { shot: Shot }) {
-  const chips = [
-    shot.shotSize,
-    ...shot.shotTypes,
-    shot.movement,
-    shot.durationSeconds ? `${shot.durationSeconds}s` : null,
-  ].filter((chip): chip is string => Boolean(chip));
-  return (
-    <div className="production-shot-details">
-      {shot.brief && <p className="production-brief">{shot.brief}</p>}
-      {chips.length > 0 && (
-        <ul className="production-chips" aria-label="Shot options">
-          {chips.map((chip) => (
-            <li key={chip}>{chip}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function InvocationCard({
-  item,
-  isFinal,
-  disabled,
-  onOpen,
-  onSetFinal,
-  onUnassign,
-  onRemove,
-}: {
-  item: CreationItem;
-  isFinal: boolean;
-  disabled: boolean;
-  onOpen: (media: MediaItem) => void;
-  onSetFinal: () => void;
-  onUnassign: () => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className={`production-invocation${isFinal ? " is-final" : ""}`}>
-      <CreationThumb generation={item.generation} onOpen={onOpen} />
-      <small>
-        {item.tool ? `${item.tool.charAt(0)}${item.tool.slice(1).toLowerCase()} · ` : ""}
-        {toolLabel(item.generation)}
-      </small>
-      <div className="production-invocation-actions">
-        <button
-          type="button"
-          className="secondary-button"
-          aria-pressed={isFinal}
-          disabled={disabled}
-          onClick={onSetFinal}
-        >
-          {isFinal ? "Final" : "Set as final"}
-        </button>
-        <button type="button" className="secondary-button" disabled={disabled} onClick={onUnassign}>
-          Unassign
-        </button>
-        <IconButton label="Remove invocation" disabled={disabled} onClick={onRemove}>
-          <Trash2 size={14} aria-hidden="true" />
-        </IconButton>
-      </div>
-    </div>
   );
 }
 

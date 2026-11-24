@@ -17,21 +17,21 @@ Creation ─ Scene (position) ─ Shot (position) ─ Tool invocation (position,
 - `ContentGeneration` has `MediaType { IMAGE, VIDEO }`. Upscale is planned in `browser-video-upscaler-plan.md`.
 
 A **tool invocation is a `CreationItem` that gains `shotId` and `tool`**. This reuses the generation link, the one-per-creation uniqueness rule, `parentItemId` (an invocation continues the previous one, e.g. video from image) and the existing reorder logic. No new generation concept is needed.
-## Workspace levels
+## Workspace responsibilities
 
-Generation happens at three levels. Each level is a workspace with its own generate action:
+The workspaces separate asset generation from shot organization:
 
 | Level | Scope | Generate action |
 |---|---|---|
-| Creation | all scenes and shots, in order | "Generate creation": runs every missing step in the project |
-| Scene | the shots of one scene, in order | "Generate scene": runs every missing step in that scene |
-| Shot | one shot | Per-tool "Generate" cards (the existing shot workspace) |
+| Creation | creation-wide assets | Generate assets for the creation together |
+| Scene | organize the shots belonging to a scene | None |
+| Shot | one shot | Per-tool "Generate" cards for that shot |
 
-Adding structure at each level works the same way: the creation workspace lists scenes, the scene workspace lists shots, and the shot workspace lists tool cards.
+The creation detail opens on **Scenes & Shots** by default. This overview shows each shot's title and final media when set, keeping status, briefs, settings, and other generated invocations in the shot workspace. The creation workspace is the central place to generate and review assets. The scene workspace is for organizing shots; it does not generate assets. The shot workspace is where generations specific to an individual shot take place.
 
 **Why this needs backend work.** A batch of steps has to keep running after the browser closes, so it cannot be a frontend loop over the single-generation calls. The plan adds a backend run that uses the same services as the single-generation endpoints:
 
-- **`creation_generation_runs`** (new): `id`, `creationId`, `userId`, `scope` (`CREATION`/`SCENE`/`SHOT`), `scopeId`, `status` (`QUEUED`/`RUNNING`/`PAUSED`/`COMPLETED`/`FAILED`/`CANCELLED`), `steps` (ordered list), `createdAt`, `updatedAt`.
+- **`creation_generation_runs`** (new): `id`, `creationId`, `userId`, `scope` (`CREATION`/`SHOT`), `scopeId`, `status` (`QUEUED`/`RUNNING`/`PAUSED`/`COMPLETED`/`FAILED`/`CANCELLED`), `steps` (ordered list), `createdAt`, `updatedAt`.
 - **Step:** `shotId`, `tool`, `status` (`PENDING`/`RUNNING`/`COMPLETED`/`FAILED`/`SKIPPED`/`BLOCKED`), `generationId?`, `itemId?`, `error?`.
 - **Planning:** on start, the backend expands the scope into ordered steps: scenes by position, shots by position, and each shot's tools in the order of its plan.
 - **Skip rule:** a step is skipped when its shot already has a completed invocation for that tool. A "Regenerate" option resets a step to `PENDING` instead.
@@ -52,7 +52,7 @@ Adding structure at each level works the same way: the creation workspace lists 
 - `POST /creations/{id}/runs/{runId}/steps/{stepId}/retry` and `/skip`, and `POST /creations/{id}/runs/{runId}/cancel`.
 - Shot-level generation uses the same step execution code, so a single generation and a batch step behave the same way.
 
-**Frontend.** Each level gets a generate button and a progress strip (for example "Scene 01: 3 of 4 steps done, 1 failed"). A failed step shows a retry action. Batch generation is available from the creation and scene workspaces, while the shot workspace keeps its per-tool cards.
+**Frontend.** Creation-wide and shot-specific generation show progress and retry actions. The scene workspace remains focused on organizing shots and has no generation action.
 
 **Phase placement.** Shot-level generation stays in phase 3. Runs are a new phase after it (phase 3b), because they depend on the shot-level execution code and the derived shot status.
 
@@ -117,7 +117,7 @@ Shot fields (all optional, so a shot can be created with just a title):
 2. Restructure `CreationDetailPage` (split into `components/creations/*`):
    - Header: title, status pill, and Storyboard / Production / Preview tabs.
    - `SceneStrip`: scene cards with cover, "Scene 01", title, "N shots". Add, rename and reorder scenes.
-   - `ShotList`: shot rows with thumbnail, title, "shot size · movement · duration" (shot types appear as secondary chips in the workspace), status chip, "+ Add shot", and reorder.
+   - `ShotList`: compact shot rows with title, status, and only the selected final media preview; open a shot to see its brief, settings, and generated invocations. Support adding, editing, reordering, and opening shots.
    - `ShotSettings` (in the shot editor): Shot size and Movement as single-select popovers with grouped radio lists and a "Custom" text row; Shot types as a grouped multi-select with checkboxes (Camera height, Dutch angle, Framing, Focus / DOF) and a "Custom" row; Duration as a whole-seconds number input. Options come from `shotOptions.ts`.
    - `ShotWorkspace` (selected shot): brief card (editable), tool chips (Image, Video, Edit, Upscale, Chat), then an ordered invocation card per tool. Each card shows state (Not started, Processing, Completed, Failed), a preview, and a Generate / Regenerate action.
 3. Tool launch: a tool→route registry (Image → `/create/gpt-image-gen`, Video → `/create/rh/:workflowKey`, Edit → image page with the previous output attached, Upscale → upscaler, Chat → chat with shot context). Links carry `?creationId=&shotId=&tool=&parentItemId=`. The brief prefills the prompt, and the previous invocation's output is the default input. For Video, `durationSeconds` prefills the workflow's seconds input when it has one, and shot size, shot types and movement are offered as optional prompt text the user can insert, not appended silently.

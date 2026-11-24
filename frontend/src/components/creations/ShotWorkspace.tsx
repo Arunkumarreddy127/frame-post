@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Check, ChevronRight, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Trash2 } from "lucide-react";
 import {
   errorMessage,
   removeCreationItem,
@@ -9,6 +9,7 @@ import {
 } from "../../creationApi";
 import type { Confirm } from "../ConfirmDialog";
 import type { CreationItem, CreationTool, MediaItem } from "../../types";
+import { CreationBreadcrumbs } from "./CreationBreadcrumbs";
 import { CreationThumb, toolLabel } from "./CreationThumb";
 import { STATUS_LABELS, ShotForm } from "./ProductionBoard";
 import { formatShotLabel, type ShotLocation } from "./shotTarget";
@@ -54,13 +55,16 @@ const TOOL_CARDS: {
 type ShotWorkspaceProps = {
   pageId?: string;
   creationId: string;
+  creationName: string;
+  creationsPath: string;
   location: ShotLocation;
   confirm: Confirm;
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
   onOpenMedia: (item: MediaItem) => void;
-  onBack: () => void;
-  backLabel?: string;
+  onOpenCreation: () => void;
+  onOpenScenes: () => void;
+  onOpenScene: (sceneId: string) => void;
   onGenerate: (tool: CreationTool) => void;
   generator?: ReactNode;
   position: number;
@@ -73,13 +77,16 @@ type ShotWorkspaceProps = {
 export function ShotWorkspace({
   pageId,
   creationId,
+  creationName,
+  creationsPath,
   location,
   confirm,
   onChanged,
   onError,
   onOpenMedia,
-  onBack,
-  backLabel = "Production",
+  onOpenCreation,
+  onOpenScenes,
+  onOpenScene,
   onGenerate,
   generator,
   position,
@@ -145,51 +152,58 @@ export function ShotWorkspace({
       className="panel shot-workspace"
       aria-label={`${formatShotLabel(location)} workspace`}
     >
-      <nav className="shot-workspace-nav" aria-label="Shot navigation">
-        <ol className="shot-breadcrumb">
-          <li>
-            <button type="button" className="shot-breadcrumb-link" onClick={onBack}>
-              <ArrowLeft size={14} strokeWidth={1.8} aria-hidden="true" />
-              {backLabel}
-            </button>
-          </li>
-          <li>
-            <ChevronRight size={14} aria-hidden="true" />
-            <span>
-              Scene {String(location.sceneNumber).padStart(2, "0")} · {scene.title}
-            </span>
-          </li>
-          <li aria-current="page">
-            <ChevronRight size={14} aria-hidden="true" />
-            <span>Shot {String(location.shotNumber).padStart(2, "0")}</span>
-          </li>
-        </ol>
-        <div className="shot-stepper">
+      <div className="shot-workspace-nav">
+        <CreationBreadcrumbs
+          items={[
+            { label: "Creations", to: creationsPath },
+            { label: creationName, onSelect: onOpenCreation },
+            { label: "Scenes & Shots", onSelect: onOpenScenes },
+            {
+              label: `Scene ${String(location.sceneNumber).padStart(2, "0")} · ${scene.title}`,
+              onSelect: () => onOpenScene(scene.id),
+            },
+            {
+              label: `Shot ${String(location.shotNumber).padStart(2, "0")} · ${shot.title}`,
+              current: true,
+            },
+          ]}
+        />
+        <div className="shot-workspace-nav-actions">
           <button
             type="button"
-            className="secondary-button"
-            disabled={!previous}
-            title={previous ? `${formatShotLabel(previous)} · ${previous.shot.title}` : undefined}
-            onClick={() => previous && onOpenShot(previous.shot.id)}
+            className="secondary-button workspace-back-button"
+            onClick={() => onOpenScene(scene.id)}
           >
             <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-            Previous
+            Back to Shots List
           </button>
-          <span className="shot-stepper-position" aria-live="polite">
-            {position} of {total}
-          </span>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={!next}
-            title={next ? `${formatShotLabel(next)} · ${next.shot.title}` : undefined}
-            onClick={() => next && onOpenShot(next.shot.id)}
-          >
-            Next
-            <ArrowRight size={16} strokeWidth={1.8} aria-hidden="true" />
-          </button>
+          <div className="shot-stepper">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!previous}
+              title={previous ? `${formatShotLabel(previous)} · ${previous.shot.title}` : undefined}
+              onClick={() => previous && onOpenShot(previous.shot.id)}
+            >
+              <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+              Previous
+            </button>
+            <span className="shot-stepper-position" aria-live="polite">
+              {position} of {total}
+            </span>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!next}
+              title={next ? `${formatShotLabel(next)} · ${next.shot.title}` : undefined}
+              onClick={() => next && onOpenShot(next.shot.id)}
+            >
+              Next
+              <ArrowRight size={16} strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          </div>
         </div>
-      </nav>
+      </div>
       <header className="shot-workspace-header">
         <div>
           <p className="eyebrow">{formatShotLabel(location)}</p>

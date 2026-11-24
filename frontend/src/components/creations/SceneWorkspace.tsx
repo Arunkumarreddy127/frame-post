@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   ChevronDown,
-  ChevronRight,
   ChevronUp,
   Pencil,
   Plus,
@@ -11,14 +10,15 @@ import {
 } from "lucide-react";
 import {
   createShot,
-  deleteScene,
+  deleteShot,
   errorMessage,
   reorderShots,
   updateScene,
   type ShotDraft,
 } from "../../creationApi";
 import type { Confirm } from "../ConfirmDialog";
-import type { CreationTool, MediaItem, Shot } from "../../types";
+import type { MediaItem, Shot } from "../../types";
+import { CreationBreadcrumbs } from "./CreationBreadcrumbs";
 import { CreationThumb } from "./CreationThumb";
 import { STATUS_LABELS, SceneForm, ShotForm } from "./ProductionBoard";
 import type { SceneLocation } from "./sceneTarget";
@@ -27,44 +27,41 @@ import { shotCoverItem } from "./sceneTarget";
 type SceneWorkspaceProps = {
   pageId?: string;
   creationId: string;
+  creationName: string;
+  creationsPath: string;
   location: SceneLocation;
   confirm: Confirm;
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
   onOpenMedia: (item: MediaItem) => void;
-  onBack: () => void;
+  onOpenCreation: () => void;
+  onOpenScenes: () => void;
   position: number;
   total: number;
   previous: SceneLocation | null;
   next: SceneLocation | null;
   onOpenScene: (sceneId: string) => void;
   onOpenShot: (shotId: string) => void;
-  onGenerate: (tool: CreationTool) => void;
-  generator?: ReactNode;
 };
-
-const GENERATE_TOOLS: { tool: CreationTool; label: string }[] = [
-  { tool: "IMAGE", label: "image" },
-  { tool: "VIDEO", label: "video" },
-];
 
 export function SceneWorkspace({
   pageId,
   creationId,
+  creationName,
+  creationsPath,
   location,
   confirm,
   onChanged,
   onError,
   onOpenMedia,
-  onBack,
+  onOpenCreation,
+  onOpenScenes,
   position,
   total,
   previous,
   next,
   onOpenScene,
   onOpenShot,
-  onGenerate,
-  generator,
 }: SceneWorkspaceProps) {
   const { scene, sceneNumber } = location;
   const [renaming, setRenaming] = useState(false);
@@ -105,21 +102,18 @@ export function SceneWorkspace({
     );
   }
 
-  async function removeScene() {
-    const shotCount = scene.shots.length;
+  async function removeShot(shot: Shot) {
     const accepted = await confirm({
-      title: "Delete scene?",
-      message: `Delete "${scene.title}" and its ${shotCount} ${
-        shotCount === 1 ? "shot" : "shots"
-      }? Their invocations move to Unassigned.`,
-      confirmLabel: "Delete scene",
+      title: "Delete shot?",
+      message: `Delete "${shot.title}"? Its invocations stay in Assets.`,
+      confirmLabel: "Delete shot",
       danger: true,
     });
     if (!accepted) return;
-    void run(async () => {
-      await deleteScene(pageId, creationId, scene.id);
-      onBack();
-    }, "Unable to delete scene");
+    void run(
+      () => deleteShot(pageId, creationId, shot.id),
+      "Unable to delete shot",
+    );
   }
 
   function moveShot(shot: Shot, delta: number) {
@@ -148,47 +142,51 @@ export function SceneWorkspace({
       className="panel shot-workspace scene-workspace"
       aria-label={`${sceneLabel} workspace`}
     >
-      <nav className="shot-workspace-nav" aria-label="Scene navigation">
-        <ol className="shot-breadcrumb">
-          <li>
-            <button type="button" className="shot-breadcrumb-link" onClick={onBack}>
-              <ArrowLeft size={14} strokeWidth={1.8} aria-hidden="true" />
-              Production
-            </button>
-          </li>
-          <li aria-current="page">
-            <ChevronRight size={14} aria-hidden="true" />
-            <span>
-              {sceneLabel} · {scene.title}
-            </span>
-          </li>
-        </ol>
-        <div className="shot-stepper">
+      <div className="shot-workspace-nav">
+        <CreationBreadcrumbs
+          items={[
+            { label: "Creations", to: creationsPath },
+            { label: creationName, onSelect: onOpenCreation },
+            { label: "Scenes & Shots", onSelect: onOpenScenes },
+            { label: `${sceneLabel} · ${scene.title}`, current: true },
+          ]}
+        />
+        <div className="shot-workspace-nav-actions">
           <button
             type="button"
-            className="secondary-button"
-            disabled={!previous}
-            title={previous ? `Scene ${String(previous.sceneNumber).padStart(2, "0")} · ${previous.scene.title}` : undefined}
-            onClick={() => previous && onOpenScene(previous.scene.id)}
+            className="secondary-button workspace-back-button"
+            onClick={onOpenScenes}
           >
             <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
-            Previous
+            Back to Scenes
           </button>
-          <span className="shot-stepper-position" aria-live="polite">
-            {position} of {total}
-          </span>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={!next}
-            title={next ? `Scene ${String(next.sceneNumber).padStart(2, "0")} · ${next.scene.title}` : undefined}
-            onClick={() => next && onOpenScene(next.scene.id)}
-          >
-            Next
-            <ArrowRight size={16} strokeWidth={1.8} aria-hidden="true" />
-          </button>
+          <div className="shot-stepper">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!previous}
+              title={previous ? `Scene ${String(previous.sceneNumber).padStart(2, "0")} · ${previous.scene.title}` : undefined}
+              onClick={() => previous && onOpenScene(previous.scene.id)}
+            >
+              <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
+              Previous
+            </button>
+            <span className="shot-stepper-position" aria-live="polite">
+              {position} of {total}
+            </span>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!next}
+              title={next ? `Scene ${String(next.sceneNumber).padStart(2, "0")} · ${next.scene.title}` : undefined}
+              onClick={() => next && onOpenScene(next.scene.id)}
+            >
+              Next
+              <ArrowRight size={16} strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          </div>
         </div>
-      </nav>
+      </div>
 
       <header className="shot-workspace-header">
         <div>
@@ -210,14 +208,6 @@ export function SceneWorkspace({
           >
             <Pencil size={14} aria-hidden="true" /> Rename
           </button>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={working}
-            onClick={() => void removeScene()}
-          >
-            <Trash2 size={14} aria-hidden="true" /> Delete scene
-          </button>
         </div>
       </header>
 
@@ -230,23 +220,6 @@ export function SceneWorkspace({
           disabled={working}
         />
       )}
-
-      <section className="scene-generate" aria-label="Generate in scene">
-        <div className="scene-generate-buttons">
-          {GENERATE_TOOLS.map((card) => (
-            <button
-              key={card.tool}
-              type="button"
-              className="primary-button"
-              disabled={working}
-              onClick={() => onGenerate(card.tool)}
-            >
-              Generate {card.label}
-            </button>
-          ))}
-        </div>
-        {generator}
-      </section>
 
       {scene.outputs.length > 0 && (
         <section className="scene-outputs" aria-label="Scene outputs">
@@ -332,6 +305,16 @@ export function SceneWorkspace({
                       onClick={() => moveShot(shot, 1)}
                     >
                       <ChevronDown size={16} aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label="Delete shot"
+                      title="Delete shot"
+                      disabled={working}
+                      onClick={() => void removeShot(shot)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
                     </button>
                   </div>
                 </div>

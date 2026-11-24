@@ -5,25 +5,19 @@ import {
   type FormEvent,
 } from "react";
 import {
-  ChevronRight,
   Clock,
   Layers,
   Pencil,
-  Plus,
   Trash2,
 } from "lucide-react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { useConfirm } from "../components/ConfirmDialog";
 import { useFilesWorkspaceContext } from "../components/files/FilesWorkspaceProvider";
 import {
+  CreationThumb,
   toolLabel,
 } from "../components/creations/CreationThumb";
+import { CreationBreadcrumbs } from "../components/creations/CreationBreadcrumbs";
 import { ProductionBoard } from "../components/creations/ProductionBoard";
 import { SceneWorkspace } from "../components/creations/SceneWorkspace";
 import { ShotWorkspace } from "../components/creations/ShotWorkspace";
@@ -35,12 +29,12 @@ import { GptImageGenPage } from "./GptImageGenPage";
 import { RunningHubWorkflowPage } from "./RunningHubWorkflowPage";
 import {
   addCreationItem,
-  deleteCreation,
   errorMessage,
   getCreation,
   getOutline,
   listCreationItems,
   notifyCreationsChanged,
+  removeCreationItem,
   updateCreation,
 } from "../creationApi";
 import { getCatalog } from "../generationApi";
@@ -57,7 +51,7 @@ import type {
 import { ACTION_TOOLS, actionLabel } from "../creationTools";
 
 type CreationDetailPageProps = ShellRouteProps & { pageId?: string };
-type SortOrder = "latest" | "earliest" | "manual";
+type CreationTab = "assets" | "scenes";
 
 function optionsFor(tool: CreationTool, workflows: Workflow[]) {
   const options: { value: string; label: string }[] = [];
@@ -76,10 +70,8 @@ export function CreationDetailPage({
   pageId,
 }: CreationDetailPageProps) {
   const { creationId = "" } = useParams<{ creationId: string }>();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { closePageTab, setCreationTabLabel } = useFilesWorkspaceContext();
-  const { confirm, dialog: confirmDialog } = useConfirm();
+  const { setCreationTabLabel } = useFilesWorkspaceContext();
   const base = pageId ? `/pages/${pageId}` : "";
 
   const [creation, setCreation] = useState<Creation | null>(null);
@@ -87,7 +79,7 @@ export function CreationDetailPage({
   const [outline, setOutline] = useState<CreationOutline | null>(null);
   const shotParam = searchParams.get("shot");
   const sceneParam = searchParams.get("scene");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("latest");
+  const [tab, setTab] = useState<CreationTab>("scenes");
   const [viewing, setViewing] = useState<MediaItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -100,13 +92,11 @@ export function CreationDetailPage({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<CreationTool | null>(null);
   const [generatorShotId, setGeneratorShotId] = useState<string | null>(null);
-  const [generatorSceneId, setGeneratorSceneId] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState("");
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [toolsError, setToolsError] = useState("");
   const [pickerParent, setPickerParent] = useState("");
-  const [pickerShotId, setPickerShotId] = useState("");
 
   async function refresh() {
     const [next, list, nextOutline] = await Promise.all([
@@ -173,19 +163,9 @@ export function CreationDetailPage({
     if (creation) setCreationTabLabel(creationId, creation.name);
   }, [creation?.name, creationId, setCreationTabLabel]);
 
-  const displayedItems = useMemo(() => {
-    if (sortOrder === "manual") return items;
-    const direction = sortOrder === "latest" ? -1 : 1;
-    return [...items].sort((first, second) => {
-      const dateOrder =
-        (Date.parse(first.addedAt) - Date.parse(second.addedAt)) * direction;
-      return dateOrder || first.position - second.position;
-    });
-  }, [items, sortOrder]);
-
   const viewerItems = useMemo(
-    () => displayedItems.flatMap((item) => item.generation.outputs),
-    [displayedItems],
+    () => items.flatMap((item) => item.generation.outputs),
+    [items],
   );
   const mediaId = searchParams.get("media");
 
@@ -214,18 +194,16 @@ export function CreationDetailPage({
   const sceneLocation = outline && sceneParam ? findScene(outline, sceneParam) : null;
   const sceneNeighbours =
     outline && sceneLocation ? adjacentScenes(outline, sceneLocation.scene.id) : null;
+  const workspaceLabel = shotLocation
+    ? "Shot workspace"
+    : sceneLocation
+      ? "Scene workspace"
+      : "Creation workspace";
 
   function openShot(shotId: string) {
     closeGenerator();
     const next = new URLSearchParams(searchParams);
     next.set("shot", shotId);
-    setSearchParams(next);
-  }
-
-  function closeShot() {
-    closeGenerator();
-    const next = new URLSearchParams(searchParams);
-    next.delete("shot");
     setSearchParams(next);
   }
 
@@ -254,31 +232,28 @@ export function CreationDetailPage({
 
   function togglePicker() {
     setPickerOpen((open) => !open);
-    setPickerShotId("");
   }
 
   function openGenerator(
     tool: CreationTool,
-    target: { shotId?: string | null; sceneId?: string | null } = {},
+    target: { shotId?: string | null } = {},
   ) {
     const first = optionsFor(tool, workflows)[0];
     setActiveTool(tool);
     setGeneratorShotId(target.shotId ?? null);
-    setGeneratorSceneId(target.sceneId ?? null);
     setSelectedTool(first?.value ?? "");
   }
 
   function closeGenerator() {
     setActiveTool(null);
     setGeneratorShotId(null);
-    setGeneratorSceneId(null);
     setSelectedTool("");
   }
 
-  const toolCount = useMemo(
-    () => new Set(items.map((item) => toolLabel(item.generation))).size,
-    [items],
-  );
+  const sceneCount = outline?.scenes.length ?? 0;
+  const shotCount =
+    outline?.scenes.reduce((total, scene) => total + scene.shots.length, 0) ??
+    0;
   const hasCreateActions = ACTION_TOOLS.some(
     (tool) => optionsFor(tool, workflows).length > 0,
   );
@@ -300,9 +275,17 @@ export function CreationDetailPage({
     );
   }
 
-  function openShotPicker(shotId: string) {
-    setPickerShotId(shotId);
-    setPickerOpen(true);
+  async function removeAsset(itemId: string) {
+    setError("");
+    setBusy(true);
+    try {
+      await removeCreationItem(pageId, creationId, itemId);
+      await refresh();
+    } catch (requestError) {
+      setError(errorMessage(requestError, "Unable to remove asset"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function addSelectedMedia(media: MediaItem[]) {
@@ -314,13 +297,11 @@ export function CreationDetailPage({
       for (const generationId of generationIds) {
         await addCreationItem(pageId, creationId, {
           generationId,
-          shotId: pickerShotId || undefined,
-          parentItemId: pickerShotId ? undefined : pickerParent || undefined,
+          parentItemId: pickerParent || undefined,
         });
       }
       await refresh();
       setPickerOpen(false);
-      setPickerShotId("");
     } catch (requestError) {
       throw new Error(
         errorMessage(requestError, "Unable to add selected files"),
@@ -356,27 +337,6 @@ export function CreationDetailPage({
     } catch (requestError) {
       setError(errorMessage(requestError, "Unable to save creation"));
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeCreation() {
-    const accepted = await confirm({
-      title: `Delete “${creation?.name ?? "creation"}”?`,
-      message:
-        "The creation will be removed. Its generations and files are kept.",
-      confirmLabel: "Delete creation",
-      danger: true,
-    });
-    if (!accepted) return;
-    setBusy(true);
-    try {
-      await deleteCreation(pageId, creationId);
-      notifyCreationsChanged();
-      closePageTab(`creation:${pageId ?? "global"}:${creationId}`);
-      navigate(`${base}/creations`);
-    } catch (requestError) {
-      setError(errorMessage(requestError, "Unable to delete creation"));
       setBusy(false);
     }
   }
@@ -425,8 +385,7 @@ export function CreationDetailPage({
           embedded
           creationId={creationId}
           shotId={generatorShotId}
-          sceneId={generatorSceneId}
-          shotTool={generatorShotId || generatorSceneId ? activeTool : null}
+          shotTool={generatorShotId ? activeTool : null}
           onGenerationTriggered={closeGenerator}
           onCreationItemAdded={() => {
             void refresh().catch((requestError: unknown) =>
@@ -448,8 +407,7 @@ export function CreationDetailPage({
           embedded
           creationId={creationId}
           shotId={generatorShotId}
-          sceneId={generatorSceneId}
-          shotTool={generatorShotId || generatorSceneId ? activeTool : null}
+          shotTool={generatorShotId ? activeTool : null}
           onGenerationTriggered={closeGenerator}
           onCreationItemAdded={() => {
             void refresh().catch((requestError: unknown) =>
@@ -462,41 +420,109 @@ export function CreationDetailPage({
     </section>
   ) : null;
 
+  function selectTab(next: CreationTab) {
+    const params = new URLSearchParams(searchParams);
+    params.delete("scene");
+    params.delete("shot");
+    setSearchParams(params);
+    setTab(next);
+  }
+
+  const activeTab: CreationTab = shotLocation || sceneLocation ? "scenes" : tab;
+  const tabBar = (
+    <div className="creation-tabs" role="tablist" aria-label="Creation sections">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "assets"}
+        className={activeTab === "assets" ? "active" : ""}
+        onClick={() => selectTab("assets")}
+      >
+        Assets
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={activeTab === "scenes"}
+        className={activeTab === "scenes" ? "active" : ""}
+        onClick={() => selectTab("scenes")}
+      >
+        Scenes &amp; Shots
+      </button>
+    </div>
+  );
+
   const content = loading ? (
     <div className="page-list" aria-busy="true" aria-label="Loading creation">
       <div className="page-card skeleton-card" />
     </div>
   ) : !creation ? null : (
     <>
-      <nav className="creation-breadcrumb" aria-label="Breadcrumb">
-        <ol>
-          <li>
-            <Link to={`${base}/creations`}>Creations</Link>
-          </li>
-          <li aria-current="page">
-            <ChevronRight size={14} aria-hidden="true" />
-            <span>{creation.name}</span>
-          </li>
-        </ol>
-      </nav>
-
       <header className="creation-hero">
+        <CreationBreadcrumbs
+          items={[
+            { label: "Creations", to: `${base}/creations` },
+            { label: creation.name, current: true },
+          ]}
+        />
         <div className="creation-hero-main">
           <p className="creation-hero-eyebrow">
-            <Layers size={14} aria-hidden="true" /> Creation
+            <Layers size={14} aria-hidden="true" /> {workspaceLabel}
           </p>
-          <h2 className="creation-hero-title">{creation.name}</h2>
-          {creation.description && (
-            <p className="creation-hero-description">{creation.description}</p>
+          {editing ? (
+            <form
+              className="creation-inline-edit"
+              onSubmit={saveDetails}
+            >
+              <label>
+                Name
+                <input
+                  value={draftName}
+                  maxLength={120}
+                  onChange={(event) => setDraftName(event.target.value)}
+                  required
+                  autoFocus
+                />
+              </label>
+              <label>
+                Description
+                <textarea
+                  value={draftDescription}
+                  maxLength={2000}
+                  rows={2}
+                  onChange={(event) => setDraftDescription(event.target.value)}
+                />
+              </label>
+              <div className="creation-form-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setEditing(false)}
+                  disabled={busy}
+                >
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={busy}>
+                  Save
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <h2 className="creation-hero-title">{creation.name}</h2>
+              {creation.description && (
+                <p className="creation-hero-description">{creation.description}</p>
+              )}
+            </>
           )}
           <ul className="creation-stats" aria-label="Creation summary">
             <li>
-              <strong>{creation.itemCount}</strong>{" "}
-              {creation.itemCount === 1 ? "item" : "items"}
+              <strong>{sceneCount}</strong>{" "}
+              {sceneCount === 1 ? "scene" : "scenes"}
             </li>
             <li>
-              <strong>{toolCount}</strong>{" "}
-              {toolCount === 1 ? "tool" : "tools"}
+              <strong>{shotCount}</strong>{" "}
+              {shotCount === 1 ? "shot" : "shots"}
             </li>
             <li>
               <Clock size={13} aria-hidden="true" />
@@ -505,112 +531,24 @@ export function CreationDetailPage({
           </ul>
         </div>
         <div className="creation-header-actions">
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={startEditing}
-            disabled={busy}
-          >
-            <Pencil size={14} aria-hidden="true" /> Edit
-          </button>
-          <button
-            type="button"
-            className="secondary-button danger-button"
-            onClick={() => void removeCreation()}
-            disabled={busy}
-          >
-            <Trash2 size={14} aria-hidden="true" /> Delete
-          </button>
-        </div>
-      </header>
-
-      {editing && (
-        <form className="panel creation-form" onSubmit={saveDetails}>
-          <label>
-            Name
-            <input
-              value={draftName}
-              maxLength={120}
-              onChange={(event) => setDraftName(event.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              value={draftDescription}
-              maxLength={2000}
-              rows={2}
-              onChange={(event) => setDraftDescription(event.target.value)}
-            />
-          </label>
-          <div className="creation-form-actions">
+          {!editing && (
             <button
               type="button"
               className="secondary-button"
-              onClick={() => setEditing(false)}
+              onClick={startEditing}
+              disabled={busy}
             >
-              Cancel
+              <Pencil size={14} aria-hidden="true" /> Edit
             </button>
-            <button className="primary-button" type="submit" disabled={busy}>
-              Save
-            </button>
-          </div>
-        </form>
-      )}
+          )}
+        </div>
+      </header>
 
       {error && (
         <p className="error" role="alert">
           {error}
         </p>
       )}
-
-      <section className="creation-toolbar" aria-label="Creation controls">
-        <div className="creation-toolbar-row">
-          <div className="creation-toolbar-tools">
-            <label className="creation-sort-control">
-              Sort
-              <select
-                value={sortOrder}
-                onChange={(event) =>
-                  setSortOrder(event.target.value as SortOrder)
-                }
-              >
-                <option value="latest">Latest</option>
-                <option value="earliest">Earliest</option>
-                <option value="manual">Manual order</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={togglePicker}
-              aria-expanded={pickerOpen}
-            >
-              {pickerOpen ? "Close picker" : "Add existing"}
-            </button>
-          </div>
-        </div>
-        {hasCreateActions && (
-          <div className="creation-create-bar">
-            <span className="creation-create-label">
-              <Plus size={14} aria-hidden="true" /> New generation
-            </span>
-            <div className="creation-create-actions">
-              {renderActionButtons("primary-button")}
-            </div>
-          </div>
-        )}
-        <p className="creation-view-hint">
-          {sortOrder === "manual"
-            ? "Items are in manual order."
-            : `Sorted by date added, ${
-                sortOrder === "latest" ? "latest" : "earliest"
-              } first. Choose Manual order to reorder.`}
-        </p>
-      </section>
-
-      {!shotLocation && !sceneLocation && generatorPanel}
 
       {pickerOpen && (
         <LibraryPicker
@@ -623,11 +561,6 @@ export function CreationDetailPage({
           onSelect={addSelectedMedia}
           onClose={togglePicker}
           beforeGrid={
-            pickerShotId ? (
-              <p className="creation-view-hint">
-                Selected files are added to the shot you chose.
-              </p>
-            ) : (
             <div className="creation-picker-options">
               <label>
                 Follows
@@ -636,7 +569,7 @@ export function CreationDetailPage({
                   onChange={(event) => setPickerParent(event.target.value)}
                 >
                   <option value="">Nothing</option>
-                  {displayedItems.map((item) => (
+                  {items.map((item) => (
                     <option key={item.id} value={item.id}>
                       Step {item.position + 1}
                     </option>
@@ -645,11 +578,28 @@ export function CreationDetailPage({
                 <small>Places added items after this step.</small>
               </label>
             </div>
-            )
           }
         />
       )}
 
+      <div className="creation-tabs-shell">
+        {tabBar}
+        <div className="creation-tabs-body">
+          {!shotLocation && !sceneLocation && (
+            <CreationBreadcrumbs
+              items={[
+                { label: "Creations", to: `${base}/creations` },
+                {
+                  label: creation.name,
+                  onSelect: () => selectTab("scenes"),
+                },
+                {
+                  label: activeTab === "assets" ? "Assets" : "Scenes & Shots",
+                  current: true,
+                },
+              ]}
+            />
+          )}
       {shotLocation && shotNeighbours ? (
         <ShotWorkspace
           pageId={pageId}
@@ -659,8 +609,11 @@ export function CreationDetailPage({
           onChanged={refresh}
           onError={setError}
           onOpenMedia={openMedia}
-          onBack={closeShot}
-          backLabel={sceneLocation ? "Scene" : "Production"}
+          creationName={creation.name}
+          creationsPath={`${base}/creations`}
+          onOpenCreation={closeScene}
+          onOpenScenes={() => selectTab("scenes")}
+          onOpenScene={openScene}
           onGenerate={(tool) => openGenerator(tool, { shotId: shotLocation.shot.id })}
           generator={generatorPanel}
           position={shotNeighbours.position}
@@ -678,50 +631,99 @@ export function CreationDetailPage({
           onChanged={refresh}
           onError={setError}
           onOpenMedia={openMedia}
-          onBack={closeScene}
+          creationName={creation.name}
+          creationsPath={`${base}/creations`}
+          onOpenCreation={closeScene}
+          onOpenScenes={() => selectTab("scenes")}
           position={sceneNeighbours.position}
           total={sceneNeighbours.total}
           previous={sceneNeighbours.previous}
           next={sceneNeighbours.next}
           onOpenScene={openScene}
           onOpenShot={openShot}
-          onGenerate={(tool) => openGenerator(tool, { sceneId: sceneLocation.scene.id })}
-          generator={generatorPanel}
         />
-      ) : outline ? (
-        <ProductionBoard
-          pageId={pageId}
-          creationId={creationId}
-          outline={outline}
-          busy={busy}
-          confirm={confirm}
-          onChanged={refresh}
-          onError={setError}
-          onOpenMedia={openMedia}
-          onOpenScene={openScene}
-          onOpenShot={openShot}
-          onAddExisting={openShotPicker}
-        />
-      ) : items.length === 0 ? (
-        <div className="empty-state creation-empty">
-          <span className="creation-empty-icon" aria-hidden="true">
-            <Layers size={22} />
-          </span>
-          <h3>Nothing here yet</h3>
-          <p>Create something new or add files you already have.</p>
+      ) : tab === "scenes" && outline ? (
+            <ProductionBoard
+              pageId={pageId}
+              creationId={creationId}
+              outline={outline}
+              busy={busy}
+              confirm={confirm}
+              onChanged={refresh}
+              onError={setError}
+              onOpenMedia={openMedia}
+              onOpenScene={openScene}
+            />
+          ) : tab === "assets" ? (
+            <>
+              {items.length > 0 && (
+                <section className="creation-toolbar" aria-label="Creation controls">
+                  <div className="creation-toolbar-row">
+                    <div className="creation-toolbar-tools">
+                      {hasCreateActions && renderActionButtons("primary-button")}
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={togglePicker}
+                        aria-expanded={pickerOpen}
+                      >
+                        {pickerOpen ? "Close picker" : "Add existing"}
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              )}
 
-          <div className="creation-empty-actions">
-            {renderActionButtons("primary-button")}
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={togglePicker}
-            >
-              Add existing
-            </button>
-          </div>
+              {generatorPanel}
+
+              {items.length > 0 ? (
+                <div className="creation-assets-grid">
+                  {items.map((item) => (
+                    <div className="creation-asset-card" key={item.id}>
+                      <CreationThumb generation={item.generation} onOpen={openMedia} />
+                      <div className="creation-card-body">
+                        <p className="creation-card-prompt">
+                          {item.generation.inputs.prompt || "No prompt"}
+                        </p>
+                        <small>{toolLabel(item.generation)}</small>
+                      </div>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label="Remove asset"
+                        title="Remove asset"
+                        disabled={busy}
+                        onClick={() => void removeAsset(item.id)}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state creation-empty">
+                  <span className="creation-empty-icon" aria-hidden="true">
+                    <Layers size={22} />
+                  </span>
+                  <h3>Nothing here yet</h3>
+                  <p>Create something new or add files you already have.</p>
+
+                  <div className="creation-empty-actions">
+                    {renderActionButtons("primary-button")}
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={togglePicker}
+                    >
+                      Add existing
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
-      ) : null}
+      </div>
 
     </>
   );
@@ -742,13 +744,12 @@ export function CreationDetailPage({
       ) : (
         content
       )}
-      {confirmDialog}
       {viewing && (
         <MediaViewer
           item={viewing}
           items={viewerItems}
           alt={
-            displayedItems
+            items
               .map((entry) => entry.generation)
               .find((generation) =>
                 generation.outputs.some((output) => output.id === viewing.id),
