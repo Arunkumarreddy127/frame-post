@@ -14,7 +14,7 @@ import { LibraryPicker } from "../components/library/LibraryPicker";
 import { GenerationFeed } from "../components/generations/GenerationFeed";
 import { getCatalog, getGeneration, startWorkflowGeneration } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
-import { addCreationItem, errorMessage } from "../creationApi";
+import { errorMessage } from "../creationApi";
 import {
   CreationTargetBanner,
   creationQuery,
@@ -49,7 +49,6 @@ type RunningHubWorkflowPageProps = ShellRouteProps & {
   shotTool?: CreationTool | null;
   onGenerationTriggered?: () => void;
   onCreationItemAdded?: () => void;
-  onCreationItemError?: (message: string) => void;
 };
 
 const INSTANCE_TYPES: { value: InstanceType; label: string }[] = [
@@ -98,7 +97,6 @@ export function RunningHubWorkflowPage({
   shotTool: shotToolProp,
   onGenerationTriggered,
   onCreationItemAdded,
-  onCreationItemError,
 }: RunningHubWorkflowPageProps) {
   const { pageId: routePageId, workflowKey: routeWorkflowKey = "" } = useParams<{
     pageId?: string;
@@ -322,26 +320,16 @@ export function RunningHubWorkflowPage({
           libraryKeys,
           instanceType,
         },
+        {
+          creationId,
+          shotId,
+          sceneId,
+          tool: shotId || sceneId ? toolForWorkflow(workflow) : undefined,
+        },
       );
       prepend(created);
       onGenerationTriggered?.();
-      if (creationId && activePageId) {
-        try {
-          await addCreationItem(activePageId, creationId, {
-            generationId: created.id,
-            ...(shotId
-              ? { shotId, tool: toolForWorkflow(workflow) }
-              : sceneId
-                ? { sceneId, tool: toolForWorkflow(workflow) }
-                : {}),
-          });
-          onCreationItemAdded?.();
-        } catch (attachError) {
-          const message = `Started, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`;
-          if (onCreationItemError) onCreationItemError(message);
-          else setError(message);
-        }
-      }
+      if (creationId) onCreationItemAdded?.();
       fileInputs.forEach((input) => {
         setFile(input, null);
         setLibraryFile(input, null);

@@ -31,6 +31,8 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import com.example.framepost.auth.AuthService;
 import com.example.framepost.auth.User;
 import com.example.framepost.config.R2Properties;
+import com.example.framepost.creation.CreationService;
+import com.example.framepost.creation.CreationService.AddItemRequest;
 import com.example.framepost.generation.GenerationService.Catalog;
 import com.example.framepost.generation.GenerationService.ImageRequest;
 import com.example.framepost.storage.StorageKeys;
@@ -48,6 +50,7 @@ public class GenerationController {
     private static final Logger log = LoggerFactory.getLogger(GenerationController.class);
 
     private final GenerationService service;
+    private final CreationService creations;
     private final GenerationEvents events;
     private final AuthService authService;
     private final S3Client s3Client;
@@ -55,12 +58,14 @@ public class GenerationController {
 
     public GenerationController(
             GenerationService service,
+            CreationService creations,
             GenerationEvents events,
             AuthService authService,
             S3Client s3Client,
             R2Properties r2Properties
     ) {
         this.service = service;
+        this.creations = creations;
         this.events = events;
         this.authService = authService;
         this.s3Client = s3Client;
@@ -159,13 +164,20 @@ public class GenerationController {
                 fields.put(name, values[0]);
             }
         });
+        String targetCreationId = fields.remove("targetCreationId");
+        String targetShotId = fields.remove("targetShotId");
+        String targetSceneId = fields.remove("targetSceneId");
+        String targetTool = fields.remove("targetTool");
         String provider = fields.remove("provider");
         if ("openai".equalsIgnoreCase(provider)) {
             GenerationResponse created = service.createImage(user, pageId, new ImageRequest(
                     fields.get("prompt"), fields.get("model"), fields.get("size"), fields.get("quality"),
                     count(fields.get("count")), request.getFiles("attachments"),
                     values(request, "attachmentKeys"),
-                    fields.get("parentGenerationId"), fields.get("parentResultKey")));
+                    fields.get("parentGenerationId"), fields.get("parentResultKey")),
+                    generationId -> attachToCreation(
+                            user, pageId, generationId, targetCreationId,
+                            targetShotId, targetSceneId, targetTool));
             return ResponseEntity.status(HttpStatus.CREATED).body(created);
         }
         if ("runninghub".equalsIgnoreCase(provider)) {
@@ -185,9 +197,41 @@ public class GenerationController {
             });
             GenerationResponse started = service.startWorkflow(
                     user, pageId, workflowKey, fields, files, libraryKeys, instanceType);
+            attachToCreation(
+                    user, pageId, started.id(), targetCreationId,
+                    targetShotId, targetSceneId, targetTool);
             return ResponseEntity.status(HttpStatus.ACCEPTED).body(started);
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "provider must be openai or runninghub");
+    }
+
+    private void attachToCreation(
+            User user,
+            String pageId,
+            String generationId,
+            String creationId,
+            String shotId,
+            String sceneId,
+            String tool
+    ) {
+        boolean hasPlacement = isPresent(shotId) || isPresent(sceneId) || isPresent(tool);
+        if (!isPresent(creationId)) {
+            if (hasPlacement) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "targetCreationId is required for a creation placement");
+            }
+            return;
+        }
+        if (isPresent(shotId) && isPresent(sceneId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "A generation cannot target both a shot and a scene");
+        }
+        creations.addItem(user, pageId, creationId,
+                new AddItemRequest(generationId, null, shotId, sceneId, tool));
+    }
+
+    private static boolean isPresent(String value) {
+        return value != null && !value.isBlank();
     }
 
     @DeleteMapping({"/generations/{id}", "/pages/{pageId}/generations/{id}"})

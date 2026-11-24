@@ -18,7 +18,6 @@ import {
   getGeneration,
 } from "../generationApi";
 import { useGenerationPages } from "../hooks/useGenerationPages";
-import { addCreationItem, errorMessage } from "../creationApi";
 import {
   CreationTargetBanner,
   creationQuery,
@@ -38,7 +37,6 @@ type GptImageGenPageProps = ShellRouteProps & {
   shotTool?: CreationTool | null;
   onGenerationTriggered?: () => void;
   onCreationItemAdded?: () => void;
-  onCreationItemError?: (message: string) => void;
 };
 
 const FALLBACK_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare"];
@@ -73,7 +71,6 @@ export function GptImageGenPage({
   shotTool: shotToolProp,
   onGenerationTriggered,
   onCreationItemAdded,
-  onCreationItemError,
 }: GptImageGenPageProps) {
   const { pageId: routePageId } = useParams<{ pageId?: string }>();
   const [searchParams] = useSearchParams();
@@ -310,26 +307,15 @@ export function GptImageGenPage({
     setGenerating(true);
     setError("");
     try {
-      const generation = await createImageGeneration(input, activePageId);
+      const generation = await createImageGeneration(input, activePageId, {
+        creationId,
+        shotId,
+        sceneId,
+        tool: shotId || sceneId ? "IMAGE" : undefined,
+      });
       prepend(generation);
       onGenerationTriggered?.();
-      if (creationId) {
-        try {
-          await addCreationItem(activePageId, creationId, {
-            generationId: generation.id,
-            ...(shotId
-              ? { shotId, tool: "IMAGE" as const }
-              : sceneId
-                ? { sceneId, tool: "IMAGE" as const }
-                : {}),
-          });
-          onCreationItemAdded?.();
-        } catch (attachError) {
-          const message = `Generated, but it was not added to the creation: ${errorMessage(attachError, "unknown error")}`;
-          if (onCreationItemError) onCreationItemError(message);
-          else setError(message);
-        }
-      }
+      if (creationId) onCreationItemAdded?.();
     } catch (requestError) {
       // Give the user their work back unless they have already started a new prompt.
       if (!(promptInput.current?.value ?? "").trim()) {

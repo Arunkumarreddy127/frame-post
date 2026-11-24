@@ -4,6 +4,7 @@ import {
   getOutline,
   listCreations,
   moveCreationItem,
+  updateShot,
 } from "./creationApi";
 
 afterEach(() => {
@@ -81,5 +82,31 @@ describe("creationApi", () => {
     });
 
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/api\/creations\/creation-1\/outline$/);
+  });
+
+  it("includes the shot scene when updating shot details", async () => {
+    const fetchMock = stubFetch({});
+
+    await updateShot("page-1", "creation-1", "shot-1", {
+      sceneId: "scene-1",
+      title: "Shot",
+      brief: "Updated brief",
+      shotSize: null,
+      shotTypes: [],
+      movement: null,
+      durationSeconds: null,
+    });
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(init.body as string)).toEqual({
+      sceneId: "scene-1",
+      title: "Shot",
+      brief: "Updated brief",
+      shotSize: null,
+      shotTypes: [],
+      movement: null,
+      durationSeconds: null,
+    });
   });
 });

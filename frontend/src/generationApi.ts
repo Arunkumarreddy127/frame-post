@@ -6,6 +6,7 @@ import type {
   InstanceType,
   MediaItem,
   Paged,
+  CreationTool,
 } from "./types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -105,9 +106,32 @@ export type CreateImageInput = {
   parentResultKey?: string;
 };
 
-export function createImageGeneration(input: CreateImageInput, pageId?: string) {
+export type GenerationCreationTarget = {
+  creationId?: string | null;
+  shotId?: string | null;
+  sceneId?: string | null;
+  tool?: CreationTool | null;
+};
+
+function appendCreationTarget(
+  form: FormData,
+  target?: GenerationCreationTarget,
+) {
+  if (!target?.creationId) return;
+  form.append("targetCreationId", target.creationId);
+  if (target.shotId) form.append("targetShotId", target.shotId);
+  if (target.sceneId) form.append("targetSceneId", target.sceneId);
+  if (target.tool) form.append("targetTool", target.tool);
+}
+
+export function createImageGeneration(
+  input: CreateImageInput,
+  pageId?: string,
+  target?: GenerationCreationTarget,
+) {
   const form = new FormData();
   form.append("provider", "openai");
+  appendCreationTarget(form, target);
   form.append("prompt", input.prompt);
   form.append("model", input.model);
   form.append("size", input.size);
@@ -138,9 +162,11 @@ export function startWorkflowGeneration(
   pageId: string,
   workflowKey: string,
   input: StartWorkflowInput,
+  target?: GenerationCreationTarget,
 ) {
   const form = new FormData();
   form.append("provider", "runninghub");
+  appendCreationTarget(form, target);
   form.append("workflowKey", workflowKey);
   form.append("instanceType", input.instanceType);
   Object.entries(input.values).forEach(([name, value]) =>

@@ -8,8 +8,10 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import com.example.framepost.auth.User;
@@ -129,6 +131,25 @@ public class ImageGenerationService {
             String parentGenerationId,
             String parentResultKey
     ) {
+        return generate(user, pageId, prompt, model, size, quality, count, attachments, libraryFiles,
+                parentGenerationId, parentResultKey, ignored -> {});
+    }
+
+    public ImageGenerationResponse generate(
+            User user,
+            String pageId,
+            String prompt,
+            String model,
+            String size,
+            String quality,
+            int count,
+            List<MultipartFile> attachments,
+            List<LibraryFile> libraryFiles,
+            String parentGenerationId,
+            String parentResultKey,
+            Consumer<String> onPersisted
+    ) {
+        Objects.requireNonNull(onPersisted, "onPersisted");
         validateScope(user, pageId);
         validateParent(user, pageId, parentGenerationId, parentResultKey);
         String cleanPrompt = prompt == null ? "" : prompt.trim();
@@ -196,6 +217,7 @@ public class ImageGenerationService {
             repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                     inputKeys, List.of(), ImageGenerationStatus.FAILED, exception.getMessage(), now,
                     parentGenerationId, parentResultKey, Map.of()));
+            onPersisted.accept(id);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, exception.getMessage());
         } catch (RuntimeException exception) {
             storedKeys.forEach(this::deleteQuietly);
@@ -206,11 +228,13 @@ public class ImageGenerationService {
             repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                     List.of(), List.of(), ImageGenerationStatus.FAILED, "Unable to store the generated images", now,
                     parentGenerationId, parentResultKey, Map.of()));
+            onPersisted.accept(id);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to store the generated images");
         }
         ImageGeneration saved = repository.save(record(id, user, pageId, cleanPrompt, model, size, quality, count,
                 inputKeys, results, ImageGenerationStatus.COMPLETED, null, now,
                 parentGenerationId, parentResultKey, metadata));
+        onPersisted.accept(id);
         return ImageGenerationResponse.from(saved, storage::publicUrl);
     }
 

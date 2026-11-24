@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.framepost.auth.User;
 import com.example.framepost.config.ImageProperties;
@@ -49,6 +50,28 @@ class ImageGenerationServiceTest {
         assertEquals(2, saved.getValue().results().size());
         assertEquals(ImageGenerationStatus.COMPLETED, saved.getValue().status());
         assertEquals("outputs/name-user-1/" + response.id() + "/output-1.png", response.results().get(0).key());
+    }
+
+    @Test
+    void reportsPersistedFailedGenerationBeforeReturningTimeoutError() {
+        when(repository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(client.generate(any(), any()))
+                .thenThrow(new OpenAiImageClient.ImageRequestException("Request timeout"));
+        AtomicReference<String> persistedId = new AtomicReference<>();
+
+        assertThrows(ResponseStatusException.class, () -> service.generate(
+                user, null, "a cat", "gpt-image-2.5-flare", "auto", "auto", 1,
+                null, List.of(), null, null, id -> {
+                    verify(repository).save(org.mockito.ArgumentMatchers.argThat(
+                            generation -> id.equals(generation.id())
+                                    && generation.status() == ImageGenerationStatus.FAILED));
+                    persistedId.set(id);
+                }));
+
+        ArgumentCaptor<ImageGeneration> failed = ArgumentCaptor.forClass(ImageGeneration.class);
+        verify(repository).save(failed.capture());
+        assertEquals("Request timeout", failed.getValue().error());
+        assertEquals(failed.getValue().id(), persistedId.get());
     }
 
     @Test

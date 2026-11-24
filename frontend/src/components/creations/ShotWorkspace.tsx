@@ -71,6 +71,7 @@ type ShotWorkspaceProps = {
   onOpenScenes: () => void;
   onOpenScene: (sceneId: string) => void;
   onGenerate: (tool: CreationTool) => void;
+  onAddExisting: (tool: CreationTool) => void;
   generator?: ReactNode;
   position: number;
   total: number;
@@ -93,6 +94,7 @@ export function ShotWorkspace({
   onOpenScenes,
   onOpenScene,
   onGenerate,
+  onAddExisting,
   generator,
   position,
   total,
@@ -129,7 +131,10 @@ export function ShotWorkspace({
 
   async function saveShot(draft: Omit<ShotDraft, "sceneId">) {
     await run(async () => {
-      await updateShot(pageId, creationId, shot.id, draft);
+      await updateShot(pageId, creationId, shot.id, {
+        ...draft,
+        sceneId: shot.sceneId,
+      });
       setEditingTitle(false);
       setEditingBrief(false);
     }, "Unable to save shot");
@@ -420,13 +425,22 @@ export function ShotWorkspace({
                 </ul>
               )}
               {card.generatable ? (
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => onGenerate(card.tool)}
-                >
-                  Generate {card.label.toLowerCase()}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => onGenerate(card.tool)}
+                  >
+                    Generate {card.label.toLowerCase()}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => onAddExisting(card.tool)}
+                  >
+                    Add existing
+                  </button>
+                </>
               ) : (
                 <button type="button" className="secondary-button" disabled>
                   Coming soon

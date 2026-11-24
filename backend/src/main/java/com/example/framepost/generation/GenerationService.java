@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -131,10 +132,19 @@ public class GenerationService {
     }
 
     public GenerationResponse createImage(User user, String pageId, ImageRequest request) {
+        return createImage(user, pageId, request, ignored -> {});
+    }
+
+    public GenerationResponse createImage(
+            User user,
+            String pageId,
+            ImageRequest request,
+            Consumer<String> onPersisted
+    ) {
         List<LibraryFile> library = libraryFiles.resolve(user, pageId, request.attachmentKeys());
         String id = imageService.generate(user, pageId, request.prompt(), request.model(), request.size(),
                 request.quality(), request.count(), request.attachments(), library, request.parentGenerationId(),
-                request.parentResultKey()).id();
+                request.parentResultKey(), onPersisted).id();
         return get(user, pageId, id);
     }
 

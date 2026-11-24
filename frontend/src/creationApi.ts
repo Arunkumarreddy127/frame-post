@@ -168,7 +168,7 @@ export function updateShot(
   pageId: string | undefined,
   id: string,
   shotId: string,
-  draft: Omit<ShotDraft, "sceneId">,
+  draft: ShotDraft,
 ) {
   return request<void>(
     scoped(pageId, `/creations/${id}/shots/${shotId}`),

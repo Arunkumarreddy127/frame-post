@@ -52,6 +52,11 @@ import { ACTION_TOOLS, actionLabel } from "../creationTools";
 
 type CreationDetailPageProps = ShellRouteProps & { pageId?: string };
 type CreationTab = "assets" | "scenes";
+type PickerTarget = {
+  shotId?: string;
+  tool?: CreationTool;
+  accept: string[];
+};
 
 function optionsFor(tool: CreationTool, workflows: Workflow[]) {
   const options: { value: string; label: string }[] = [];
@@ -89,7 +94,8 @@ export function CreationDetailPage({
   const [draftName, setDraftName] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
 
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
+  const pickerOpen = pickerTarget !== null;
   const [activeTool, setActiveTool] = useState<CreationTool | null>(null);
   const [generatorShotId, setGeneratorShotId] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState("");
@@ -231,7 +237,17 @@ export function CreationDetailPage({
   }
 
   function togglePicker() {
-    setPickerOpen((open) => !open);
+    setPickerTarget((current) =>
+      current ? null : { accept: ["image/*", "video/*"] },
+    );
+  }
+
+  function openShotPicker(shotId: string, tool: CreationTool) {
+    setPickerTarget({
+      shotId,
+      tool,
+      accept: [tool === "VIDEO" ? "video/*" : "image/*"],
+    });
   }
 
   function openGenerator(
@@ -295,13 +311,16 @@ export function CreationDetailPage({
     setBusy(true);
     try {
       for (const generationId of generationIds) {
+        const placement = pickerTarget?.shotId
+          ? { shotId: pickerTarget.shotId, tool: pickerTarget.tool }
+          : { parentItemId: pickerParent || undefined };
         await addCreationItem(pageId, creationId, {
           generationId,
-          parentItemId: pickerParent || undefined,
+          ...placement,
         });
       }
       await refresh();
-      setPickerOpen(false);
+      setPickerTarget(null);
     } catch (requestError) {
       throw new Error(
         errorMessage(requestError, "Unable to add selected files"),
@@ -392,9 +411,6 @@ export function CreationDetailPage({
               setError(errorMessage(requestError, "Unable to refresh creation")),
             );
           }}
-          onCreationItemError={(message) => {
-            setError(message);
-          }}
         />
       )}
       {selectedTool.startsWith("rh:") && (
@@ -414,7 +430,6 @@ export function CreationDetailPage({
               setError(errorMessage(requestError, "Unable to refresh creation")),
             );
           }}
-          onCreationItemError={(message) => setError(message)}
         />
       )}
     </section>
@@ -553,7 +568,7 @@ export function CreationDetailPage({
       {pickerOpen && (
         <LibraryPicker
           pageId={pageId}
-          accept={["image/*", "video/*"]}
+          accept={pickerTarget.accept}
           limit={24}
           excludeGenerationIds={new Set(items.map((item) => item.generation.id))}
           title="Add existing files"
@@ -561,6 +576,7 @@ export function CreationDetailPage({
           onSelect={addSelectedMedia}
           onClose={togglePicker}
           beforeGrid={
+            !pickerTarget.shotId && (
             <div className="creation-picker-options">
               <label>
                 Follows
@@ -578,6 +594,7 @@ export function CreationDetailPage({
                 <small>Places added items after this step.</small>
               </label>
             </div>
+            )
           }
         />
       )}
@@ -615,6 +632,7 @@ export function CreationDetailPage({
           onOpenScenes={() => selectTab("scenes")}
           onOpenScene={openScene}
           onGenerate={(tool) => openGenerator(tool, { shotId: shotLocation.shot.id })}
+          onAddExisting={(tool) => openShotPicker(shotLocation.shot.id, tool)}
           generator={generatorPanel}
           position={shotNeighbours.position}
           total={shotNeighbours.total}
