@@ -149,7 +149,7 @@ export function ShotWorkspace({
   return (
     <section
       ref={rootRef}
-      className="panel shot-workspace"
+      className="shot-workspace"
       aria-label={`${formatShotLabel(location)} workspace`}
     >
       <div className="shot-workspace-nav">
@@ -182,7 +182,11 @@ export function ShotWorkspace({
               type="button"
               className="secondary-button"
               disabled={!previous}
-              title={previous ? `${formatShotLabel(previous)} · ${previous.shot.title}` : undefined}
+              title={
+                previous
+                  ? `${formatShotLabel(previous)} · ${previous.shot.title}`
+                  : undefined
+              }
               onClick={() => previous && onOpenShot(previous.shot.id)}
             >
               <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -195,7 +199,11 @@ export function ShotWorkspace({
               type="button"
               className="secondary-button"
               disabled={!next}
-              title={next ? `${formatShotLabel(next)} · ${next.shot.title}` : undefined}
+              title={
+                next
+                  ? `${formatShotLabel(next)} · ${next.shot.title}`
+                  : undefined
+              }
               onClick={() => next && onOpenShot(next.shot.id)}
             >
               Next
@@ -208,7 +216,9 @@ export function ShotWorkspace({
         <div>
           <p className="eyebrow">{formatShotLabel(location)}</p>
           <h2 className="app-page-title">{shot.title}</h2>
-          <span className={`production-status status-${shot.status.toLowerCase()}`}>
+          <span
+            className={`production-status status-${shot.status.toLowerCase()}`}
+          >
             {STATUS_LABELS[shot.status]}
           </span>
         </div>
@@ -244,7 +254,9 @@ export function ShotWorkspace({
 
       <div className="shot-workspace-tools">
         {TOOL_CARDS.map((card) => {
-          const outputs = shot.invocations.filter((item) => item.tool === card.tool);
+          const outputs = shot.invocations.filter(
+            (item) => item.tool === card.tool,
+          );
           return (
             <article className="shot-tool-card" key={card.tool}>
               <header>
@@ -252,14 +264,19 @@ export function ShotWorkspace({
                 <p>{card.description}</p>
               </header>
               {outputs.length === 0 ? (
-                <p className="creation-view-hint">No {card.label.toLowerCase()} outputs yet.</p>
+                <p className="creation-view-hint">
+                  No {card.label.toLowerCase()} outputs yet.
+                </p>
               ) : (
                 <ul className="shot-tool-outputs">
                   {outputs.map((item) => {
                     const isFinal = shot.finalItemId === item.id;
                     return (
                       <li className="shot-output" key={item.id}>
-                        <CreationThumb generation={item.generation} onOpen={onOpenMedia} />
+                        <CreationThumb
+                          generation={item.generation}
+                          onOpen={onOpenMedia}
+                        />
                         <div className="shot-output-meta">
                           <span>{toolLabel(item.generation)}</span>
                           {isFinal ? (

@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import {
   createScene,
-  createShot,
   deleteScene,
   errorMessage,
   reorderScenes,
@@ -72,9 +71,6 @@ export function ProductionBoard({
     { sceneId: string | null } | null
   >(null);
   const [sceneTitle, setSceneTitle] = useState("");
-  const [shotEditor, setShotEditor] = useState<
-    { sceneId: string; shot: Shot | null } | null
-  >(null);
   const disabled = busy || working;
 
 
@@ -168,8 +164,6 @@ export function ProductionBoard({
       )}
 
       {outline.scenes.map((scene, sceneIndex) => {
-        const addingShotHere =
-          shotEditor?.sceneId === scene.id && shotEditor.shot === null;
         return (
         <section className="production-scene" key={scene.id} aria-label={`Scene ${sceneIndex + 1}: ${scene.title}`}>
           <header className="production-scene-header">
@@ -238,30 +232,6 @@ export function ProductionBoard({
               );
             })}
           </ol>
-
-          {addingShotHere && (
-            <ShotForm
-              disabled={disabled}
-              onCancel={() => setShotEditor(null)}
-              onSave={(draft) => {
-                setShotEditor(null);
-                void run(
-                  () => createShot(pageId, creationId, { ...draft, sceneId: scene.id }),
-                  "Unable to add shot",
-                );
-              }}
-            />
-          )}
-          {!addingShotHere && (
-            <button
-              type="button"
-              className="secondary-button production-add-shot"
-              disabled={disabled}
-              onClick={() => setShotEditor({ sceneId: scene.id, shot: null })}
-            >
-              <Plus size={14} aria-hidden="true" /> Add shot
-            </button>
-          )}
         </section>
         );
       })}

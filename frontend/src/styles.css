@@ -4815,6 +4815,10 @@ h2 {
   justify-content: space-between;
 }
 
+.production-toolbar {
+  justify-content: flex-end;
+}
+
 .production-scene {
   display: grid;
   gap: 0.75rem;

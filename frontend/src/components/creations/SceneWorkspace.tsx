@@ -70,7 +70,9 @@ export function SceneWorkspace({
   const [working, setWorking] = useState(false);
   const rootRef = useRef<HTMLElement>(null);
   const sceneLabel = `Scene ${String(sceneNumber).padStart(2, "0")}`;
-  const finalCount = scene.shots.filter((shot) => shot.status === "FINAL").length;
+  const finalCount = scene.shots.filter(
+    (shot) => shot.status === "FINAL",
+  ).length;
 
   // Moving between scenes should land at the top of the new scene and drop any open form.
   useEffect(() => {
@@ -97,7 +99,11 @@ export function SceneWorkspace({
     if (!title) return;
     setRenaming(false);
     void run(
-      () => updateScene(pageId, creationId, scene.id, { title, description: scene.description }),
+      () =>
+        updateScene(pageId, creationId, scene.id, {
+          title,
+          description: scene.description,
+        }),
       "Unable to save scene",
     );
   }
@@ -139,7 +145,7 @@ export function SceneWorkspace({
   return (
     <section
       ref={rootRef}
-      className="panel shot-workspace scene-workspace"
+      className="shot-workspace scene-workspace"
       aria-label={`${sceneLabel} workspace`}
     >
       <div className="shot-workspace-nav">
@@ -165,7 +171,11 @@ export function SceneWorkspace({
               type="button"
               className="secondary-button"
               disabled={!previous}
-              title={previous ? `Scene ${String(previous.sceneNumber).padStart(2, "0")} · ${previous.scene.title}` : undefined}
+              title={
+                previous
+                  ? `Scene ${String(previous.sceneNumber).padStart(2, "0")} · ${previous.scene.title}`
+                  : undefined
+              }
               onClick={() => previous && onOpenScene(previous.scene.id)}
             >
               <ArrowLeft size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -178,7 +188,11 @@ export function SceneWorkspace({
               type="button"
               className="secondary-button"
               disabled={!next}
-              title={next ? `Scene ${String(next.sceneNumber).padStart(2, "0")} · ${next.scene.title}` : undefined}
+              title={
+                next
+                  ? `Scene ${String(next.sceneNumber).padStart(2, "0")} · ${next.scene.title}`
+                  : undefined
+              }
               onClick={() => next && onOpenScene(next.scene.id)}
             >
               Next
@@ -193,7 +207,8 @@ export function SceneWorkspace({
           <p className="eyebrow">{sceneLabel}</p>
           <h2 className="app-page-title">{scene.title}</h2>
           <small>
-            {scene.shots.length} {scene.shots.length === 1 ? "shot" : "shots"} · {finalCount} final
+            {scene.shots.length} {scene.shots.length === 1 ? "shot" : "shots"} ·{" "}
+            {finalCount} final
           </small>
         </div>
         <div className="scene-workspace-actions">
@@ -227,7 +242,10 @@ export function SceneWorkspace({
           <ul className="scene-output-list">
             {scene.outputs.map((item) => (
               <li key={item.id}>
-                <CreationThumb generation={item.generation} onOpen={onOpenMedia} />
+                <CreationThumb
+                  generation={item.generation}
+                  onOpen={onOpenMedia}
+                />
               </li>
             ))}
           </ul>
@@ -253,12 +271,17 @@ export function SceneWorkspace({
             return (
               <li className="scene-shot-card" key={shot.id}>
                 {cover ? (
-                  <CreationThumb generation={cover.generation} onOpen={onOpenMedia} />
+                  <CreationThumb
+                    generation={cover.generation}
+                    onOpen={onOpenMedia}
+                  />
                 ) : (
                   <div className="scene-shot-empty">No output yet</div>
                 )}
                 <div className="scene-shot-body">
-                  <p className="eyebrow">Shot {String(shotIndex + 1).padStart(2, "0")}</p>
+                  <p className="eyebrow">
+                    Shot {String(shotIndex + 1).padStart(2, "0")}
+                  </p>
                   <strong>{shot.title}</strong>
                   <span
                     className={`production-status status-${shot.status.toLowerCase().replace(/_/g, "-")}`}
@@ -274,7 +297,9 @@ export function SceneWorkspace({
                   )}
                   <small>
                     {shot.invocations.length}{" "}
-                    {shot.invocations.length === 1 ? "invocation" : "invocations"}
+                    {shot.invocations.length === 1
+                      ? "invocation"
+                      : "invocations"}
                   </small>
                 </div>
                 <div className="scene-shot-actions">
