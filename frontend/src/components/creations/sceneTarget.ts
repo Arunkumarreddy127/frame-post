@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { getOutline } from "../../creationApi";
-import type { CreationOutline, CreationItem, Scene, Shot } from "../../types";
+import type {
+  CreationOutline,
+  CreationItem,
+  MediaItem,
+  Scene,
+  Shot,
+} from "../../types";
 
 export type SceneLocation = {
   scene: Scene;
@@ -73,4 +79,17 @@ export function shotCoverItem(shot: Shot): CreationItem | null {
     if (item.generation.outputs.length > 0) return item;
   }
   return null;
+}
+
+export function sceneFinalVideoItems(scene: Scene): MediaItem[] {
+  return scene.shots.flatMap((shot) => {
+    const final = shot.invocations.find((item) => item.id === shot.finalItemId);
+    return final?.generation.outputs.filter(
+      (output) => output.mediaType === "video",
+    ) ?? [];
+  });
+}
+
+export function outlineFinalVideoItems(outline: CreationOutline): MediaItem[] {
+  return outline.scenes.flatMap(sceneFinalVideoItems);
 }

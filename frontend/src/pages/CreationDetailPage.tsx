@@ -22,7 +22,12 @@ import { ProductionBoard } from "../components/creations/ProductionBoard";
 import { SceneWorkspace } from "../components/creations/SceneWorkspace";
 import { ShotWorkspace } from "../components/creations/ShotWorkspace";
 import { adjacentShots, findShot } from "../components/creations/shotTarget";
-import { adjacentScenes, findScene } from "../components/creations/sceneTarget";
+import {
+  adjacentScenes,
+  findScene,
+  outlineFinalVideoItems,
+  sceneFinalVideoItems,
+} from "../components/creations/sceneTarget";
 import { LibraryPicker } from "../components/library/LibraryPicker";
 import { MediaViewer } from "../components/media/MediaViewer";
 import { GptImageGenPage } from "./GptImageGenPage";
@@ -200,6 +205,15 @@ export function CreationDetailPage({
   const sceneLocation = outline && sceneParam ? findScene(outline, sceneParam) : null;
   const sceneNeighbours =
     outline && sceneLocation ? adjacentScenes(outline, sceneLocation.scene.id) : null;
+  const finalVideosInView = sceneLocation
+    ? sceneFinalVideoItems(sceneLocation.scene)
+    : !shotLocation && tab === "scenes" && outline
+      ? outlineFinalVideoItems(outline)
+      : [];
+  const viewerNavigationItems =
+    viewing && finalVideosInView.some((item) => item.id === viewing.id)
+      ? finalVideosInView
+      : viewerItems;
   const workspaceLabel = shotLocation
     ? "Shot workspace"
     : sceneLocation
@@ -671,6 +685,7 @@ export function CreationDetailPage({
               onError={setError}
               onOpenMedia={openMedia}
               onOpenScene={openScene}
+              onOpenShot={openShot}
             />
           ) : tab === "assets" ? (
             <>
@@ -765,7 +780,7 @@ export function CreationDetailPage({
       {viewing && (
         <MediaViewer
           item={viewing}
-          items={viewerItems}
+          items={viewerNavigationItems}
           alt={
             items
               .map((entry) => entry.generation)

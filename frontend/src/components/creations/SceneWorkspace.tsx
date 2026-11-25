@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -68,17 +68,15 @@ export function SceneWorkspace({
   const [addingShot, setAddingShot] = useState(false);
   const [sceneTitle, setSceneTitle] = useState("");
   const [working, setWorking] = useState(false);
-  const rootRef = useRef<HTMLElement>(null);
   const sceneLabel = `Scene ${String(sceneNumber).padStart(2, "0")}`;
   const finalCount = scene.shots.filter(
     (shot) => shot.status === "FINAL",
   ).length;
 
-  // Moving between scenes should land at the top of the new scene and drop any open form.
+  // Moving between scenes should drop any open form.
   useEffect(() => {
     setRenaming(false);
     setAddingShot(false);
-    rootRef.current?.scrollIntoView({ block: "start" });
   }, [scene.id]);
 
   async function run(action: () => Promise<unknown>, fallback: string) {
@@ -144,7 +142,6 @@ export function SceneWorkspace({
 
   return (
     <section
-      ref={rootRef}
       className="shot-workspace scene-workspace"
       aria-label={`${sceneLabel} workspace`}
     >

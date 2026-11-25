@@ -215,7 +215,13 @@ export function MediaViewer({
       <div className="media-viewer" onMouseDown={(event) => event.stopPropagation()}>
         <div className="media-viewer-stage">
           {item.mediaType === "video" ? (
-            <video src={item.url} controls playsInline preload="metadata" />
+            <video
+              src={item.url}
+              controls
+              playsInline
+              preload="metadata"
+              autoPlay
+            />
           ) : (
             <img src={item.url} alt={alt ?? prompt ?? item.name} />
           )}

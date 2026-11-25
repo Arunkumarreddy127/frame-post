@@ -4816,7 +4816,7 @@ h2 {
 }
 
 .production-toolbar {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .production-scene {
@@ -4855,6 +4855,25 @@ h2 {
 .production-shot-title {
   margin: 0;
   font-weight: 600;
+}
+
+.production-shot-number {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.production-shot-number:hover {
+  text-decoration: underline;
+}
+
+.production-shot-number:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .production-shot-final .creation-thumb {

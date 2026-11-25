@@ -53,6 +53,7 @@ type ProductionBoardProps = {
   onError: (message: string) => void;
   onOpenMedia: (item: MediaItem) => void;
   onOpenScene: (sceneId: string) => void;
+  onOpenShot: (shotId: string) => void;
 };
 
 export function ProductionBoard({
@@ -65,6 +66,7 @@ export function ProductionBoard({
   onError,
   onOpenMedia,
   onOpenScene,
+  onOpenShot,
 }: ProductionBoardProps) {
   const [working, setWorking] = useState(false);
   const [sceneEditor, setSceneEditor] = useState<
@@ -142,27 +144,6 @@ export function ProductionBoard({
 
   return (
     <div className="production-board">
-      <div className="production-toolbar">
-        <button
-          type="button"
-          className="primary-button"
-          disabled={disabled}
-          onClick={() => openSceneEditor(null)}
-        >
-          <Plus size={14} aria-hidden="true" /> Add scene
-        </button>
-      </div>
-
-      {sceneEditor && !sceneEditor.sceneId && (
-        <SceneForm
-          title={sceneTitle}
-          onTitle={setSceneTitle}
-          onSubmit={saveScene}
-          onCancel={() => setSceneEditor(null)}
-          disabled={disabled}
-        />
-      )}
-
       {outline.scenes.map((scene, sceneIndex) => {
         return (
         <section className="production-scene" key={scene.id} aria-label={`Scene ${sceneIndex + 1}: ${scene.title}`}>
@@ -211,9 +192,14 @@ export function ProductionBoard({
               return (
                 <li className="production-shot" key={shot.id}>
                 <div className="production-shot-header">
-                  <span className="eyebrow">
+                  <button
+                    type="button"
+                    className="eyebrow production-shot-number"
+                    aria-label={`Open Shot ${String(shotIndex + 1).padStart(2, "0")}: ${shot.title}`}
+                    onClick={() => onOpenShot(shot.id)}
+                  >
                     Shot {String(shotIndex + 1).padStart(2, "0")}
-                  </span>
+                  </button>
                   <div className="production-shot-title">
                     <strong>{shot.title}</strong>
                   </div>
@@ -236,6 +222,26 @@ export function ProductionBoard({
         );
       })}
 
+      <div className="production-toolbar">
+        <button
+          type="button"
+          className="primary-button"
+          disabled={disabled}
+          onClick={() => openSceneEditor(null)}
+        >
+          <Plus size={14} aria-hidden="true" /> Add scene
+        </button>
+      </div>
+
+      {sceneEditor && !sceneEditor.sceneId && (
+        <SceneForm
+          title={sceneTitle}
+          onTitle={setSceneTitle}
+          onSubmit={saveScene}
+          onCancel={() => setSceneEditor(null)}
+          disabled={disabled}
+        />
+      )}
     </div>
   );
 }
